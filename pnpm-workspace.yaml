@@ -1,0 +1,5 @@
+packages:
+  - 'petclaw-desktop'
+  - 'petclaw-web'
+  - 'petclaw-api'
+  - 'petclaw-shared'

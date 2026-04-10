@@ -1,0 +1,15 @@
+out/
+dist/
+node_modules/
+*.node
+prebuilds/
+.env
+.env.local
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+coverage/
+.nyc_output
+*.tsbuildinfo
+.vite/

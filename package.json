@@ -1,0 +1,25 @@
+{
+  "name": "petclaw",
+  "private": true,
+  "scripts": {
+    "dev:desktop": "pnpm --filter petclaw-desktop dev",
+    "build:desktop": "pnpm --filter petclaw-desktop build",
+    "test": "pnpm -r test",
+    "test:desktop": "pnpm --filter petclaw-desktop test",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "petclaw-desktop/**/*.{ts,tsx}": [
+      "pnpm --filter petclaw-desktop exec prettier --write",
+      "pnpm --filter petclaw-desktop exec eslint --fix"
+    ]
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.0.0",
+    "@commitlint/config-conventional": "^19.0.0",
+    "husky": "^9.0.0",
+    "lint-staged": "^15.0.0"
+  }
+}
