@@ -1,8 +1,14 @@
-import { app, BrowserWindow, shell, ipcMain } from 'electron'
+import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
+import Database from 'better-sqlite3'
+import { initDatabase } from './data/db'
+import { OpencLawProvider } from './ai/openclaw'
+import { registerIpcHandlers } from './ipc'
 
 let mainWindow: BrowserWindow | null = null
+let db: Database.Database
+let aiProvider: OpencLawProvider
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -43,12 +49,25 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  // Initialize database
+  const dbPath = join(app.getPath('userData'), 'petclaw.db')
+  db = new Database(dbPath)
+  initDatabase(db)
+
+  // Initialize AI provider
+  aiProvider = new OpencLawProvider()
+
+  // Create window
   createWindow()
 
-  ipcMain.on('window:move', (_event, dx: number, dy: number) => {
-    if (!mainWindow) return
-    const [x, y] = mainWindow.getPosition()
-    mainWindow.setPosition(x + dx, y + dy)
+  // Register IPC handlers
+  if (mainWindow) {
+    registerIpcHandlers(mainWindow, aiProvider, db)
+  }
+
+  // Attempt to connect to Openclaw (non-blocking)
+  aiProvider.connect().catch((err) => {
+    console.warn('Openclaw not available:', err.message)
   })
 })
 
@@ -56,6 +75,11 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+app.on('before-quit', () => {
+  aiProvider?.disconnect()
+  db?.close()
 })
 
 export { mainWindow }
