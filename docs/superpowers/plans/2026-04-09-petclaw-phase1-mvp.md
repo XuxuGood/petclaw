@@ -10,20 +10,45 @@
 
 **Spec Reference:** `docs/superpowers/specs/2026-04-09-petclaw-design.md`
 
+**Engineering Standards:** ESLint flat config, Prettier, Conventional Commits (husky + commitlint), pnpm workspace monorepo, CSP security, Vitest with environment-specific configs, electron-log for production logging.
+
 ---
 
 ## File Structure
 
 ```
-petclaw-desktop/
-├── electron.vite.config.ts          # electron-vite config (main/preload/renderer)
-├── package.json
-├── tsconfig.json                    # root tsconfig (references)
-├── tsconfig.node.json               # main + preload tsconfig
-├── tsconfig.web.json                # renderer tsconfig
-├── resources/
-│   └── icon.png                     # app icon
-├── src/
+petclaw/                              # Monorepo root
+├── package.json                      # workspace root scripts
+├── pnpm-workspace.yaml               # pnpm workspace config
+├── .gitignore                        # monorepo gitignore
+├── .editorconfig                     # editor consistency
+├── commitlint.config.mjs             # conventional commits
+├── .husky/
+│   ├── pre-commit                    # lint-staged
+│   └── commit-msg                    # commitlint
+├── CLAUDE.md                         # AI agent workspace instructions
+├── .github/
+│   └── workflows/
+│       └── ci.yml                    # lint + test + build
+├── petclaw-desktop/
+│   ├── CLAUDE.md                     # desktop-specific AI instructions
+│   ├── .gitignore                    # electron-specific ignores
+│   ├── .prettierrc                   # code formatting
+│   ├── .prettierignore
+│   ├── eslint.config.mjs             # ESLint flat config (main/preload/renderer)
+│   ├── vitest.config.ts              # test env config (node + jsdom)
+│   ├── .env.example                  # env var documentation
+│   ├── electron.vite.config.ts       # electron-vite config (main/preload/renderer)
+│   ├── package.json
+│   ├── tsconfig.json                 # root tsconfig (references)
+│   ├── tsconfig.node.json            # main + preload tsconfig
+│   ├── tsconfig.web.json             # renderer tsconfig
+│   ├── resources/
+│   │   └── icon.png                  # app icon
+│   ├── tests/
+│   │   └── __mocks__/
+│   │       └── electron.ts           # Electron API mock for tests
+│   ├── src/
 │   ├── main/
 │   │   ├── index.ts                 # app entry, window creation
 │   │   ├── ipc.ts                   # IPC handler registration
@@ -79,6 +104,427 @@ petclaw-desktop/
 
 ---
 
+## Task 0: Monorepo Foundation + Engineering Standards
+
+**Files:**
+- Create: `package.json` (monorepo root)
+- Create: `pnpm-workspace.yaml`
+- Create: `.gitignore` (root)
+- Create: `.editorconfig`
+- Create: `CLAUDE.md` (root)
+- Create: `commitlint.config.mjs`
+- Create: `.husky/pre-commit`
+- Create: `.husky/commit-msg`
+- Create: `petclaw-desktop/.gitignore`
+- Create: `petclaw-desktop/.prettierrc`
+- Create: `petclaw-desktop/.prettierignore`
+- Create: `petclaw-desktop/eslint.config.mjs`
+- Create: `petclaw-desktop/vitest.config.ts`
+- Create: `petclaw-desktop/tests/__mocks__/electron.ts`
+- Create: `petclaw-desktop/.env.example`
+- Create: `petclaw-desktop/CLAUDE.md`
+- Create: `.github/workflows/ci.yml`
+
+- [ ] **Step 1: Create monorepo root package.json and workspace config**
+
+```json
+// package.json (monorepo root)
+{
+  "name": "petclaw",
+  "private": true,
+  "scripts": {
+    "dev:desktop": "pnpm --filter petclaw-desktop dev",
+    "build:desktop": "pnpm --filter petclaw-desktop build",
+    "test": "pnpm -r test",
+    "test:desktop": "pnpm --filter petclaw-desktop test",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.0.0",
+    "@commitlint/config-conventional": "^19.0.0",
+    "husky": "^9.0.0",
+    "lint-staged": "^15.0.0"
+  }
+}
+```
+
+```yaml
+# pnpm-workspace.yaml
+packages:
+  - 'petclaw-desktop'
+  - 'petclaw-web'
+  - 'petclaw-api'
+  - 'petclaw-shared'
+```
+
+- [ ] **Step 2: Create root .gitignore and .editorconfig**
+
+```gitignore
+# .gitignore (monorepo root)
+**/node_modules/
+**/out/
+**/dist/
+.pnpm-store/
+.DS_Store
+Thumbs.db
+.env
+.env.local
+.env.*.local
+.vscode/settings.json
+.idea/
+**/*.log
+*.tsbuildinfo
+coverage/
+```
+
+```ini
+# .editorconfig
+root = true
+
+[*]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.md]
+trim_trailing_whitespace = false
+```
+
+- [ ] **Step 3: Create commitlint config and husky hooks**
+
+```javascript
+// commitlint.config.mjs
+export default {
+  extends: ['@commitlint/config-conventional'],
+  rules: {
+    'type-enum': [
+      2,
+      'always',
+      ['feat', 'fix', 'docs', 'style', 'refactor', 'perf', 'test', 'build', 'ci', 'chore', 'revert']
+    ],
+    'scope-enum': [
+      1,
+      'always',
+      ['desktop', 'web', 'api', 'shared', 'ci', 'deps', 'release']
+    ],
+    'subject-max-length': [2, 'always', 100]
+  }
+}
+```
+
+```bash
+# .husky/pre-commit
+pnpm exec lint-staged
+```
+
+```bash
+# .husky/commit-msg
+pnpm exec commitlint --edit "$1"
+```
+
+- [ ] **Step 4: Create root CLAUDE.md**
+
+```markdown
+# PetClaw Monorepo — AI 工作指南
+
+## 子项目
+- `petclaw-desktop/` — Electron 桌面应用（Phase 1 当前焦点）
+- `petclaw-web/` — Next.js 营销官网（Phase 3）
+- `petclaw-api/` — 后端服务（Phase 3）
+- `petclaw-shared/` — 共享 TypeScript 类型
+
+## Commit 规范
+Conventional Commits：`type(scope): subject`
+- scope：`desktop`、`web`、`api`、`shared`、`ci`
+
+## 包管理
+pnpm workspace，从根目录执行：`pnpm --filter petclaw-desktop <cmd>`
+```
+
+- [ ] **Step 5: Create petclaw-desktop/.gitignore**
+
+```gitignore
+# petclaw-desktop/.gitignore
+out/
+dist/
+node_modules/
+*.node
+prebuilds/
+.env
+.env.local
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+coverage/
+.nyc_output
+*.tsbuildinfo
+.vite/
+```
+
+- [ ] **Step 6: Create Prettier config**
+
+```json
+// petclaw-desktop/.prettierrc
+{
+  "semi": false,
+  "singleQuote": true,
+  "printWidth": 100,
+  "tabWidth": 2,
+  "trailingComma": "none",
+  "bracketSpacing": true,
+  "arrowParens": "always",
+  "endOfLine": "lf"
+}
+```
+
+```
+# petclaw-desktop/.prettierignore
+out/
+dist/
+node_modules/
+*.md
+```
+
+- [ ] **Step 7: Create ESLint flat config**
+
+```javascript
+// petclaw-desktop/eslint.config.mjs
+import js from '@eslint/js'
+import globals from 'globals'
+import reactHooks from 'eslint-plugin-react-hooks'
+import reactRefresh from 'eslint-plugin-react-refresh'
+import tseslint from 'typescript-eslint'
+
+export default tseslint.config(
+  { ignores: ['out/**', 'dist/**'] },
+  {
+    extends: [js.configs.recommended, ...tseslint.configs.recommended],
+    rules: {
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-explicit-any': 'warn',
+      'no-console': ['warn', { allow: ['warn', 'error'] }]
+    }
+  },
+  {
+    files: ['src/main/**/*.ts', 'src/preload/**/*.ts'],
+    languageOptions: { globals: { ...globals.node } }
+  },
+  {
+    files: ['src/renderer/**/*.{ts,tsx}'],
+    languageOptions: { globals: { ...globals.browser } },
+    plugins: {
+      'react-hooks': reactHooks,
+      'react-refresh': reactRefresh
+    },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+      'react-refresh/only-export-components': 'warn'
+    }
+  },
+  {
+    files: ['tests/**/*.{ts,tsx}'],
+    languageOptions: { globals: { ...globals.node } }
+  }
+)
+```
+
+- [ ] **Step 8: Create Vitest config with Electron mock**
+
+```typescript
+// petclaw-desktop/vitest.config.ts
+import { defineConfig } from 'vitest/config'
+import { resolve } from 'path'
+
+export default defineConfig({
+  test: {
+    environmentMatchGlobs: [
+      ['tests/renderer/**', 'jsdom'],
+      ['tests/main/**', 'node']
+    ],
+    globals: false,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      include: ['src/**/*.ts', 'src/**/*.tsx'],
+      exclude: ['src/renderer/index.html', '**/*.d.ts']
+    },
+    alias: {
+      electron: resolve('./tests/__mocks__/electron.ts')
+    }
+  }
+})
+```
+
+```typescript
+// petclaw-desktop/tests/__mocks__/electron.ts
+import { vi } from 'vitest'
+
+export const app = {
+  getPath: vi.fn(() => '/tmp/test'),
+  getVersion: vi.fn(() => '0.1.0'),
+  quit: vi.fn(),
+  whenReady: vi.fn(() => Promise.resolve()),
+  on: vi.fn()
+}
+
+export const ipcMain = {
+  on: vi.fn(),
+  handle: vi.fn(),
+  removeHandler: vi.fn()
+}
+
+export const ipcRenderer = {
+  on: vi.fn(),
+  send: vi.fn(),
+  invoke: vi.fn(),
+  removeListener: vi.fn()
+}
+
+export const BrowserWindow = vi.fn()
+export const shell = { openExternal: vi.fn() }
+export const globalShortcut = { register: vi.fn(), unregisterAll: vi.fn() }
+export const Tray = vi.fn()
+export const Menu = { buildFromTemplate: vi.fn() }
+export const nativeImage = { createEmpty: vi.fn() }
+export const contextBridge = { exposeInMainWorld: vi.fn() }
+export const session = {
+  defaultSession: { webRequest: { onHeadersReceived: vi.fn() } }
+}
+```
+
+- [ ] **Step 9: Create .env.example and desktop CLAUDE.md**
+
+```bash
+# petclaw-desktop/.env.example
+OPENCLAW_GATEWAY_URL=ws://127.0.0.1:18789
+# ANTHROPIC_API_KEY=sk-ant-...
+VITE_DEV_TOOLS=true
+```
+
+```markdown
+# petclaw-desktop/CLAUDE.md
+
+## 项目概述
+Electron + React + TypeScript 桌面宠物应用。透明窗口，猫咪动画，AI 聊天，工具监控。
+
+## 进程隔离（最重要）
+- `src/main/` — Node.js 主进程，可用所有 Node API
+- `src/preload/` — 桥接层，只能用 contextBridge 暴露 API
+- `src/renderer/` — 浏览器渲染进程，禁止引用 Node.js 模块
+
+## IPC 规范
+- channel 名格式：`模块:动作`（如 `chat:send`、`window:move`）
+- 渲染→主（单向）：`ipcRenderer.send()` → `ipcMain.on()`
+- 渲染→主（双向）：`ipcRenderer.invoke()` → `ipcMain.handle()`
+- 主→渲染：`mainWindow.webContents.send()`
+
+## 安全约束
+- `nodeIntegration: false` — 永不开启
+- `contextIsolation: true` — 永不关闭
+- `sandbox: false` — 仅因 better-sqlite3，后续迁移后恢复
+
+## 常用命令
+- `pnpm dev` — 开发模式
+- `pnpm test` — 运行测试
+- `pnpm lint` — ESLint
+- `pnpm typecheck` — 类型检查
+- `pnpm build` — 生产构建
+
+## 禁止事项
+- 不能在 renderer 中 require('electron') 或任何 Node 模块
+- 不能修改 webPreferences.nodeIntegration 或 contextIsolation
+- Git commit 必须遵循 Conventional Commits
+```
+
+- [ ] **Step 10: Create GitHub Actions CI**
+
+```yaml
+# .github/workflows/ci.yml
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-typecheck:
+    name: Lint & TypeCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter petclaw-desktop lint
+      - run: pnpm --filter petclaw-desktop typecheck
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter petclaw-desktop test
+        env:
+          CI: true
+
+  build:
+    name: Build
+    runs-on: macos-latest
+    needs: [lint-and-typecheck, test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter petclaw-desktop build
+```
+
+- [ ] **Step 11: Install root dependencies and initialize husky**
+
+```bash
+pnpm install
+pnpm exec husky init
+chmod +x .husky/pre-commit .husky/commit-msg
+```
+
+- [ ] **Step 12: Commit**
+
+```bash
+git add .
+git commit -m "chore(desktop): add monorepo foundation and engineering standards
+
+Includes: pnpm workspace, ESLint flat config, Prettier, commitlint,
+husky hooks, Vitest config, CSP, .gitignore, CLAUDE.md, GitHub Actions CI."
+```
+
+---
+
 ## Task 1: Project Scaffolding
 
 **Files:**
@@ -118,8 +564,13 @@ cd petclaw-desktop
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
+    "lint": "eslint . --max-warnings 0",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@electron-toolkit/utils": "^3.0.0",
@@ -143,7 +594,20 @@ cd petclaw-desktop
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.0",
     "vite": "^6.0.0",
-    "vitest": "^3.0.0"
+    "vitest": "^3.0.0",
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "eslint-plugin-react-refresh": "^0.4.0",
+    "globals": "^15.0.0",
+    "typescript-eslint": "^8.0.0",
+    "prettier": "^3.0.0",
+    "jsdom": "^25.0.0",
+    "electron-log": "^5.0.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": ["eslint --fix --max-warnings 0", "prettier --write"],
+    "*.{json,css}": ["prettier --write"]
   }
 }
 ```
@@ -336,6 +800,10 @@ export {}
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws://127.0.0.1:*; font-src 'self' data:; object-src 'none'"
+    />
     <title>PetClaw</title>
   </head>
   <body style="background: transparent; margin: 0; overflow: hidden;">
@@ -3017,6 +3485,7 @@ git commit -m "feat: add electron-builder packaging configuration"
 
 | Task | Description | Tests |
 |------|-------------|-------|
+| 0 | Monorepo foundation + engineering standards | CI config |
 | 1 | Project scaffolding + transparent window | Manual |
 | 2 | Pet state machine | 11 unit tests |
 | 3 | PixiJS cat sprite + PetCanvas | Manual |
@@ -3032,7 +3501,7 @@ git commit -m "feat: add electron-builder packaging configuration"
 | 13 | Pet store + final wiring | All tests |
 | 14 | Build & package config | Build test |
 
-**Total: 14 tasks, 32 automated tests**
+**Total: 15 tasks, 32 automated tests**
 
 After completion, the MVP delivers:
 - A transparent desktop cat pet with state-based animations
