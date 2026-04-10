@@ -12,8 +12,8 @@ let aiProvider: OpencLawProvider
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
-    width: 300,
-    height: 350,
+    width: 350,
+    height: 500,
     transparent: true,
     frame: false,
     backgroundColor: '#00000000',
