@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, shell, ipcMain } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 
@@ -44,6 +44,12 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   createWindow()
+
+  ipcMain.on('window:move', (_event, dx: number, dy: number) => {
+    if (!mainWindow) return
+    const [x, y] = mainWindow.getPosition()
+    mainWindow.setPosition(x + dx, y + dy)
+  })
 })
 
 app.on('window-all-closed', () => {

@@ -1,5 +1,6 @@
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type
-interface ElectronAPI {}
+interface ElectronAPI {
+  moveWindow: (dx: number, dy: number) => void
+}
 
 declare global {
   interface Window {
