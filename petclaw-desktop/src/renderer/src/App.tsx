@@ -40,6 +40,13 @@ export function App(): JSX.Element {
     }
   }, [stateMachine])
 
+  useEffect(() => {
+    const unsub = window.api.onPanelOpen((panel) => {
+      setActivePanel(panel as PanelType)
+    })
+    return unsub
+  }, [])
+
   const handleDragMove = useCallback(
     (dx: number, dy: number) => {
       window.api.moveWindow(dx, dy)

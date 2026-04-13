@@ -6,6 +6,8 @@ import { initDatabase } from './data/db'
 import { OpencLawProvider } from './ai/openclaw'
 import { registerIpcHandlers } from './ipc'
 import { HookServer } from './hooks/server'
+import { createTray } from './system/tray'
+import { registerShortcuts, unregisterShortcuts } from './system/shortcuts'
 
 let mainWindow: BrowserWindow | null = null
 let db: Database.Database
@@ -71,6 +73,8 @@ app.whenReady().then(() => {
   // Register IPC handlers
   if (mainWindow) {
     registerIpcHandlers(mainWindow, aiProvider, db, hookServer)
+    createTray(mainWindow)
+    registerShortcuts(mainWindow)
   }
 
   // Attempt to connect to Openclaw (non-blocking)
@@ -89,6 +93,7 @@ app.on('before-quit', () => {
   aiProvider?.disconnect()
   db?.close()
   hookServer?.stop()
+  unregisterShortcuts()
 })
 
 export { mainWindow }

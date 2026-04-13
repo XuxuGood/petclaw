@@ -49,6 +49,11 @@ const api = {
     ) => callback(event)
     ipcRenderer.on('hook:event', handler)
     return () => ipcRenderer.removeListener('hook:event', handler)
+  },
+  onPanelOpen: (callback: (panel: string) => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, panel: string) => callback(panel)
+    ipcRenderer.on('panel:open', handler)
+    return () => ipcRenderer.removeListener('panel:open', handler)
   }
 }
 

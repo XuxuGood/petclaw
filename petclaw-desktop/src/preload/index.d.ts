@@ -20,6 +20,7 @@ interface ElectronAPI {
       timestamp: number
     }) => void
   ) => () => void
+  onPanelOpen: (callback: (panel: string) => void) => () => void
 }
 
 declare global {
