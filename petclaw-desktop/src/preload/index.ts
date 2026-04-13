@@ -27,6 +27,28 @@ const api = {
     const handler = () => callback()
     ipcRenderer.on('chat:ai-responding', handler)
     return () => ipcRenderer.removeListener('chat:ai-responding', handler)
+  },
+  onHookEvent: (
+    callback: (event: {
+      type: string
+      tool: string
+      sessionId: string
+      data: Record<string, unknown>
+      timestamp: number
+    }) => void
+  ) => {
+    const handler = (
+      _e: Electron.IpcRendererEvent,
+      event: {
+        type: string
+        tool: string
+        sessionId: string
+        data: Record<string, unknown>
+        timestamp: number
+      }
+    ) => callback(event)
+    ipcRenderer.on('hook:event', handler)
+    return () => ipcRenderer.removeListener('hook:event', handler)
   }
 }
 

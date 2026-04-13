@@ -5,10 +5,12 @@ import Database from 'better-sqlite3'
 import { initDatabase } from './data/db'
 import { OpencLawProvider } from './ai/openclaw'
 import { registerIpcHandlers } from './ipc'
+import { HookServer } from './hooks/server'
 
 let mainWindow: BrowserWindow | null = null
 let db: Database.Database
 let aiProvider: OpencLawProvider
+let hookServer: HookServer
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -57,12 +59,18 @@ app.whenReady().then(() => {
   // Initialize AI provider
   aiProvider = new OpencLawProvider()
 
+  // Start hook server
+  hookServer = new HookServer()
+  hookServer.start().then((socketPath) => {
+    console.warn('Hook server listening on:', socketPath)
+  })
+
   // Create window
   createWindow()
 
   // Register IPC handlers
   if (mainWindow) {
-    registerIpcHandlers(mainWindow, aiProvider, db)
+    registerIpcHandlers(mainWindow, aiProvider, db, hookServer)
   }
 
   // Attempt to connect to Openclaw (non-blocking)
@@ -80,6 +88,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   aiProvider?.disconnect()
   db?.close()
+  hookServer?.stop()
 })
 
 export { mainWindow }

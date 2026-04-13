@@ -2,16 +2,23 @@ import { ipcMain, BrowserWindow } from 'electron'
 import { OpencLawProvider } from './ai/openclaw'
 import Database from 'better-sqlite3'
 import { saveMessage, getMessages } from './data/db'
+import { HookServer } from './hooks/server'
 
 export function registerIpcHandlers(
   mainWindow: BrowserWindow,
   aiProvider: OpencLawProvider,
-  db: Database.Database
+  db: Database.Database,
+  hookServer: HookServer
 ): void {
   // Window move
   ipcMain.on('window:move', (_event, dx: number, dy: number) => {
     const [x, y] = mainWindow.getPosition()
     mainWindow.setPosition(x + dx, y + dy)
+  })
+
+  // Forward hook events to renderer
+  hookServer.onEvent((event) => {
+    mainWindow.webContents.send('hook:event', event)
   })
 
   // Chat: send message and stream response

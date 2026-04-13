@@ -11,6 +11,15 @@ interface ElectronAPI {
   onChatDone: (callback: () => void) => () => void
   onChatError: (callback: (error: string) => void) => () => void
   onAIResponding: (callback: () => void) => () => void
+  onHookEvent: (
+    callback: (event: {
+      type: string
+      tool: string
+      sessionId: string
+      data: Record<string, unknown>
+      timestamp: number
+    }) => void
+  ) => () => void
 }
 
 declare global {
