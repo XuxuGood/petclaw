@@ -63,5 +63,29 @@
     "*.{json,css}": [
       "prettier --write"
     ]
+  },
+  "build": {
+    "appId": "ai.petclaw.desktop",
+    "productName": "PetClaw",
+    "directories": {
+      "output": "dist"
+    },
+    "mac": {
+      "category": "public.app-category.utilities",
+      "icon": "resources/icon.png",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "hardenedRuntime": true
+    },
+    "win": {
+      "icon": "resources/icon.png",
+      "target": [
+        "nsis"
+      ]
+    },
+    "npmRebuild": true,
+    "nativeRebuilder": "sequential"
   }
 }
