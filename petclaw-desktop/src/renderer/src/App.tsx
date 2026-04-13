@@ -3,6 +3,7 @@ import { PetCanvas } from './pet/PetCanvas'
 import { PetState, PetEvent, PetStateMachine } from './pet/state-machine'
 import { ChatPanel } from './panels/ChatPanel'
 import { MonitorPanel } from './panels/MonitorPanel'
+import { SettingsPanel } from './panels/SettingsPanel'
 
 type PanelType = 'chat' | 'monitor' | 'settings' | null
 
@@ -63,6 +64,10 @@ export function App(): JSX.Element {
     setActivePanel((prev) => (prev === null ? 'chat' : null))
   }, [])
 
+  const handleContextMenu = useCallback(() => {
+    setActivePanel('settings')
+  }, [])
+
   return (
     <div className="w-full h-full bg-transparent relative">
       <PetCanvas
@@ -70,9 +75,11 @@ export function App(): JSX.Element {
         onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
         onClick={handleClick}
+        onContextMenu={handleContextMenu}
       />
       {activePanel === 'chat' && <ChatPanel onClose={() => setActivePanel(null)} />}
       {activePanel === 'monitor' && <MonitorPanel onClose={() => setActivePanel(null)} />}
+      {activePanel === 'settings' && <SettingsPanel onClose={() => setActivePanel(null)} />}
     </div>
   )
 }

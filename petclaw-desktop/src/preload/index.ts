@@ -54,7 +54,11 @@ const api = {
     const handler = (_e: Electron.IpcRendererEvent, panel: string) => callback(panel)
     ipcRenderer.on('panel:open', handler)
     return () => ipcRenderer.removeListener('panel:open', handler)
-  }
+  },
+  getSetting: (key: string): Promise<string | null> => ipcRenderer.invoke('settings:get', key),
+  setSetting: (key: string, value: string): Promise<void> =>
+    ipcRenderer.invoke('settings:set', key, value),
+  getAppVersion: (): Promise<string> => ipcRenderer.invoke('app:version')
 }
 
 if (process.contextIsolated) {

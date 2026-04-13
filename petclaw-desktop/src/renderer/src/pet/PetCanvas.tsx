@@ -8,9 +8,16 @@ interface PetCanvasProps {
   onDragMove?: (dx: number, dy: number) => void
   onDragEnd?: () => void
   onClick?: () => void
+  onContextMenu?: () => void
 }
 
-export function PetCanvas({ state, onDragMove, onDragEnd, onClick }: PetCanvasProps): JSX.Element {
+export function PetCanvas({
+  state,
+  onDragMove,
+  onDragEnd,
+  onClick,
+  onContextMenu
+}: PetCanvasProps): JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const catRef = useRef<CatSprite | null>(null)
   const isDragging = useRef(false)
@@ -93,6 +100,10 @@ export function PetCanvas({ state, onDragMove, onDragEnd, onClick }: PetCanvasPr
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       onClick={handleClick}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        onContextMenu?.()
+      }}
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
     />
   )

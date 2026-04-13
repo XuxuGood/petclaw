@@ -21,6 +21,9 @@ interface ElectronAPI {
     }) => void
   ) => () => void
   onPanelOpen: (callback: (panel: string) => void) => () => void
+  getSetting: (key: string) => Promise<string | null>
+  setSetting: (key: string, value: string) => Promise<void>
+  getAppVersion: () => Promise<string>
 }
 
 declare global {
