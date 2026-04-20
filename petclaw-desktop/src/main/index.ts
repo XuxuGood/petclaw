@@ -2,7 +2,7 @@ import { app, BrowserWindow, shell, screen } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 import Database from 'better-sqlite3'
-import { initDatabase, getSetting } from './data/db'
+import { initDatabase } from './data/db'
 import { OpencLawProvider } from './ai/openclaw'
 import { registerIpcHandlers } from './ipc'
 import { HookServer } from './hooks/server'
@@ -10,6 +10,8 @@ import { createTray } from './system/tray'
 import { registerShortcuts, unregisterShortcuts } from './system/shortcuts'
 import { runBootCheck } from './bootcheck'
 import { diagAppReady, diagBootResult, diagWindowLoad, diagError } from './diagnostics'
+import { getAppSetting } from './app-settings'
+import { resolveDatabasePath } from './database-path'
 
 let petWindow: BrowserWindow | null = null
 let chatWindow: BrowserWindow | null = null
@@ -110,7 +112,10 @@ app.whenReady().then(async () => {
   diagAppReady()
 
   // Initialize database
-  const dbPath = join(app.getPath('userData'), 'petclaw.db')
+  const dbPath = resolveDatabasePath({
+    petclawHome: join(app.getPath('home'), '.petclaw'),
+    legacyUserDataPath: app.getPath('userData')
+  })
   db = new Database(dbPath)
   initDatabase(db)
 
@@ -138,7 +143,8 @@ app.whenReady().then(async () => {
   diagBootResult(bootResult.success)
 
   // Initialize AI provider
-  const savedUrl = getSetting(db, 'gatewayUrl')
+  const settingsPath = join(app.getPath('home'), '.petclaw', 'petclaw-settings.json')
+  const savedUrl = getAppSetting('gatewayUrl', settingsPath)
   const gatewayUrl = bootResult.gatewayUrl ?? savedUrl ?? 'ws://127.0.0.1:29890'
   const gatewayToken = bootResult.gatewayToken ?? ''
   aiProvider = new OpencLawProvider(gatewayUrl, gatewayToken)

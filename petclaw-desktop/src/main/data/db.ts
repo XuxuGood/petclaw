@@ -18,11 +18,6 @@ export function initDatabase(db: Database.Database): void {
       content TEXT NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
-
-    CREATE TABLE IF NOT EXISTS settings (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL
-    );
   `)
 }
 
@@ -42,17 +37,4 @@ export function getMessages(db: Database.Database, limit: number): ChatMessage[]
       )
       .all(limit) as ChatMessage[]
   ).reverse()
-}
-
-export function saveSetting(db: Database.Database, key: string, value: string): void {
-  db.prepare(
-    'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
-  ).run(key, value)
-}
-
-export function getSetting(db: Database.Database, key: string): string | null {
-  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as
-    | { value: string }
-    | undefined
-  return row?.value ?? null
 }

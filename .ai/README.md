@@ -158,7 +158,7 @@ Main Process (Node.js)              Preload (Bridge)              Renderer (Brow
 ├── ai/
 │   ├── openclaw.ts  WebSocket 客户端
 │   └── provider.ts  AI 接口抽象
-├── data/db.ts       SQLite 数据库
+├── data/db.ts       SQLite 数据库（`~/.petclaw/petclaw.db`）
 ├── hooks/
 │   ├── server.ts    Unix socket 服务器（接收 Claude Code hook 事件）
 │   ├── installer.ts Hook 配置安装器
@@ -345,6 +345,8 @@ Openclaw agent 的工作目录，包含人格、记忆和技能：
 
 #### openclaw.json（Openclaw 运行时配置）
 
+唯一的 Openclaw 运行时配置源。Electron 可读取其中的网关信息，但不会用 `petclaw-settings.json` 直接替代它。
+
 | 字段 | 来源 | 说明 |
 | ---- | ---- | ---- |
 | `models.providers.llm.baseUrl` | BootCheck 生成 | 默认 `https://petclaw.ai/api/v1` |
@@ -359,6 +361,8 @@ Openclaw agent 的工作目录，包含人格、记忆和技能：
 | `gateway.remote.token` | BootCheck 生成 | 同 auth.token |
 
 #### petclaw-settings.json（应用设置）
+
+仅用于 PetClaw Desktop 应用层配置，不直接作为 Openclaw 运行时配置源。涉及 Openclaw 的配置变更，应由主进程同步写入 `openclaw.json`。
 
 | 字段 | 来源 | 说明 |
 | ---- | ---- | ---- |
@@ -377,6 +381,9 @@ Openclaw agent 的工作目录，包含人格、记忆和技能：
 | `userCredits` / `modelTier` / `membershipTier` | 登录后从服务端拉取 | 积分/会员 |
 
 #### 其他运行时文件
+
+- `~/.petclaw/petclaw.db` — PetClaw Desktop 本地 SQLite 数据库，保存消息和会话数据
+- 兼容迁移：如果旧版本曾把数据库放在 Electron `userData` 目录，首次启动会自动迁移到 `~/.petclaw/petclaw.db`
 
 | 文件 | 来源 | 说明 |
 | ---- | ---- | ---- |
@@ -447,6 +454,10 @@ ls /tmp/petclaw-extracted/dist/
 - 9 个 WebM 动画（VP8+alpha）— 已提取到 `assets/cat/`
 - 2 个音效：`wake.MP3`（唤醒）、`down.MP3`（关闭）
 - Logo SVG：`logo-dark.svg`、`logo-light.svg`、`logo-text-dark.svg`、`logo-text-light.svg`
+
+### 12.4 官方生成的配置
+
+在目录/Users/xiaoxuxuy/Desktop/.petclaw
 
 ---
 

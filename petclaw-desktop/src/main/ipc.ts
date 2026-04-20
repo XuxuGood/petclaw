@@ -3,10 +3,11 @@ import { join } from 'path'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { OpencLawProvider } from './ai/openclaw'
 import Database from 'better-sqlite3'
-import { saveMessage, getMessages, saveSetting, getSetting } from './data/db'
+import { saveMessage, getMessages } from './data/db'
 import { HookServer } from './hooks/server'
 import { ConfigInstaller } from './hooks/installer'
 import { checkEnvironment, checkGatewayConnectivity, installHooks } from './onboarding'
+import { getAppSetting, saveOnboardingSettings, setAppSetting } from './app-settings'
 
 export function registerIpcHandlers(
   petWindow: BrowserWindow,
@@ -73,11 +74,13 @@ export function registerIpcHandlers(
 
   // Settings
   ipcMain.handle('settings:get', async (_event, key: string) => {
-    return getSetting(db, key)
+    const settingsPath = join(app.getPath('home'), '.petclaw', 'petclaw-settings.json')
+    return getAppSetting(key, settingsPath)
   })
 
   ipcMain.handle('settings:set', async (_event, key: string, value: string) => {
-    saveSetting(db, key, value)
+    const settingsPath = join(app.getPath('home'), '.petclaw', 'petclaw-settings.json')
+    setAppSetting(key, value, settingsPath)
 
     if (key === 'gatewayUrl') {
       aiProvider.disconnect()
@@ -124,19 +127,7 @@ export function registerIpcHandlers(
       const petclawHome = join(app.getPath('home'), '.petclaw')
       const settingsPath = join(petclawHome, 'petclaw-settings.json')
 
-      // Update petclaw-settings.json
-      if (existsSync(settingsPath)) {
-        try {
-          const settings = JSON.parse(readFileSync(settingsPath, 'utf-8'))
-          settings.onboardingComplete = true
-          settings.sopComplete = true
-          settings.language = data.language
-          settings.voiceShortcut = data.voiceShortcut.split(' + ').map((k) => k.trim())
-          writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
-        } catch {
-          // ignore
-        }
-      }
+      saveOnboardingSettings(data, settingsPath)
 
       // Write USER.md in workspace
       const workspacePath = join(petclawHome, 'workspace')

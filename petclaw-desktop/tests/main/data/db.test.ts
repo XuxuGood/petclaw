@@ -1,12 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
-import {
-  initDatabase,
-  saveMessage,
-  getMessages,
-  saveSetting,
-  getSetting
-} from '../../../src/main/data/db'
+import { initDatabase, saveMessage, getMessages } from '../../../src/main/data/db'
 
 describe('Database', () => {
   let db: Database.Database
@@ -45,23 +39,6 @@ describe('Database', () => {
       expect(messages).toHaveLength(2)
       expect(messages[0].content).toBe('b')
       expect(messages[1].content).toBe('c')
-    })
-  })
-
-  describe('settings', () => {
-    it('saves and retrieves a setting', () => {
-      saveSetting(db, 'theme', 'dark')
-      expect(getSetting(db, 'theme')).toBe('dark')
-    })
-
-    it('returns null for missing setting', () => {
-      expect(getSetting(db, 'nonexistent')).toBeNull()
-    })
-
-    it('upserts existing setting', () => {
-      saveSetting(db, 'theme', 'dark')
-      saveSetting(db, 'theme', 'light')
-      expect(getSetting(db, 'theme')).toBe('light')
     })
   })
 })

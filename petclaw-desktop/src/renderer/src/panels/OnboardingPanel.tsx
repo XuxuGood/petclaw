@@ -516,22 +516,20 @@ export function OnboardingPanel({ onComplete }: { onComplete: () => void }): JSX
   const isFirstStep = step === 'permissions'
 
   const handleSkip = useCallback(async () => {
-    await window.api.setSetting('onboardingCompleted', 'true')
+    const store = useOnboardingStore.getState()
+    await window.api.saveOnboardingConfig({
+      nickname: store.nickname.trim() || 'PetClaw',
+      roles: store.roles,
+      selectedSkills: store.skills.filter((s) => s.selected).map((s) => s.id),
+      voiceShortcut: store.shortcut,
+      language: store.language
+    })
     onComplete()
   }, [onComplete])
 
   const handleNext = useCallback(async () => {
     if (isLastStep) {
-      await window.api.setSetting('onboardingCompleted', 'true')
-      // Save user data to SQLite
       const store = useOnboardingStore.getState()
-      await window.api.setSetting('petName', store.nickname.trim() || 'PetClaw')
-      await window.api.setSetting('userRoles', JSON.stringify(store.roles))
-      await window.api.setSetting(
-        'selectedSkills',
-        JSON.stringify(store.skills.filter((s) => s.selected).map((s) => s.id))
-      )
-      await window.api.setSetting('voiceShortcut', store.shortcut)
       // Save to ~/.petclaw config files
       await window.api.saveOnboardingConfig({
         nickname: store.nickname.trim() || 'PetClaw',
