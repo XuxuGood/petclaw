@@ -1,6 +1,9 @@
 import { create } from 'zustand'
 
+let nextId = 0
+
 export interface ChatMessage {
+  id: number
   role: 'user' | 'assistant'
   content: string
 }
@@ -8,17 +11,18 @@ export interface ChatMessage {
 interface ChatState {
   messages: ChatMessage[]
   isLoading: boolean
-  addMessage: (msg: ChatMessage) => void
+  addMessage: (msg: Omit<ChatMessage, 'id'>) => void
   appendToLastMessage: (text: string) => void
   setLoading: (loading: boolean) => void
-  loadHistory: (messages: ChatMessage[]) => void
+  loadHistory: (messages: Omit<ChatMessage, 'id'>[]) => void
 }
 
 export const useChatStore = create<ChatState>()((set) => ({
   messages: [],
   isLoading: false,
 
-  addMessage: (msg) => set((state) => ({ messages: [...state.messages, msg] })),
+  addMessage: (msg) =>
+    set((state) => ({ messages: [...state.messages, { ...msg, id: nextId++ }] })),
 
   appendToLastMessage: (text) =>
     set((state) => {
@@ -32,5 +36,5 @@ export const useChatStore = create<ChatState>()((set) => ({
 
   setLoading: (isLoading) => set({ isLoading }),
 
-  loadHistory: (messages) => set({ messages })
+  loadHistory: (messages) => set({ messages: messages.map((m) => ({ ...m, id: nextId++ })) })
 }))

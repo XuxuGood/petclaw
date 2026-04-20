@@ -26,7 +26,10 @@ export function initDatabase(db: Database.Database): void {
   `)
 }
 
-export function saveMessage(db: Database.Database, msg: { role: string; content: string }): void {
+export function saveMessage(
+  db: Database.Database,
+  msg: { role: 'user' | 'assistant'; content: string }
+): void {
   db.prepare('INSERT INTO messages (role, content) VALUES (?, ?)').run(msg.role, msg.content)
 }
 

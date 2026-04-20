@@ -14,11 +14,3 @@ export interface HookEvent {
   data: Record<string, unknown>
   timestamp?: number
 }
-
-export interface AgentSession {
-  sessionId: string
-  tool: string
-  status: 'active' | 'idle' | 'error'
-  lastEvent?: HookEvent
-  startedAt: number
-}

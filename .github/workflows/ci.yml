@@ -41,9 +41,21 @@ jobs:
           CI: true
 
   build:
-    name: Build
-    runs-on: macos-latest
+    name: Build (${{ matrix.os }})
     needs: [lint-and-typecheck, test]
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            platform: darwin
+            arch: arm64
+          - os: macos-13
+            platform: darwin
+            arch: x64
+          - os: windows-latest
+            platform: win
+            arch: x64
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -54,4 +66,29 @@ jobs:
           node-version: 22
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
+
+      # Prepare runtime resources (Node.js + Openclaw)
+      - name: Prepare runtime
+        if: runner.os != 'Windows'
+        run: |
+          chmod +x petclaw-desktop/scripts/prepare-runtime.sh
+          cd petclaw-desktop && ./scripts/prepare-runtime.sh ${{ matrix.platform }} ${{ matrix.arch }}
+
+      # Build Electron app
       - run: pnpm --filter petclaw-desktop build
+
+      # Package with electron-builder
+      - name: Package
+        run: pnpm --filter petclaw-desktop package
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Upload artifacts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: petclaw-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            petclaw-desktop/dist/*.dmg
+            petclaw-desktop/dist/*.zip
+            petclaw-desktop/dist/*.exe
+          if-no-files-found: ignore

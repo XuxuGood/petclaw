@@ -1,15 +1,9 @@
 import { useState, useCallback, useEffect } from 'react'
 import { PetCanvas } from './pet/PetCanvas'
 import { PetState, PetEvent, PetStateMachine } from './pet/state-machine'
-import { ChatPanel } from './panels/ChatPanel'
-import { MonitorPanel } from './panels/MonitorPanel'
-import { SettingsPanel } from './panels/SettingsPanel'
-
-type PanelType = 'chat' | 'monitor' | 'settings' | null
 
 export function App(): JSX.Element {
   const [petState, setPetState] = useState<PetState>(PetState.Idle)
-  const [activePanel, setActivePanel] = useState<PanelType>(null)
   const [stateMachine] = useState(
     () =>
       new PetStateMachine((_, to) => {
@@ -26,7 +20,6 @@ export function App(): JSX.Element {
       stateMachine.send(PetEvent.AIDone)
       setTimeout(() => stateMachine.send(PetEvent.Timeout), 3000)
     })
-    // Hook events drive pet state
     const unsub3 = window.api.onHookEvent((event) => {
       if (event.type === 'session_end') {
         stateMachine.send(PetEvent.HookIdle)
@@ -41,13 +34,6 @@ export function App(): JSX.Element {
     }
   }, [stateMachine])
 
-  useEffect(() => {
-    const unsub = window.api.onPanelOpen((panel) => {
-      setActivePanel(panel as PanelType)
-    })
-    return unsub
-  }, [])
-
   const handleDragMove = useCallback(
     (dx: number, dy: number) => {
       window.api.moveWindow(dx, dy)
@@ -61,15 +47,15 @@ export function App(): JSX.Element {
   }, [stateMachine])
 
   const handleClick = useCallback(() => {
-    setActivePanel((prev) => (prev === null ? 'chat' : null))
+    window.api.toggleChatWindow()
   }, [])
 
   const handleContextMenu = useCallback(() => {
-    setActivePanel('settings')
+    window.api.toggleChatWindow()
   }, [])
 
   return (
-    <div className="w-full h-full bg-transparent relative">
+    <div className="w-full h-full bg-transparent">
       <PetCanvas
         state={petState}
         onDragMove={handleDragMove}
@@ -77,9 +63,6 @@ export function App(): JSX.Element {
         onClick={handleClick}
         onContextMenu={handleContextMenu}
       />
-      {activePanel === 'chat' && <ChatPanel onClose={() => setActivePanel(null)} />}
-      {activePanel === 'monitor' && <MonitorPanel onClose={() => setActivePanel(null)} />}
-      {activePanel === 'settings' && <SettingsPanel onClose={() => setActivePanel(null)} />}
     </div>
   )
 }

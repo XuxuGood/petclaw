@@ -8,7 +8,7 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()],
     build: {
       rollupOptions: {
-        external: ['better-sqlite3']
+        external: ['better-sqlite3', 'ws']
       }
     }
   },
@@ -24,6 +24,14 @@ export default defineConfig({
     plugins: [react(), tailwindcss()],
     optimizeDeps: {
       include: ['pixi.js']
+    },
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve('src/renderer/index.html'),
+          chat: resolve('src/renderer/chat.html')
+        }
+      }
     }
   }
 })

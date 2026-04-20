@@ -1,20 +1,24 @@
 import { globalShortcut, BrowserWindow } from 'electron'
 
-export function registerShortcuts(mainWindow: BrowserWindow): void {
-  globalShortcut.register('CommandOrControl+Shift+P', () => {
-    if (mainWindow.isVisible()) {
-      mainWindow.hide()
+export function registerShortcuts(
+  petWindow: BrowserWindow,
+  _chatWindow: BrowserWindow,
+  toggleChatWindow: () => void
+): void {
+  const registered1 = globalShortcut.register('CommandOrControl+Shift+P', () => {
+    if (petWindow.isVisible()) {
+      petWindow.hide()
     } else {
-      mainWindow.show()
-      mainWindow.focus()
+      petWindow.show()
+      petWindow.focus()
     }
   })
+  if (!registered1) console.warn('Failed to register shortcut: CommandOrControl+Shift+P')
 
-  globalShortcut.register('CommandOrControl+Shift+C', () => {
-    mainWindow.show()
-    mainWindow.focus()
-    mainWindow.webContents.send('panel:open', 'chat')
+  const registered2 = globalShortcut.register('CommandOrControl+Shift+C', () => {
+    toggleChatWindow()
   })
+  if (!registered2) console.warn('Failed to register shortcut: CommandOrControl+Shift+C')
 }
 
 export function unregisterShortcuts(): void {

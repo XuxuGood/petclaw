@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useChatStore, ChatMessage } from '../../../src/renderer/src/stores/chat-store'
+import { useChatStore } from '../../../src/renderer/src/stores/chat-store'
 
 describe('ChatStore', () => {
   beforeEach(() => {
@@ -31,11 +31,12 @@ describe('ChatStore', () => {
   })
 
   it('loads history messages', () => {
-    const history: ChatMessage[] = [
-      { role: 'user', content: 'a' },
-      { role: 'assistant', content: 'b' }
+    const history = [
+      { role: 'user' as const, content: 'a' },
+      { role: 'assistant' as const, content: 'b' }
     ]
     useChatStore.getState().loadHistory(history)
     expect(useChatStore.getState().messages).toHaveLength(2)
+    expect(useChatStore.getState().messages[0].id).toBeDefined()
   })
 })

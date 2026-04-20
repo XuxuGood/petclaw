@@ -1,8 +1,13 @@
 import { Tray, Menu, nativeImage, app, BrowserWindow } from 'electron'
 
-export function createTray(mainWindow: BrowserWindow): Tray {
+export function createTray(
+  petWindow: BrowserWindow,
+  chatWindow: BrowserWindow,
+  toggleChatWindow: () => void
+): Tray {
   const icon = nativeImage.createEmpty()
   const tray = new Tray(icon)
+  tray.setTitle('🐱')
 
   tray.setToolTip('PetClaw - AI Desktop Pet')
 
@@ -10,25 +15,26 @@ export function createTray(mainWindow: BrowserWindow): Tray {
     {
       label: '显示/隐藏宠物',
       click: () => {
-        if (mainWindow.isVisible()) {
-          mainWindow.hide()
+        if (petWindow.isVisible()) {
+          petWindow.hide()
         } else {
-          mainWindow.show()
+          petWindow.show()
         }
       }
     },
     {
       label: '打开聊天',
       click: () => {
-        mainWindow.show()
-        mainWindow.webContents.send('panel:open', 'chat')
+        chatWindow.show()
+        chatWindow.focus()
       }
     },
     {
       label: 'AI 工具监控',
       click: () => {
-        mainWindow.show()
-        mainWindow.webContents.send('panel:open', 'monitor')
+        chatWindow.show()
+        chatWindow.focus()
+        chatWindow.webContents.send('panel:open', 'monitor')
       }
     },
     { type: 'separator' },
@@ -43,11 +49,7 @@ export function createTray(mainWindow: BrowserWindow): Tray {
   tray.setContextMenu(contextMenu)
 
   tray.on('click', () => {
-    if (mainWindow.isVisible()) {
-      mainWindow.hide()
-    } else {
-      mainWindow.show()
-    }
+    toggleChatWindow()
   })
 
   return tray

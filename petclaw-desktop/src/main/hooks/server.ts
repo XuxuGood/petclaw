@@ -57,7 +57,11 @@ export class HookServer {
       })
 
       this.server.on('error', reject)
-      this.server.listen(this.socketPath, () => resolve(this.socketPath))
+      this.server.listen(this.socketPath, () => {
+        // Restrict socket access to current user only
+        fs.chmodSync(this.socketPath, 0o600)
+        resolve(this.socketPath)
+      })
     })
   }
 

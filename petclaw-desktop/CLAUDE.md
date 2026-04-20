@@ -1,32 +1,18 @@
-# petclaw-desktop/CLAUDE.md
+# petclaw-desktop — AI 编码指南
 
-## 项目概述
-Electron + React + TypeScript 桌面宠物应用。透明窗口，猫咪动画，AI 聊天，工具监控。
+**完整架构文档见根目录 `.ai/README.md` 第 10 节。**
 
-## 进程隔离（最重要）
-- `src/main/` — Node.js 主进程，可用所有 Node API
-- `src/preload/` — 桥接层，只能用 contextBridge 暴露 API
-- `src/renderer/` — 浏览器渲染进程，禁止引用 Node.js 模块
+## 红线（绝对禁止）
+- renderer/ 中 `require('electron')` 或任何 Node 模块
+- 修改 `nodeIntegration`（必须 false）或 `contextIsolation`（必须 true）
+- 新增 IPC channel 不同步更新 `ipc.ts` + `preload/index.ts` + `preload/index.d.ts`
 
-## IPC 规范
-- channel 名格式：`模块:动作`（如 `chat:send`、`window:move`）
-- 渲染→主（单向）：`ipcRenderer.send()` → `ipcMain.on()`
-- 渲染→主（双向）：`ipcRenderer.invoke()` → `ipcMain.handle()`
-- 主→渲染：`mainWindow.webContents.send()`
-
-## 安全约束
-- `nodeIntegration: false` — 永不开启
-- `contextIsolation: true` — 永不关闭
-- `sandbox: false` — 仅因 better-sqlite3，后续迁移后恢复
-
-## 常用命令
-- `pnpm dev` — 开发模式
-- `pnpm test` — 运行测试
-- `pnpm lint` — ESLint
-- `pnpm typecheck` — 类型检查
-- `pnpm build` — 生产构建
-
-## 禁止事项
-- 不能在 renderer 中 require('electron') 或任何 Node 模块
-- 不能修改 webPreferences.nodeIntegration 或 contextIsolation
-- Git commit 必须遵循 Conventional Commits
+## 快捷命令
+```bash
+pnpm dev           # 开发模式
+pnpm test          # 单元测试
+pnpm lint          # ESLint
+pnpm typecheck     # 类型检查
+pnpm build         # 生产构建
+pnpm package       # 打包
+```

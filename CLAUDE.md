@@ -1,14 +1,8 @@
-# PetClaw Monorepo — AI 工作指南
+# PetClaw — AI 编码指南
 
-## 子项目
-- `petclaw-desktop/` — Electron 桌面应用（Phase 1 当前焦点）
-- `petclaw-web/` — Next.js 营销官网（Phase 3）
-- `petclaw-api/` — 后端服务（Phase 3）
-- `petclaw-shared/` — 共享 TypeScript 类型
+本文件是 Claude Code 入口。
 
-## Commit 规范
-Conventional Commits：`type(scope): subject`
-- scope：`desktop`、`web`、`api`、`shared`、`ci`
+完整规范见 `.ai/README.md`，默认按该文档执行。
 
-## 包管理
-pnpm workspace，从根目录执行：`pnpm --filter petclaw-desktop <cmd>`
+Claude Code 补充：
+- 始终使用中文回复

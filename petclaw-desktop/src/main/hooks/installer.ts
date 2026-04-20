@@ -12,7 +12,12 @@ export class ConfigInstaller {
 
     let settings: Record<string, unknown> = {}
     if (fs.existsSync(settingsPath)) {
-      settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'))
+      try {
+        settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'))
+      } catch {
+        console.warn('Invalid JSON in settings file, creating new config:', settingsPath)
+        settings = {}
+      }
     }
 
     if (!settings.hooks || typeof settings.hooks !== 'object') {
@@ -45,7 +50,13 @@ export class ConfigInstaller {
   uninstallClaudeHooks(settingsPath: string): void {
     if (!fs.existsSync(settingsPath)) return
 
-    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'))
+    let settings: Record<string, unknown>
+    try {
+      settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'))
+    } catch {
+      console.warn('Invalid JSON in settings file, skipping uninstall:', settingsPath)
+      return
+    }
     if (!settings.hooks) return
 
     const hooks = settings.hooks as Record<string, unknown>
