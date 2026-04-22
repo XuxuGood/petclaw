@@ -2,7 +2,7 @@
 
 **日期**: 2026-04-22
 **状态**: 设计完成，待实现
-**范围**: Gateway 通信、多 Agent 会话、自管理 Skills、多 Provider 模型、工作目录选择、配置同步
+**范围**: 运行时管理、Gateway 通信、多 Agent 会话、自管理 Skills、多 Provider 模型、工作目录选择、配置同步
 
 ---
 
@@ -10,16 +10,17 @@
 
 将 PetClaw 从"简化 WebSocket 客户端 + 硬编码单模型"升级为完整的 AI 桌面应用架构：
 
-1. **GatewayClient 重写** — 动态加载 Openclaw 自带客户端，替代手写 WebSocket
-2. **多 Agent 会话** — 每个项目目录对应一个 Agent，独立 workspace
-3. **自管理 Skills** — 完整 skill 生命周期（扫描/安装/卸载/启用/禁用），通过 `skills.load.extraDirs` 注入 Openclaw
-4. **多 Provider 多 Model** — 支持多 LLM Provider（Anthropic、OpenAI、自定义），每次对话可切换模型
-5. **工作目录选择** — 每次对话可选择项目目录作为 Agent workspace
-6. **ConfigSync 单一写入者** — 唯一写入 `openclaw.json` 的模块，保证配置一致性
+1. **运行时管理** — 捆绑 Openclaw runtime，`utilityProcess.fork()` 启动，动态端口、健康检查、自动重启
+2. **GatewayClient 重写** — 动态加载 Openclaw 自带客户端，替代手写 WebSocket
+3. **多 Agent 会话** — 每个项目目录对应一个 Agent，独立 workspace
+4. **自管理 Skills** — 完整 skill 生命周期（扫描/安装/卸载/启用/禁用），通过 `skills.load.extraDirs` 注入 Openclaw
+5. **多 Provider 多 Model** — 支持多 LLM Provider（Anthropic、OpenAI、自定义），每次对话可切换模型
+6. **工作目录选择** — 每次对话可选择项目目录作为 Agent workspace
+7. **ConfigSync 单一写入者** — 唯一写入 `openclaw.json` 的模块，保证配置一致性
 
 ### 参考来源
 
-- LobsterAI 源码（`openclawRuntimeAdapter.ts`、`openclawConfigSync.ts`、`skillManager.ts`）
+- LobsterAI 源码（`openclawRuntimeAdapter.ts`、`openclawConfigSync.ts`、`openclawEngineManager.ts`、`skillManager.ts`）
 - Openclaw Gateway 协议（129 RPC 方法 + 22 事件，详见 `docs/openclaw-gateway-api.md`）
 - 官方 PetClaw App 解包（workspace-templates、内置 skills）
 
@@ -32,34 +33,33 @@
 │                    Electron Main Process                 │
 │                                                         │
 │  ┌──────────────┐  ┌──────────────┐  ┌───────────────┐ │
-│  │ OpenclawGW   │  │ SessionMgr   │  │ SkillManager  │ │
-│  │              │  │              │  │               │ │
-│  │ · connect()  │  │ · create()   │  │ · scan()      │ │
-│  │ · chatSend() │←─│ · send()     │  │ · install()   │ │
-│  │ · onEvent()  │  │ · abort()    │  │ · uninstall() │ │
-│  │ · disconnect │  │ · setCwd()   │  │ · enable()    │ │
-│  └──────┬───────┘  └──────────────┘  │ · disable()   │ │
-│         │                             └───────┬───────┘ │
-│         │          ┌──────────────┐           │         │
-│         │          │ ConfigSync   │←──────────┘         │
-│         │          │              │                      │
-│         │          │ · syncAll()  │← ModelRegistry       │
-│         │          │ → openclaw.json                    │ │
-│         │          │ → AGENTS.md  │                      │
-│         │          └──────────────┘                      │
-│         │                                               │
-│  ┌──────┴───────┐  ┌──────────────┐  ┌───────────────┐ │
-│  │ ModelRegistry│  │ WorkspaceMgr │  │ BootCheck     │ │
-│  │              │  │              │  │ (existing)    │ │
-│  │ · providers  │  │ · syncAll()  │  └───────────────┘ │
-│  │ · models     │  │ · templates  │                     │
-│  │ · active     │  │ · skills     │  ┌───────────────┐ │
-│  └──────────────┘  └──────────────┘  │ HookServer    │ │
-│                                       │ (existing)    │ │
-│  ┌──────────────┐  ┌──────────────┐  └───────────────┘ │
-│  │ Database     │  │ IPC Router   │                     │
-│  │ (SQLite)     │  │ (modular)    │                     │
-│  └──────────────┘  └──────────────┘                     │
+│  │ EngineMgr    │  │ OpenclawGW   │  │ SessionMgr   │ │
+│  │              │  │              │  │              │ │
+│  │ · resolve()  │  │ · connect()  │  │ · create()   │ │
+│  │ · start()    │──│ · chatSend() │←─│ · send()     │ │
+│  │ · restart()  │  │ · onEvent()  │  │ · abort()    │ │
+│  │ · health()   │  │ · disconnect │  │ · setCwd()   │ │
+│  └──────────────┘  └──────┬───────┘  └──────────────┘ │
+│                            │                            │
+│  ┌──────────────┐  ┌──────┴───────┐  ┌───────────────┐ │
+│  │ SkillManager │  │ ConfigSync   │  │ ModelRegistry │ │
+│  │              │  │              │  │              │ │
+│  │ · scan()     │─→│ · syncAll()  │←─│ · providers  │ │
+│  │ · install()  │  │ → openclaw.json │ · models     │ │
+│  │ · uninstall()│  │ → AGENTS.md  │  │ · active     │ │
+│  │ · enable()   │  └──────────────┘  └──────────────┘ │
+│  │ · disable()  │                                      │
+│  └──────────────┘                                      │
+│                                                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌───────────────┐ │
+│  │ WorkspaceMgr │  │ BootCheck    │  │ HookServer   │ │
+│  │              │  │ (simplified) │  │ (existing)   │ │
+│  │ · syncAll()  │  └──────────────┘  └───────────────┘ │
+│  │ · templates  │                                      │
+│  │ · skills     │  ┌──────────────┐  ┌───────────────┐ │
+│  └──────────────┘  │ Database     │  │ IPC Router   │ │
+│                     │ (SQLite)     │  │ (modular)    │ │
+│                     └──────────────┘  └───────────────┘ │
 │                                                         │
 ├──────────────── contextBridge (preload) ─────────────────┤
 │                                                         │
@@ -72,7 +72,7 @@
 └─────────────────────────────────────────────────────────┘
          ↕ WebSocket (GatewayClient)
 ┌─────────────────────────────────────────────────────────┐
-│              Openclaw Runtime (Gateway)                   │
+│     Openclaw Runtime (utilityProcess / bundled)           │
 │  · LLM 调用 · Tool 执行 · Skill prompt 注入              │
 │  · Session 管理 · Exec Approvals                         │
 └─────────────────────────────────────────────────────────┘
@@ -82,7 +82,8 @@
 
 | 模块 | 职责 | 依赖 |
 |------|------|------|
-| **OpenclawGateway** | 动态加载 GatewayClient，管理连接、事件分发 | Openclaw npm 包 |
+| **OpenclawEngineManager** | Openclaw runtime 生命周期（resolve/start/stop/restart/health check） | Electron utilityProcess |
+| **OpenclawGateway** | 动态加载 GatewayClient，管理连接、事件分发 | OpenclawEngineManager |
 | **SessionManager** | 对话会话生命周期（创建/发送/中止），每次对话绑定 workspace + model | OpenclawGateway |
 | **SkillManager** | 扫描/安装/卸载/启用/禁用 skills，解析 SKILL.md frontmatter | 文件系统 |
 | **ConfigSync** | 唯一写入 openclaw.json 的模块，同步所有 Manager 状态 | SkillManager, ModelRegistry |
@@ -158,7 +159,229 @@ agent:{agentId}:petclaw:{sessionId}
 
 ## 4. 模块详细设计
 
-### 4.1 OpenclawGateway — 连接层
+### 4.1 OpenclawEngineManager — 运行时生命周期
+
+管理 Openclaw runtime 的解析、启动、停止、重启和健康检查。参考 LobsterAI `openclawEngineManager.ts`。
+
+#### 运行时分发策略
+
+**不再 npm install**，改为 App 捆绑 Openclaw runtime：
+
+| 环境 | runtime 路径 | 说明 |
+|------|-------------|------|
+| 开发 | `vendor/openclaw-runtime/current/` | 手动放置或脚本下载 |
+| 生产 | `resources/cfmind/` (electron-builder extraResources) | 打包时复制 |
+
+runtime 目录结构：
+```
+cfmind/（或 vendor/openclaw-runtime/current/）
+├── gateway-bundle.mjs          ← esbuild 单文件打包（~28MB，消除 1100+ ESM 模块解析）
+├── dist/
+│   ├── gateway/
+│   │   ├── server.js           ← Gateway 入口
+│   │   └── client.js           ← GatewayClient 模块
+│   ├── plugin-sdk/
+│   │   └── gateway-runtime.js  ← GatewayClient 备选入口
+│   └── client.js               ← GatewayClient 备选入口
+├── skills/                     ← bundled skills（52 个）
+├── package.json
+└── node_modules/（或 gateway.asar 按需提取）
+```
+
+#### Gateway 启动方式
+
+**macOS**: `utilityProcess.fork(openclawEntry, args, options)` — Electron 内置子进程，共享 Electron Node.js 运行时，无需独立 Node.js 二进制。
+
+**Windows 备选**: `spawn(process.execPath, [openclawEntry, ...args], { env: { ELECTRON_RUN_AS_NODE: '1' } })` — 使用 Electron 自身作为 Node.js 运行。
+
+```typescript
+// src/main/ai/engine-manager.ts
+
+interface RuntimeMetadata {
+  runtimeRoot: string           // runtime 根目录
+  openclawEntry: string         // Gateway 入口 JS（gateway-bundle.mjs 或 dist/gateway/server.js）
+  clientEntryPath: string       // GatewayClient JS 模块路径
+  version: string               // package.json version
+}
+
+interface GatewayConnection {
+  port: number
+  token: string
+  clientEntryPath: string
+}
+
+export class OpenclawEngineManager extends EventEmitter {
+  private process: Electron.UtilityProcess | null = null
+  private metadata: RuntimeMetadata | null = null
+  private restartCount = 0
+
+  // ─── Runtime 解析 ───
+
+  // 查找捆绑的 runtime（生产: resources/cfmind, 开发: vendor/openclaw-runtime/current）
+  resolveRuntimeMetadata(): RuntimeMetadata
+
+  // 解析 Gateway 入口文件
+  // 优先级: gateway-bundle.mjs → dist/gateway/server.js
+  private resolveOpenclawEntry(runtimeRoot: string): string
+
+  // 解析 GatewayClient 入口文件
+  // 优先级: dist/plugin-sdk/gateway-runtime.js → dist/gateway/client.js → dist/client.js → glob client-*.js
+  // 鸭子类型检测兜底：遍历 exports 找有 start/stop/request 原型方法的构造函数
+  private resolveGatewayClientEntry(runtimeRoot: string): string
+
+  // ─── Gateway 启动/停止 ───
+
+  async startGateway(): Promise<GatewayConnection> {
+    this.metadata = this.resolveRuntimeMetadata()
+
+    // 1. 动态端口扫描
+    const port = await this.resolveGatewayPort()
+
+    // 2. 生成 Gateway token
+    const token = crypto.randomUUID()
+    const tokenPath = join(STATE_DIR, 'gateway-token')
+    writeFileSync(tokenPath, token)
+
+    // 3. 构建环境变量
+    const env = this.buildGatewayEnv(port, token)
+
+    // 4. 启动 utilityProcess
+    this.process = utilityProcess.fork(this.metadata.openclawEntry, ['gateway', 'run'], {
+      env,
+      stdio: 'pipe',
+    })
+
+    // 5. 监听退出 → 自动重启
+    this.process.on('exit', (code) => this.handleExit(code))
+
+    // 6. 等待 Gateway 就绪
+    await this.waitForGatewayReady(port)
+
+    // 7. 生成 CLI shims
+    this.ensureBundledCliShims(port, token)
+
+    return {
+      port,
+      token,
+      clientEntryPath: this.metadata.clientEntryPath,
+    }
+  }
+
+  stopGateway(): void {
+    this.process?.kill()
+    this.process = null
+  }
+
+  // ─── 动态端口 ───
+
+  // 默认 18789，并行批量检测（10 个一组），扫描上限 80 个端口
+  private async resolveGatewayPort(): Promise<number>
+
+  // ─── 健康检查 ───
+
+  // 并行 HTTP 探针（/health, /healthz, /ready, /）+ TCP 可达性
+  private async isGatewayHealthy(port: number): Promise<boolean>
+
+  // 轮询等待 Gateway 就绪，带进度事件
+  private async waitForGatewayReady(port: number): Promise<void>
+
+  // ─── 自动重启 ───
+
+  // 指数退避: [3s, 5s, 10s, 20s, 30s]，最多 5 次
+  private static RESTART_DELAYS = [3000, 5000, 10000, 20000, 30000]
+
+  private handleExit(code: number | null): void {
+    if (this.restartCount >= OpenclawEngineManager.RESTART_DELAYS.length) {
+      this.emit('fatal', new Error(`Gateway crashed ${this.restartCount} times`))
+      return
+    }
+    const delay = OpenclawEngineManager.RESTART_DELAYS[this.restartCount]
+    this.restartCount++
+    this.emit('restarting', { attempt: this.restartCount, delay })
+    setTimeout(() => this.startGateway(), delay)
+  }
+
+  // ─── CLI Shims ───
+
+  // 生成 openclaw/claw shell 脚本，Agent Bash 命令可直接调用
+  private ensureBundledCliShims(port: number, token: string): void {
+    const shimDir = join(STATE_DIR, 'bin')
+    mkdirSync(shimDir, { recursive: true })
+    // openclaw shim: 设置环境变量后调用 runtime 入口
+    // claw shim: 同上
+  }
+
+  // ─── 环境变量 ───
+
+  private buildGatewayEnv(port: number, token: string): NodeJS.ProcessEnv {
+    return {
+      OPENCLAW_HOME: PETCLAW_HOME,
+      OPENCLAW_STATE_DIR: STATE_DIR,
+      OPENCLAW_CONFIG_PATH: join(PETCLAW_HOME, 'openclaw.json'),
+      GATEWAY_TOKEN: token,
+      GATEWAY_PORT: String(port),
+      NO_RESPAWN: '1',            // App 自己管重启，不让 Gateway 自重启
+      DISABLE_BONJOUR: '1',       // 禁用 Bonjour 广播
+      SKIP_MODEL_PRICING: '1',    // 跳过模型定价检查
+      LOG_LEVEL: 'info',
+      NODE_COMPILE_CACHE: join(STATE_DIR, 'v8-compile-cache'),  // V8 编译缓存加速启动
+      TZ: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      // API Keys 通过环境变量注入（不写入 openclaw.json 明文）
+      ...this.buildSecretEnvVars(),
+    }
+  }
+
+  // API Keys 从 petclaw-settings.json 读取，通过 env 注入
+  // 格式: PROVIDER_API_KEY=xxx（如 ANTHROPIC_API_KEY、OPENAI_API_KEY）
+  private buildSecretEnvVars(): Record<string, string>
+}
+```
+
+#### gateway.asar 策略
+
+Openclaw `node_modules` 体积大，打包为 `gateway.asar` 减小分发体积：
+
+```
+打包时: node_modules/ → gateway.asar（electron-builder asar 打包）
+首次启动: gateway.asar → 按需提取到 STATE_DIR/gateway-extracted/
+后续启动: 检查已提取版本，跳过提取
+```
+
+#### V8 编译缓存
+
+通过 `NODE_COMPILE_CACHE` 环境变量启用 V8 编译缓存，加速 Gateway 后续启动：
+
+```
+首次启动: 编译 JS → 生成缓存到 STATE_DIR/v8-compile-cache/
+后续启动: 直接加载缓存，跳过编译 → 启动提速 30-50%
+```
+
+#### Secret 环境变量
+
+API Keys **不写入 openclaw.json 明文**，通过环境变量注入：
+
+```
+petclaw-settings.json                 openclaw.json
+┌────────────────────┐                ┌──────────────────┐
+│ modelProviders: [  │                │ models.providers: │
+│   { apiKey: "sk-x" │  ──envVar──→  │   { /* no key */ }│
+│   }                │                │                  │
+│ ]                  │                └──────────────────┘
+└────────────────────┘
+                    ↓
+              Gateway env:
+              OPENAI_API_KEY=sk-x
+```
+
+#### Gateway Token
+
+Token 存储在独立文件，不放 settings.json：
+
+```
+~/.petclaw/state/gateway-token    ← 每次启动重新生成
+```
+
+### 4.2 OpenclawGateway — 连接层
 
 替代当前的 `OpencLawProvider`（手写 WebSocket），动态加载 Openclaw npm 包自带的 `GatewayClient`。
 
@@ -211,9 +434,9 @@ export class OpenclawGateway extends EventEmitter {
 
 | 参数 | 值 | 来源 |
 |------|-----|------|
-| `url` | `ws://127.0.0.1:{port}` | bootcheck 返回 |
-| `token` | Gateway auth token | bootcheck 返回 |
-| `clientEntryPath` | `~/.petclaw/node/lib/node_modules/openclaw/dist/gateway-client.js` | Openclaw 安装路径推断 |
+| `url` | `ws://127.0.0.1:{port}` | OpenclawEngineManager.startGateway() 返回 |
+| `token` | Gateway auth token | OpenclawEngineManager.startGateway() 返回（存于 STATE_DIR/gateway-token） |
+| `clientEntryPath` | runtime 中的 GatewayClient JS 模块 | OpenclawEngineManager.resolveGatewayClientEntry() |
 | `role` | `'operator'` | 固定 |
 | `scopes` | `['operator.admin']` | 固定 |
 | `caps` | `['tool-events']` | 固定 |
@@ -228,7 +451,7 @@ private handleEvent(frame: GatewayEventFrame): void {
 }
 ```
 
-### 4.2 SessionManager — 会话管理
+### 4.3 SessionManager — 会话管理
 
 ```typescript
 // src/main/ai/session-manager.ts
@@ -304,7 +527,7 @@ SessionManager.patchWorkspace(sessionId, newPath)
   → gateway.sessionsPatch(sessionKey, { /* ... */ })
 ```
 
-### 4.3 SkillManager — 技能管理
+### 4.4 SkillManager — 技能管理
 
 ```typescript
 // src/main/skills/skill-manager.ts
@@ -384,7 +607,7 @@ export function parseSkillMd(content: string): ParsedSkill {
 | GitHub URL | HTTP 下载 zip，失败 fallback git clone |
 | ClawHub | `npx clawhub@latest install {id}` |
 
-### 4.4 ModelRegistry — 模型管理
+### 4.5 ModelRegistry — 模型管理
 
 ```typescript
 // src/main/models/model-registry.ts
@@ -475,7 +698,7 @@ export interface PetclawSettings {
 }
 ```
 
-### 4.5 ConfigSync — 配置同步
+### 4.6 ConfigSync — 配置同步
 
 **唯一写入 openclaw.json 的模块**。
 
@@ -577,7 +800,7 @@ export class ConfigSync {
 - Skill creation path: ~/.petclaw/skills/
 ```
 
-### 4.6 WorkspaceManager — 工作区初始化
+### 4.7 WorkspaceManager — 工作区初始化
 
 ```typescript
 // src/main/workspace/workspace-manager.ts
@@ -646,12 +869,13 @@ export class WorkspaceManager {
 ```
 petclaw-desktop/src/main/
 ├── index.ts                       ← 入口（重构）
-├── bootcheck.ts                   ← 启动检查（扩展 syncWorkspace）
+├── bootcheck.ts                   ← 启动检查（简化：runtime 检测 + 目录初始化）
 ├── app-settings.ts                ← 配置定义（扩展 ModelProvider 类型）
 ├── database-path.ts               ← 不变
 ├── diagnostics.ts                 ← 不变
 │
 ├── ai/
+│   ├── engine-manager.ts          ← ★ OpenclawEngineManager（runtime 生命周期）
 │   ├── gateway.ts                 ← ★ OpenclawGateway（替代 openclaw.ts）
 │   ├── session-manager.ts         ← ★ SessionManager
 │   └── config-sync.ts             ← ★ ConfigSync
@@ -681,6 +905,11 @@ petclaw-desktop/src/main/
 └── onboarding.ts                   ← 扩展
 
 petclaw-desktop/resources/
+├── cfmind/                         ← ★ 捆绑的 Openclaw runtime（生产环境）
+│   ├── gateway-bundle.mjs
+│   ├── dist/
+│   ├── skills/
+│   └── package.json
 ├── workspace-templates/            ← ★ 新建
 │   ├── AGENTS_CHAT.md
 │   ├── AGENTS_WORK.md
@@ -688,14 +917,18 @@ petclaw-desktop/resources/
 └── workspace-skills/               ← ★ 新建（8 个内置 skill）
     ├── calendar/SKILL.md
     └── ...
+
+petclaw-desktop/vendor/             ← 开发环境 runtime（gitignore）
+└── openclaw-runtime/
+    └── current/                    ← 开发时手动放置
 ```
 
 ### 运行时数据
 
 ```
 ~/.petclaw/
-├── petclaw-settings.json           ← App 全局设置（含 modelProviders）
-├── openclaw.json                   ← ConfigSync 唯一写入
+├── petclaw-settings.json           ← App 全局设置（含 modelProviders + apiKeys）
+├── openclaw.json                   ← ConfigSync 唯一写入（不含 apiKey 明文）
 ├── workspace/                      ← 默认 workspace（main agent）
 │   ├── SOUL.md
 │   ├── AGENTS_CHAT.md / AGENTS_WORK.md
@@ -704,7 +937,11 @@ petclaw-desktop/resources/
 │   ├── calendar/SKILL.md           ← 内置
 │   ├── deep-research/SKILL.md      ← 内置
 │   └── my-custom-skill/SKILL.md    ← 用户安装
-├── node/                           ← Node.js + Openclaw 运行时
+├── state/                          ← ★ 运行时状态目录
+│   ├── gateway-token               ← Gateway auth token（每次启动重新生成）
+│   ├── v8-compile-cache/           ← V8 编译缓存
+│   ├── gateway-extracted/          ← gateway.asar 按需提取
+│   └── bin/                        ← CLI shims（openclaw, claw）
 ├── agents/                         ← Openclaw agent 数据
 ├── logs/
 └── petclaw.db                      ← SQLite
@@ -790,6 +1027,8 @@ petclaw-desktop/resources/
 | `app:version` | invoke | — | string |
 | `app:pet-ready` | send | — | — |
 | `app:quit` | send | — | — |
+| `gateway:status` | send→renderer | `{ status, port?, error? }` | — |
+| `gateway:restarting` | send→renderer | `{ attempt, delay }` | — |
 
 ---
 
@@ -875,16 +1114,20 @@ app.whenReady()
   → registerEarlyIpcHandlers()               // settings + onboarding
   → runBootCheck(chatWindow)
       ├── detectSetupMode()
-      ├── checkEnv() → checkNode() → checkRuntime()
-      ├── checkModelConfig()
-      │     ├── ensurePetclawCli()
-      │     ├── 创建目录结构
-      │     ├── WorkspaceManager.syncDefaultWorkspace(settings)  ← ★
-      │     ├── WorkspaceManager.syncBuiltinSkills()             ← ★
-      │     ├── ModelRegistry.load()                             ← ★
-      │     ├── ConfigSync.sync('boot')                          ← ★
-      │     └── 返回 { gatewayPort, gatewayToken }
-      └── startAndConnect()
+      ├── OpenclawEngineManager.resolveRuntimeMetadata()   ← ★ 检测捆绑 runtime
+      │     └── 失败 → 报错"Runtime not found"（不再下载安装）
+      ├── 创建目录结构（~/.petclaw/{workspace,skills,state,logs}）
+      ├── WorkspaceManager.syncDefaultWorkspace(settings)  ← ★
+      ├── WorkspaceManager.syncBuiltinSkills()             ← ★
+      ├── ModelRegistry.load()                             ← ★
+      ├── ConfigSync.sync('boot')                          ← ★ 生成 openclaw.json
+      ├── OpenclawEngineManager.startGateway()             ← ★ utilityProcess.fork
+      │     ├── resolveGatewayPort()                       // 动态端口扫描
+      │     ├── 生成 gateway-token
+      │     ├── utilityProcess.fork(openclawEntry)         // 启动 Gateway
+      │     ├── waitForGatewayReady()                      // HTTP 健康检查轮询
+      │     └── ensureBundledCliShims()                    // 生成 CLI shims
+      └── 返回 GatewayConnection { port, token, clientEntryPath }
   → boot:complete → ChatApp:
       ├── 需要 Onboarding → OnboardingPanel
       │     ├── onboarding:save-config
@@ -894,7 +1137,11 @@ app.whenReady()
   → createPetWindow()
   → registerAllIpc(ctx)                      // 模块化 IPC 注册 ★
   → createTray() + registerShortcuts()
-  → OpenclawGateway.connect()                // GatewayClient 连接 ★
+  → OpenclawGateway.connect({               // GatewayClient 连接 ★
+      url: `ws://127.0.0.1:${port}`,
+      token,
+      clientEntryPath,
+    })
   → SkillManager.scan() + startWatching()    // Skill 扫描 ★
 ```
 
@@ -904,12 +1151,14 @@ app.whenReady()
 
 ### Phase 1: 基础架构（当前迭代）
 
+- OpenclawEngineManager（runtime 解析 + utilityProcess.fork + 动态端口 + 健康检查 + 自动重启）
 - OpenclawGateway（GatewayClient 动态加载 + 连接 + 事件分发）
 - SessionManager（基础会话管理 + chat.send）
-- ConfigSync（openclaw.json 生成 + AGENTS.md 同步）
+- ConfigSync（openclaw.json 生成 + AGENTS.md 同步 + Secret env vars）
 - WorkspaceManager（模板 + 内置 skills 初始化）
 - IPC 模块化重构
-- 删除旧 `OpencLawProvider`
+- 删除旧 `OpencLawProvider` + bootcheck 中的 Node.js 下载/npm install 逻辑
+- BootCheck 简化为 runtime 检测 + 目录初始化
 
 ### Phase 2: Skills + Models
 
@@ -940,10 +1189,41 @@ app.whenReady()
 
 ---
 
-## 11. 验证标准
+## 11. electron-builder 打包配置
+
+```json
+{
+  "build": {
+    "extraResources": [
+      { "from": "resources/cfmind", "to": "cfmind" },
+      { "from": "resources/workspace-templates", "to": "workspace-templates" },
+      { "from": "resources/workspace-skills", "to": "workspace-skills" }
+    ],
+    "asarUnpack": [
+      "resources/cfmind/**"
+    ]
+  }
+}
+```
+
+**开发环境**：runtime 放在 `vendor/openclaw-runtime/current/`，OpenclawEngineManager 按优先级查找：
+1. `resources/cfmind/`（生产）
+2. `vendor/openclaw-runtime/current/`（开发）
+3. 失败 → 抛出错误，BootCheck 面板显示"Runtime not found"
+
+---
+
+## 12. 验证标准
 
 - `npx tsc --noEmit --project tsconfig.node.json` 类型检查通过
+- OpenclawEngineManager 检测到捆绑 runtime，返回正确的 RuntimeMetadata
+- Gateway 通过 `utilityProcess.fork()` 启动成功，动态端口扫描工作正常
+- 健康检查（HTTP /health + TCP）正确判断 Gateway 状态
 - GatewayClient 动态加载成功，`chat.send` 消息正常流转
+- Gateway 异常退出后自动重启（指数退避 [3s,5s,10s,20s,30s]，最多 5 次）
+- CLI shims 生成到 STATE_DIR/bin/，Agent Bash 命令可调用 `openclaw`
+- API Keys 通过环境变量注入，openclaw.json 中不出现明文 key
+- Gateway token 存储在 STATE_DIR/gateway-token，每次启动重新生成
 - 删除 `~/.petclaw/workspace/` → 重启 → 模板文件 + 内置 skills 自动生成
 - ConfigSync 生成的 openclaw.json 包含正确的 models、skills、agents 配置
 - SkillManager 扫描 `~/.petclaw/skills/` 返回正确列表
