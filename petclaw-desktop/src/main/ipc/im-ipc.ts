@@ -21,12 +21,9 @@ export function registerImIpcHandlers(deps: ImIpcDeps): void {
   })
 
   // 保存单个 IM 平台配置
-  ipcMain.handle(
-    ImIpcChannel.SaveConfig,
-    async (_event, key: string, config: IMPlatformConfig) => {
-      imGatewayManager.savePlatformConfig(key, config)
-    }
-  )
+  ipcMain.handle(ImIpcChannel.SaveConfig, async (_event, key: string, config: IMPlatformConfig) => {
+    imGatewayManager.savePlatformConfig(key, config)
+  })
 
   // 获取各 IM 平台的启用状态
   // 注意：实际连接状态由 OpenClaw 插件管理，此处仅返回 PetClaw 侧配置中的 enabled 字段
