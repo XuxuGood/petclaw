@@ -1,4 +1,6 @@
+import fs from 'fs'
 import path from 'path'
+
 import { app, BrowserWindow, shell, screen, ipcMain } from 'electron'
 import { is } from '@electron-toolkit/utils'
 import Database from 'better-sqlite3'
@@ -12,12 +14,12 @@ import { CoworkController } from './ai/cowork-controller'
 import { CoworkStore } from './ai/cowork-store'
 import { SessionManager } from './ai/session-manager'
 import { AgentManager } from './agents/agent-manager'
+import { ModelRegistry } from './models/model-registry'
+import { SkillManager } from './skills/skill-manager'
+import { McpManager } from './mcp/mcp-manager'
+import { MemoryManager } from './memory/memory-manager'
 import { PetEventBridge } from './pet/pet-event-bridge'
-import { registerChatIpcHandlers } from './ipc/chat-ipc'
-import { registerSettingsIpcHandlers } from './ipc/settings-ipc'
-import { registerWindowIpcHandlers } from './ipc/window-ipc'
-import { registerBootIpcHandlers } from './ipc/boot-ipc'
-import { registerPetIpcHandlers } from './ipc/pet-ipc'
+import { registerAllIpcHandlers, registerBootIpcHandlers, registerSettingsIpcHandlers } from './ipc'
 import { HookServer } from './hooks/server'
 import { createTray } from './system/tray'
 import { registerShortcuts, unregisterShortcuts } from './system/shortcuts'
@@ -35,8 +37,16 @@ let coworkStore: CoworkStore
 let gateway: OpenclawGateway | null = null
 let coworkController: CoworkController | null = null
 let sessionManager: SessionManager | null = null
-// Phase 2: Task 12 中初始化，此处声明保证类型安全
-const agentManager: AgentManager | null = null
+
+// Phase 2 Manager 实例声明（在 app.whenReady 中初始化）
+let agentManager: AgentManager
+let modelRegistry: ModelRegistry
+let skillManager: SkillManager
+let mcpManager: McpManager
+let memoryManager: MemoryManager
+// workspacePath 在 whenReady 中确定，setupV3Runtime 需要引用
+let workspacePath: string
+
 // 持有引用防止 GC，桥接器在构造时绑定事件
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 let petEventBridge: PetEventBridge | null = null
@@ -271,12 +281,11 @@ async function setupV3Runtime(port: number, token: string): Promise<void> {
 
   // 创建 CoworkController（事件路由）和 SessionManager（会话门面）
   coworkController = new CoworkController(gateway, coworkStore)
-  // Phase 2: agentManager 在 Task 12 初始化，此处以 null 断言占位，Task 12 会传入真实实例
   sessionManager = new SessionManager(
     coworkStore,
     coworkController,
-    agentManager!,
-    path.join(engineManager.getBaseDir(), 'workspace'),
+    agentManager,
+    workspacePath,
     engineManager.getStateDir()
   )
 }
@@ -303,30 +312,58 @@ app.whenReady().then(async () => {
   // 3. EngineManager 初始化
   engineManager = new OpenclawEngineManager()
 
-  // 4. ConfigSync 初始化（依赖 EngineManager 的路径）
+  // 4. Phase 2: Manager 初始化（在 ConfigSync 之前，ConfigSync 直接依赖 Manager 实例）
+  const petclawHome = path.join(app.getPath('home'), '.petclaw')
+  workspacePath = path.join(petclawHome, 'workspace')
+
+  // AgentManager：Agent CRUD，确保预设 Agent 存在（幂等）
+  agentManager = new AgentManager(db, workspacePath)
+  agentManager.ensurePresetAgents()
+
+  // ModelRegistry：加载持久化的 Provider 配置和活跃模型
+  modelRegistry = new ModelRegistry(db)
+  modelRegistry.load()
+
+  // SkillManager：扫描本地 skills 目录，首次运行时目录不存在需先创建
+  const skillsDir = path.join(petclawHome, 'skills')
+  fs.mkdirSync(skillsDir, { recursive: true })
+  skillManager = new SkillManager(db, skillsDir)
+  await skillManager.scan()
+
+  // McpManager：MCP 服务器 CRUD，数据持久化在 SQLite
+  mcpManager = new McpManager(db)
+
+  // MemoryManager：纯文件驱动，不依赖 db，无构造参数
+  memoryManager = new MemoryManager()
+
+  // 5. ConfigSync 初始化（新接口直接注入 Manager，移除旧函数注入方式）
   configSync = new ConfigSync({
-    getConfigPath: () => engineManager.getConfigPath(),
-    getStateDir: () => engineManager.getStateDir(),
-    getModelConfig: () => ({
-      primary: 'llm/petclaw-fast',
-      providers: {}
-    }),
-    getSkillsExtraDirs: () => [],
-    getWorkspacePath: () => path.join(engineManager.getBaseDir(), 'workspace'),
-    collectSecretEnvVars: () => ({})
+    configPath: engineManager.getConfigPath(),
+    stateDir: engineManager.getStateDir(),
+    agentManager,
+    modelRegistry,
+    skillManager,
+    mcpManager,
+    workspacePath
   })
 
-  // 5. 同步 auto-launch 设置到系统
+  // 6. 绑定 Manager change 事件 → 触发 ConfigSync 同步，保持 Openclaw 配置与状态一致
+  agentManager.on('change', () => configSync.sync('agent-change'))
+  modelRegistry.on('change', () => configSync.sync('model-change'))
+  skillManager.on('change', () => configSync.sync('skill-change'))
+  mcpManager.on('change', () => configSync.sync('mcp-change'))
+
+  // 7. 同步 auto-launch 设置到系统
   const initSettingsPath = path.join(app.getPath('home'), '.petclaw', 'petclaw-settings.json')
   const initSettings = readAppSettings(initSettingsPath)
   if (initSettings.autoLaunch !== undefined) {
     app.setLoginItemSettings({ openAtLogin: initSettings.autoLaunch })
   }
 
-  // 6. 创建 chat 窗口（立即显示 BootCheck UI）
+  // 8. 创建 chat 窗口（立即显示 BootCheck UI）
   createChatWindow()
 
-  // 7. 注册启动阶段 IPC（boot 检查和设置查询，不依赖 petWindow）
+  // 9. 注册启动阶段 IPC（boot 检查和设置查询，不依赖 petWindow）
   ipcMain.handle('app:version', async () => app.getVersion())
   let bootSuccess: boolean | null = null
   ipcMain.handle('boot:status', () => bootSuccess)
@@ -337,18 +374,18 @@ app.whenReady().then(async () => {
     diagWindowLoad('chat-window', chatWindow?.webContents.getURL())
   })
 
-  // 8. 等待 chat 窗口就绪（内容已绘制）
+  // 10. 等待 chat 窗口就绪（内容已绘制）
   await new Promise<void>((resolve) => {
     chatWindow?.once('ready-to-show', () => resolve())
   })
   chatWindow?.show()
   chatWindow?.focus()
 
-  // 9. 运行 BootCheck（v3：环境 → 引擎 → 连接，进度推送到 chat 窗口）
+  // 11. 运行 BootCheck（v3：环境 → 引擎 → 连接，进度推送到 chat 窗口）
   const bootResult = await runBootCheck(chatWindow!, engineManager, configSync)
   diagBootResult(bootResult.success)
 
-  // 10. 处理 boot 重试（renderer 发起）
+  // 12. 处理 boot 重试（renderer 发起）
   ipcMain.on('boot:retry', async () => {
     if (!chatWindow) return
     const retryResult = await runBootCheck(chatWindow, engineManager, configSync)
@@ -363,25 +400,25 @@ app.whenReady().then(async () => {
     }
   })
 
-  // 11. Boot 成功 → 初始化 v3 运行时（Gateway + Controller + SessionManager）
+  // 13. Boot 成功 → 初始化 v3 运行时（Gateway + Controller + SessionManager）
   if (bootResult.success) {
     await setupV3Runtime(bootResult.port!, bootResult.token!)
   }
 
-  // 12. 启动 Hook Server
+  // 14. 启动 Hook Server
   hookServer = new HookServer()
   hookServer.start().then((socketPath) => {
     console.warn('Hook server listening on:', socketPath)
   })
 
-  // 13. 通知 chat 窗口 boot 完成（成功时延迟 2s 用于动画编排）
+  // 15. 通知 chat 窗口 boot 完成（成功时延迟 2s 用于动画编排）
   if (bootResult.success) {
     await new Promise((r) => setTimeout(r, 2000))
   }
   bootSuccess = bootResult.success
   chatWindow?.webContents.send('boot:complete', bootSuccess)
 
-  // 14. chat 窗口进入主界面后创建 pet 窗口并注册完整 IPC
+  // 16. chat 窗口进入主界面后创建 pet 窗口并注册完整 IPC
   let petCreated = false
   ipcMain.on('app:pet-ready', () => {
     if (petCreated) return
@@ -394,24 +431,22 @@ app.whenReady().then(async () => {
 
     // 注册需要双窗口的 IPC 处理器
     if (petWindow && chatWindow) {
-      // Chat IPC 需要 v3 运行时（sessionManager + coworkController），boot 失败时跳过
-      if (sessionManager && coworkController) {
-        registerChatIpcHandlers({
-          sessionManager,
-          coworkController,
-          getChatWindow: () => chatWindow,
-          getPetWindow: () => petWindow
-        })
-      }
-
-      registerWindowIpcHandlers({
-        getPetWindow: () => petWindow,
-        toggleChatWindow
-      })
-
-      registerPetIpcHandlers({
-        getPetWindow: () => petWindow,
+      // registerAllIpcHandlers 统一注册全部模块 IPC，
+      // Chat/Session/Manager IPC 需要 v3 运行时（sessionManager + coworkController），
+      // boot 失败时 sessionManager / coworkController 为 null，chat:send 等会报 500 错误，
+      // 但 UI 层保证 boot 失败后不允许发送，所以这里以 null 断言传入
+      registerAllIpcHandlers({
+        db,
+        sessionManager: sessionManager!,
+        coworkController: coworkController!,
+        agentManager,
+        modelRegistry,
+        skillManager,
+        mcpManager,
+        memoryManager,
         getChatWindow: () => chatWindow,
+        getPetWindow: () => petWindow,
+        toggleChatWindow,
         hookServer
       })
 
@@ -425,7 +460,7 @@ app.whenReady().then(async () => {
     }
   })
 
-  // 15. 引擎状态变更转发到 renderer
+  // 17. 引擎状态变更转发到 renderer
   engineManager.on('status', (status) => {
     chatWindow?.webContents.send('engine:status', status)
   })
