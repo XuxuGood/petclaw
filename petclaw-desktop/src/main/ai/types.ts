@@ -83,3 +83,89 @@ export interface RuntimeMetadata {
   version: string | null
   expectedPathHint: string
 }
+
+// ── Phase 2: Agent ──
+
+export interface Agent {
+  id: string
+  name: string
+  description: string
+  systemPrompt: string
+  identity: string
+  model: string
+  icon: string
+  skillIds: string[]
+  enabled: boolean
+  isDefault: boolean
+  source: 'preset' | 'custom'
+  presetId: string
+  createdAt: number
+  updatedAt: number
+}
+
+// ── Phase 2: Model ──
+
+export interface ModelProvider {
+  id: string
+  name: string
+  logo: string
+  baseUrl: string
+  apiKey: string
+  apiFormat: 'openai-completions' | 'anthropic'
+  enabled: boolean
+  isPreset: boolean
+  isCustom: boolean
+  models: ModelDefinition[]
+}
+
+export interface ModelDefinition {
+  id: string
+  name: string
+  reasoning: boolean
+  supportsImage: boolean
+  contextWindow: number
+  maxTokens: number
+}
+
+// ── Phase 2: Skill ──
+
+export interface Skill {
+  id: string
+  name: string
+  description: string
+  enabled: boolean
+  isBuiltIn: boolean
+  skillPath: string
+  version?: string
+}
+
+// ── Phase 2: MCP ──
+
+export interface McpServer {
+  id: string
+  name: string
+  description: string
+  enabled: boolean
+  transportType: 'stdio' | 'sse' | 'streamable-http'
+  config: StdioConfig | HttpConfig
+  createdAt: number
+  updatedAt: number
+}
+
+export interface StdioConfig {
+  command: string
+  args: string[]
+  env?: Record<string, string>
+}
+
+export interface HttpConfig {
+  url: string
+  headers?: Record<string, string>
+}
+
+// ── Phase 2: Memory ──
+
+export interface MemoryEntry {
+  text: string
+  line: number
+}
