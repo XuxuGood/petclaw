@@ -736,7 +736,7 @@ ChatView 中的输入区域是简单的 textarea + Send 按钮。
 
 ```
 ┌──────────────────────────────────────────────┐
-│  [🐾 默认助手 ▾]  [📁 ~/projects ▾]         │
+│  [📁 ~/projects ▾]                           │
 ├──────────────────────────────────────────────┤
 │                                              │
 │  输入消息...                                  │
@@ -750,11 +750,14 @@ ChatView 中的输入区域是简单的 textarea + Send 按钮。
 
 | 组件 | 功能 |
 |------|------|
-| `AgentSelector` | 下拉选择当前 Agent（显示 icon + name） |
 | `CwdSelector` | 工作目录选择器（最近目录列表 + 添加文件夹） |
 | `SkillSelector` | 多选已启用的 Skills（Popover 展示 Skill 列表 + checkbox） |
 | `McpPanel` | MCP 服务器管理面板（列表 + 添加/编辑/删除 + 传输协议选择） |
 | `AttachmentBar` | 附件预览栏（图片缩略图 + 文件图标，拖放或点击添加） |
+
+### 13.4 Agent 切换
+
+Agent 切换放在**侧栏**（Sidebar），不在输入框中。侧栏新增 Agent 列表区域，点击切换当前 Agent。切换只影响**新建会话**，已有会话保持创建时绑定的 Agent 不变。
 
 ### 13.4 MCP 管理
 
@@ -824,7 +827,6 @@ Phase 1 步骤 5-15（窗口创建、BootCheck、IPC 注册等）
 | `src/renderer/src/chat/components/settings/AgentSettings.tsx` | Agent 管理 |
 | `src/renderer/src/chat/components/settings/AboutSettings.tsx` | 关于页面 |
 | `src/renderer/src/chat/components/ChatInputBox.tsx` | 增强输入框 |
-| `src/renderer/src/chat/components/AgentSelector.tsx` | Agent 选择器 |
 | `src/renderer/src/chat/components/CwdSelector.tsx` | 工作目录选择器 |
 | `src/renderer/src/chat/components/SkillSelector.tsx` | Skill 选择器 |
 | `src/renderer/src/chat/components/McpPanel.tsx` | MCP 服务器管理面板 |
