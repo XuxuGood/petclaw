@@ -19,10 +19,7 @@ import type {
 import { SchedulerIpcChannel } from './types'
 
 type GatewayClientLike = {
-  request: <T = Record<string, unknown>>(
-    method: string,
-    params?: unknown
-  ) => Promise<T>
+  request: <T = Record<string, unknown>>(method: string, params?: unknown) => Promise<T>
 }
 
 // ── Gateway 响应类型 ──
@@ -178,9 +175,7 @@ function mapGatewayRun(entry: GatewayRunLogEntry): ScheduledTaskRun {
     status,
     startedAt: new Date(tsMs).toISOString(),
     finishedAt:
-      status === 'running'
-        ? null
-        : new Date(safeFiniteNumber(entry.ts, tsMs)).toISOString(),
+      status === 'running' ? null : new Date(safeFiniteNumber(entry.ts, tsMs)).toISOString(),
     durationMs: safeFiniteNumberOrNull(entry.durationMs),
     error: status === 'success' ? null : (entry.error ?? null)
   }
@@ -195,9 +190,7 @@ function toGatewayPayload(payload: ScheduledTaskPayload): ScheduledTaskPayload {
   return payload
 }
 
-function toGatewayDelivery(
-  delivery?: ScheduledTaskDelivery
-): ScheduledTaskDelivery | undefined {
+function toGatewayDelivery(delivery?: ScheduledTaskDelivery): ScheduledTaskDelivery | undefined {
   if (!delivery) return undefined
   return delivery
 }

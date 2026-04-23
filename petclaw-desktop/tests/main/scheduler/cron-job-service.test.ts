@@ -90,7 +90,10 @@ describe('CronJobService', () => {
       wakeMode: 'always',
       payload: { kind: 'agentTurn', message: 'hello' }
     })
-    expect(mockClient.request).toHaveBeenCalledWith('cron.add', expect.objectContaining({ name: 'test' }))
+    expect(mockClient.request).toHaveBeenCalledWith(
+      'cron.add',
+      expect.objectContaining({ name: 'test' })
+    )
     expect(task.id).toBe('new-1')
   })
 
