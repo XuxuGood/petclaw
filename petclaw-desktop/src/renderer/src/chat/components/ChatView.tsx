@@ -1,10 +1,19 @@
 import { useState, useEffect, useRef } from 'react'
 import { Send, PawPrint } from 'lucide-react'
+
 import { useChatStore } from '../../stores/chat-store'
 
 const SUGGESTED_PROMPTS = ['你是怎么实现的？', '现在什么模型？', '你有什么能力？']
 
-export function ChatView() {
+interface ChatViewProps {
+  activeSessionId?: string | null
+  onSessionCreated?: (id: string) => void
+  currentAgentId?: string
+  taskMonitorOpen?: boolean
+  onToggleMonitor?: () => void
+}
+
+export function ChatView(_props: ChatViewProps) {
   const [input, setInput] = useState('')
   const { messages, isLoading, addMessage, appendToLastMessage, setLoading, loadHistory } =
     useChatStore()

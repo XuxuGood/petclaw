@@ -1,45 +1,81 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+
 import { Sidebar } from './components/Sidebar'
 import { ChatView } from './components/ChatView'
-import { MonitorView } from './components/MonitorView'
-import { SettingsView } from './components/SettingsView'
+import { SkillsPage } from './components/SkillsPage'
+import { CronPage } from './components/CronPage'
+import { SettingsPage } from './components/settings/SettingsPage'
 import { StatusBar } from './components/StatusBar'
+
 import { OnboardingPanel } from '../panels/OnboardingPanel'
 import { BootCheckPanel } from '../panels/BootCheckPanel'
 
-export type ViewType = 'chat' | 'monitor' | 'settings'
+// v3 路由类型：去掉 monitor，新增 skills / cron
+export type ViewType = 'chat' | 'skills' | 'cron' | 'settings'
 
 type AppPhase = 'bootcheck' | 'onboarding' | 'main'
 
 export function ChatApp() {
-  const [activeView, setActiveView] = useState<ViewType>('chat')
   const [phase, setPhase] = useState<AppPhase>('bootcheck')
 
-  // Restore last active tab on mount
+  // 核心路由状态
+  const [activeView, setActiveView] = useState<ViewType>('chat')
+  // 返回 settings 时的上一个页面，用于「返回」按钮
+  const [previousView, setPreviousView] = useState<ViewType>('chat')
+
+  // Agent 与会话
+  const [currentAgentId, setCurrentAgentId] = useState('main')
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+
+  // 侧栏 Tab
+  const [sidebarTab, setSidebarTab] = useState<'tasks' | 'channels'>('tasks')
+
+  // Settings 子菜单
+  const [settingsTab, setSettingsTab] = useState('preferences')
+
+  // 任务监控面板开关
+  const [taskMonitorOpen, setTaskMonitorOpen] = useState(false)
+
+  // 切换视图：进入 settings 时记录来源页，便于返回
+  const handleViewChange = useCallback(
+    (view: ViewType) => {
+      if (view === 'settings') {
+        setPreviousView(activeView === 'settings' ? 'chat' : activeView)
+      }
+      setActiveView(view)
+      window.api.setSetting('lastActiveTab', view)
+    },
+    [activeView]
+  )
+
+  const handleBackFromSettings = useCallback(() => {
+    setActiveView(previousView)
+  }, [previousView])
+
+  // 切换 Agent：重置会话、切回 chat 视图
+  const handleAgentChange = useCallback((agentId: string) => {
+    setCurrentAgentId(agentId)
+    setSidebarTab('tasks')
+    setActiveView('chat')
+    setActiveSessionId(null)
+  }, [])
+
+  // 新建任务：清空会话 ID，回到 chat
+  const handleNewTask = useCallback(() => {
+    setActiveView('chat')
+    setActiveSessionId(null)
+  }, [])
+
+  // 启动时恢复上次激活的 Tab
   useEffect(() => {
     window.api.getSetting('lastActiveTab').then((val) => {
-      if (val === 'chat' || val === 'monitor' || val === 'settings') {
+      if (val === 'chat' || val === 'skills' || val === 'cron' || val === 'settings') {
         setActiveView(val as ViewType)
       }
     })
   }, [])
 
-  // Save active tab when it changes
-  const handleViewChange = (view: ViewType): void => {
-    setActiveView(view)
-    window.api.setSetting('lastActiveTab', view)
-  }
-
-  useEffect(() => {
-    const unsub = window.api.onPanelOpen((panel) => {
-      if (panel === 'chat' || panel === 'monitor' || panel === 'settings') {
-        handleViewChange(panel as ViewType)
-      }
-    })
-    return unsub
-  }, [])
-
-  // Listen for boot completion (event-based + polling fallback)
+  // 监听 boot 完成事件（push + 轮询兜底）
   useEffect(() => {
     function handleBootSuccess(): void {
       window.api.getSetting('onboardingComplete').then((val) => {
@@ -47,50 +83,84 @@ export function ChatApp() {
       })
     }
 
-    // Event listener for push notification
     const unsub = window.api.onBootComplete((success) => {
       if (success) handleBootSuccess()
     })
 
-    // Fallback: query in case event was sent before listener was set up
     window.api
       .getBootStatus()
       .then((success) => {
         if (success) handleBootSuccess()
       })
-      .catch(() => {
-        /* handler not yet registered */
-      })
+      .catch(() => {})
 
     return unsub
   }, [])
 
-  // Notify main process when entering main phase (pet window can be created)
+  // 进入 main 阶段后通知主进程（触发宠物窗口创建）
   useEffect(() => {
-    if (phase === 'main') {
-      window.api.petReady()
-    }
+    if (phase === 'main') window.api.petReady()
   }, [phase])
 
-  // BootCheck phase
+  // 监听主进程推送的面板切换指令（如托盘菜单点击）
+  useEffect(() => {
+    const unsub = window.api.onPanelOpen((panel) => {
+      if (panel === 'chat' || panel === 'skills' || panel === 'cron' || panel === 'settings') {
+        handleViewChange(panel as ViewType)
+      }
+    })
+    return unsub
+  }, [handleViewChange])
+
   if (phase === 'bootcheck') {
     return <BootCheckPanel onRetry={() => window.api.retryBoot()} />
   }
 
-  // Onboarding phase
   if (phase === 'onboarding') {
     return <OnboardingPanel onComplete={() => setPhase('main')} />
   }
 
-  // Main phase
+  // Settings 全页面模式：隐藏主侧栏，独占渲染
+  if (activeView === 'settings') {
+    return (
+      <SettingsPage
+        activeTab={settingsTab}
+        onTabChange={setSettingsTab}
+        onBack={handleBackFromSettings}
+      />
+    )
+  }
+
+  // 三栏布局：Sidebar (220px) + Main (flex-1) + StatusBar（底部）
   return (
     <div className="w-full h-full flex bg-bg-root overflow-hidden">
-      <Sidebar activeView={activeView} onViewChange={handleViewChange} />
+      <Sidebar
+        activeView={activeView}
+        onViewChange={handleViewChange}
+        currentAgentId={currentAgentId}
+        onAgentChange={handleAgentChange}
+        activeSessionId={activeSessionId}
+        onSessionSelect={setActiveSessionId}
+        sidebarTab={sidebarTab}
+        onSidebarTabChange={setSidebarTab}
+        onNewTask={handleNewTask}
+        onSettingsOpen={() => handleViewChange('settings')}
+      />
       <div className="flex-1 flex flex-col min-w-0">
-        <main className="flex-1 flex flex-col min-h-0">
-          {activeView === 'chat' && <ChatView />}
-          {activeView === 'monitor' && <MonitorView />}
-          {activeView === 'settings' && <SettingsView />}
+        <main className="flex-1 flex min-h-0">
+          <div className="flex-1 flex flex-col min-w-0">
+            {activeView === 'chat' && (
+              <ChatView
+                activeSessionId={activeSessionId}
+                onSessionCreated={setActiveSessionId}
+                currentAgentId={currentAgentId}
+                taskMonitorOpen={taskMonitorOpen}
+                onToggleMonitor={() => setTaskMonitorOpen((p) => !p)}
+              />
+            )}
+            {activeView === 'skills' && <SkillsPage />}
+            {activeView === 'cron' && <CronPage />}
+          </div>
         </main>
         <StatusBar />
       </div>
