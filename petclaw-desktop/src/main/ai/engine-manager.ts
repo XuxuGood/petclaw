@@ -215,6 +215,11 @@ export class OpenclawEngineManager extends EventEmitter {
     return this.gatewayLogPath
   }
 
+  /** 返回运行时根目录（用于 GatewayClient 动态加载），未安装时返回 null */
+  getRuntimeRoot(): string | null {
+    return this.resolveRuntimeMetadata().root
+  }
+
   getGatewayToken(): string | null {
     return this.readGatewayToken()
   }
