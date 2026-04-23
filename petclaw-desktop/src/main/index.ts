@@ -4,6 +4,7 @@ import { is } from '@electron-toolkit/utils'
 import Database from 'better-sqlite3'
 
 import { initDatabase } from './data/db'
+import { migrateSettingsToKv } from './data/settings-migration'
 import { OpenclawEngineManager } from './ai/engine-manager'
 import { ConfigSync } from './ai/config-sync'
 import { OpenclawGateway } from './ai/gateway'
@@ -280,6 +281,10 @@ app.whenReady().then(async () => {
   })
   db = new Database(dbPath)
   initDatabase(db)
+
+  // 1b. v1 迁移：将 petclaw-settings.json 中的设置一次性写入 kv 表
+  const oldSettingsPath = path.join(app.getPath('home'), '.petclaw', 'petclaw-settings.json')
+  migrateSettingsToKv(db, oldSettingsPath)
 
   // 2. CoworkStore 防御性重置：上次崩溃遗留的 running 状态归零
   coworkStore = new CoworkStore(db)
