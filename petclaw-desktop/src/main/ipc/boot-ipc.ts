@@ -15,15 +15,15 @@ export interface BootIpcDeps {
 export function registerBootIpcHandlers(deps: BootIpcDeps): void {
   const { db } = deps
 
-  ipcMain.handle('onboarding:checkEnv', async () => {
+  ipcMain.handle('onboarding:check-env', async () => {
     return checkEnvironment()
   })
 
-  ipcMain.handle('onboarding:checkGateway', async (_event, url: string) => {
+  ipcMain.handle('onboarding:check-gateway', async (_event, url: string) => {
     return checkGatewayConnectivity(url)
   })
 
-  ipcMain.handle('onboarding:installHooks', async () => {
+  ipcMain.handle('onboarding:install-hooks', async () => {
     const settingsPath = join(app.getPath('home'), '.claude', 'settings.json')
     const bridgePath = join(app.getAppPath(), 'resources', 'petclaw-bridge')
     const installer = new ConfigInstaller(bridgePath)
@@ -32,7 +32,7 @@ export function registerBootIpcHandlers(deps: BootIpcDeps): void {
 
   // 保存 Onboarding 结果
   ipcMain.handle(
-    'onboarding:saveConfig',
+    'onboarding:save-config',
     async (
       _event,
       data: {

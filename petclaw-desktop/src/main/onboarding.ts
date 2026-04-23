@@ -1,5 +1,4 @@
 import { execFile } from 'child_process'
-import WebSocket from 'ws'
 import { ConfigInstaller } from './hooks/installer'
 
 export async function checkEnvironment(): Promise<{
@@ -17,31 +16,27 @@ export async function checkEnvironment(): Promise<{
   })
 }
 
+/**
+ * v3: 通过 HTTP /health 端点检测 Gateway 连通性（替代 v1 WebSocket）
+ */
 export async function checkGatewayConnectivity(
   url: string
 ): Promise<{ connected: boolean; latencyMs: number | null }> {
   const start = Date.now()
-  return new Promise((resolve) => {
-    const timeout = setTimeout(() => {
-      ws.close()
-      resolve({ connected: false, latencyMs: null })
-    }, 3000)
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 3000)
 
-    const ws = new WebSocket(url)
-
-    ws.on('open', () => {
-      clearTimeout(timeout)
-      const latencyMs = Date.now() - start
-      ws.close()
-      resolve({ connected: true, latencyMs })
-    })
-
-    ws.on('error', () => {
-      clearTimeout(timeout)
-      ws.close()
-      resolve({ connected: false, latencyMs: null })
-    })
-  })
+  try {
+    // 将 ws:// 转换为 http://，拼接 /health 路径
+    const httpUrl = url.replace(/^ws(s?):\/\//, 'http$1://').replace(/\/$/, '') + '/health'
+    const res = await fetch(httpUrl, { signal: controller.signal })
+    clearTimeout(timeout)
+    const latencyMs = Date.now() - start
+    return { connected: res.status < 500, latencyMs }
+  } catch {
+    clearTimeout(timeout)
+    return { connected: false, latencyMs: null }
+  }
 }
 
 export function installHooks(
