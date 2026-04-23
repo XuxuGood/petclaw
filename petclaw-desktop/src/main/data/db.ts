@@ -93,6 +93,28 @@ export function initDatabase(db: Database.Database): void {
       updated_at INTEGER NOT NULL
     )
   `)
+
+  // IM 平台配置：KV 表，key 为平台名或 平台:实例ID（支持多实例，如 dingtalk:instance-1）
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS im_config (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    )
+  `)
+
+  // IM 会话 → Cowork 会话路由映射：记录 IM 侧会话与内部 cowork 会话的绑定关系
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS im_session_mappings (
+      im_conversation_id TEXT NOT NULL,
+      platform TEXT NOT NULL,
+      cowork_session_id TEXT NOT NULL,
+      agent_id TEXT NOT NULL DEFAULT 'main',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (im_conversation_id, platform)
+    )
+  `)
 }
 
 export function saveMessage(

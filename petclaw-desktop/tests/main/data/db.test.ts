@@ -211,3 +211,124 @@ describe('mcp_servers table', () => {
     }).toThrow()
   })
 })
+
+describe('im_config table', () => {
+  let db: Database.Database
+
+  beforeEach(() => {
+    db = new Database(':memory:')
+    initDatabase(db)
+  })
+
+  afterEach(() => {
+    db.close()
+  })
+
+  it('should set and get a single platform config', () => {
+    const now = Date.now()
+    // 直接写入单一平台 key
+    db.prepare('INSERT OR REPLACE INTO im_config (key, value, updated_at) VALUES (?, ?, ?)').run(
+      'dingtalk',
+      '{"appKey":"abc"}',
+      now
+    )
+    const row = db.prepare('SELECT * FROM im_config WHERE key = ?').get('dingtalk') as Record<
+      string,
+      unknown
+    >
+    expect(row.value).toBe('{"appKey":"abc"}')
+  })
+
+  it('should support multi-instance keys like platform:instance-id', () => {
+    const now = Date.now()
+    // 多实例 key 格式：平台:实例ID
+    db.prepare('INSERT OR REPLACE INTO im_config (key, value, updated_at) VALUES (?, ?, ?)').run(
+      'dingtalk:instance-1',
+      '{"appKey":"k1"}',
+      now
+    )
+    db.prepare('INSERT OR REPLACE INTO im_config (key, value, updated_at) VALUES (?, ?, ?)').run(
+      'dingtalk:instance-2',
+      '{"appKey":"k2"}',
+      now
+    )
+    const rows = db.prepare("SELECT * FROM im_config WHERE key LIKE 'dingtalk:%'").all() as Record<
+      string,
+      unknown
+    >[]
+    expect(rows).toHaveLength(2)
+  })
+
+  it('should upsert on conflict', () => {
+    const now = Date.now()
+    db.prepare('INSERT OR REPLACE INTO im_config (key, value, updated_at) VALUES (?, ?, ?)').run(
+      'feishu',
+      '{"v":1}',
+      now
+    )
+    db.prepare('INSERT OR REPLACE INTO im_config (key, value, updated_at) VALUES (?, ?, ?)').run(
+      'feishu',
+      '{"v":2}',
+      now
+    )
+    const row = db.prepare('SELECT value FROM im_config WHERE key = ?').get('feishu') as Record<
+      string,
+      unknown
+    >
+    expect(row.value).toBe('{"v":2}')
+  })
+})
+
+describe('im_session_mappings table', () => {
+  let db: Database.Database
+
+  beforeEach(() => {
+    db = new Database(':memory:')
+    initDatabase(db)
+  })
+
+  afterEach(() => {
+    db.close()
+  })
+
+  it('should insert and query a session mapping', () => {
+    const now = Date.now()
+    db.prepare(
+      'INSERT INTO im_session_mappings (im_conversation_id, platform, cowork_session_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+    ).run('conv-001', 'dingtalk', 'sess-abc', now, now)
+    const row = db
+      .prepare('SELECT * FROM im_session_mappings WHERE im_conversation_id = ? AND platform = ?')
+      .get('conv-001', 'dingtalk') as Record<string, unknown>
+    expect(row.cowork_session_id).toBe('sess-abc')
+    // agent_id 应有默认值 'main'
+    expect(row.agent_id).toBe('main')
+  })
+
+  it('should enforce composite primary key uniqueness', () => {
+    const now = Date.now()
+    db.prepare(
+      'INSERT INTO im_session_mappings (im_conversation_id, platform, cowork_session_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+    ).run('conv-001', 'dingtalk', 'sess-abc', now, now)
+    // 相同 (im_conversation_id, platform) 组合不可重复插入
+    expect(() => {
+      db.prepare(
+        'INSERT INTO im_session_mappings (im_conversation_id, platform, cowork_session_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+      ).run('conv-001', 'dingtalk', 'sess-xyz', now, now)
+    }).toThrow()
+  })
+
+  it('should allow same conversation id on different platforms', () => {
+    const now = Date.now()
+    // 同一 IM 会话 ID 在不同平台可以独立映射
+    db.prepare(
+      'INSERT INTO im_session_mappings (im_conversation_id, platform, cowork_session_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+    ).run('conv-001', 'dingtalk', 'sess-1', now, now)
+    db.prepare(
+      'INSERT INTO im_session_mappings (im_conversation_id, platform, cowork_session_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+    ).run('conv-001', 'feishu', 'sess-2', now, now)
+    const rows = db
+      .prepare('SELECT * FROM im_session_mappings WHERE im_conversation_id = ?')
+      .all('conv-001') as Record<string, unknown>[]
+    expect(rows).toHaveLength(2)
+  })
+})
