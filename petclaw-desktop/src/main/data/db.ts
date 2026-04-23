@@ -59,6 +59,40 @@ export function initDatabase(db: Database.Database): void {
   `)
 
   db.exec('CREATE INDEX IF NOT EXISTS idx_cowork_messages_session ON cowork_messages(session_id)')
+
+  // Agent 配置：每个 Agent 对应一套系统提示 + 模型 + 技能组合
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS agents (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      system_prompt TEXT NOT NULL DEFAULT '',
+      identity TEXT NOT NULL DEFAULT '',
+      model TEXT NOT NULL DEFAULT '',
+      icon TEXT NOT NULL DEFAULT '',
+      skill_ids TEXT NOT NULL DEFAULT '[]',
+      enabled INTEGER NOT NULL DEFAULT 1,
+      is_default INTEGER NOT NULL DEFAULT 0,
+      source TEXT NOT NULL DEFAULT 'custom',
+      preset_id TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )
+  `)
+
+  // MCP 服务器：外部工具服务连接配置，支持 stdio / sse 两种传输类型
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS mcp_servers (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      description TEXT NOT NULL DEFAULT '',
+      enabled INTEGER NOT NULL DEFAULT 1,
+      transport_type TEXT NOT NULL DEFAULT 'stdio',
+      config_json TEXT NOT NULL DEFAULT '{}',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )
+  `)
 }
 
 export function saveMessage(

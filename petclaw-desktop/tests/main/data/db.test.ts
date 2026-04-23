@@ -122,3 +122,92 @@ describe('Database', () => {
     })
   })
 })
+
+describe('agents table', () => {
+  let db: Database.Database
+
+  beforeEach(() => {
+    db = new Database(':memory:')
+    initDatabase(db)
+  })
+
+  afterEach(() => {
+    db.close()
+  })
+
+  it('should create an agent with defaults', () => {
+    const now = Date.now()
+    db.prepare(`INSERT INTO agents (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)`).run(
+      'main',
+      '默认助手',
+      now,
+      now
+    )
+    const row = db.prepare('SELECT * FROM agents WHERE id = ?').get('main') as Record<
+      string,
+      unknown
+    >
+    expect(row.name).toBe('默认助手')
+    expect(row.enabled).toBe(1)
+    expect(row.is_default).toBe(0)
+    expect(row.source).toBe('custom')
+    expect(row.skill_ids).toBe('[]')
+  })
+
+  it('should enforce primary key uniqueness', () => {
+    const now = Date.now()
+    db.prepare(`INSERT INTO agents (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)`).run(
+      'a1',
+      'Agent',
+      now,
+      now
+    )
+    expect(() => {
+      db.prepare(`INSERT INTO agents (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)`).run(
+        'a1',
+        'Dup',
+        now,
+        now
+      )
+    }).toThrow()
+  })
+})
+
+describe('mcp_servers table', () => {
+  let db: Database.Database
+
+  beforeEach(() => {
+    db = new Database(':memory:')
+    initDatabase(db)
+  })
+
+  afterEach(() => {
+    db.close()
+  })
+
+  it('should create an mcp server', () => {
+    const now = Date.now()
+    db.prepare(
+      `INSERT INTO mcp_servers (id, name, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
+    ).run('m1', 'test-server', '{"command":"npx"}', now, now)
+    const row = db.prepare('SELECT * FROM mcp_servers WHERE id = ?').get('m1') as Record<
+      string,
+      unknown
+    >
+    expect(row.name).toBe('test-server')
+    expect(row.transport_type).toBe('stdio')
+    expect(row.enabled).toBe(1)
+  })
+
+  it('should enforce unique name', () => {
+    const now = Date.now()
+    db.prepare(
+      `INSERT INTO mcp_servers (id, name, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
+    ).run('m1', 'srv', '{}', now, now)
+    expect(() => {
+      db.prepare(
+        `INSERT INTO mcp_servers (id, name, config_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
+      ).run('m2', 'srv', '{}', now, now)
+    }).toThrow()
+  })
+})
