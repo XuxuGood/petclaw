@@ -8,6 +8,8 @@ import { registerModelsIpcHandlers, type ModelsIpcDeps } from './models-ipc'
 import { registerSkillsIpcHandlers, type SkillsIpcDeps } from './skills-ipc'
 import { registerMcpIpcHandlers, type McpIpcDeps } from './mcp-ipc'
 import { registerMemoryIpcHandlers, type MemoryIpcDeps } from './memory-ipc'
+import { registerSchedulerIpcHandlers, type SchedulerIpcDeps } from './scheduler-ipc'
+import { registerImIpcHandlers, type ImIpcDeps } from './im-ipc'
 
 // AllIpcDeps 合并全部模块的依赖接口，主进程统一注入
 export type AllIpcDeps = ChatIpcDeps &
@@ -19,7 +21,9 @@ export type AllIpcDeps = ChatIpcDeps &
   ModelsIpcDeps &
   SkillsIpcDeps &
   McpIpcDeps &
-  MemoryIpcDeps
+  MemoryIpcDeps &
+  SchedulerIpcDeps &
+  ImIpcDeps
 
 export function registerAllIpcHandlers(deps: AllIpcDeps): void {
   registerChatIpcHandlers(deps)
@@ -33,6 +37,9 @@ export function registerAllIpcHandlers(deps: AllIpcDeps): void {
   registerSkillsIpcHandlers(deps)
   registerMcpIpcHandlers(deps)
   registerMemoryIpcHandlers(deps)
+  // Phase 3: 集成功能 IPC 模块
+  registerSchedulerIpcHandlers(deps)
+  registerImIpcHandlers(deps)
 }
 
 export { registerBootIpcHandlers, registerSettingsIpcHandlers }
