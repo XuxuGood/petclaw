@@ -118,6 +118,28 @@ interface ElectronAPI {
     listEntries: (workspace: string) => Promise<unknown>
     updateEntry: (workspace: string, oldText: string, newText: string) => Promise<unknown>
   }
+  // v3 Phase 3: Scheduler
+  scheduler: {
+    list: () => Promise<unknown>
+    create: (input: unknown) => Promise<unknown>
+    update: (id: string, input: unknown) => Promise<unknown>
+    delete: (id: string) => Promise<unknown>
+    toggle: (id: string, enabled: boolean) => Promise<unknown>
+    runManually: (id: string) => Promise<unknown>
+    listRuns: (jobId: string, limit?: number, offset?: number) => Promise<unknown>
+    listAllRuns: (limit?: number, offset?: number) => Promise<unknown>
+    onStatusUpdate: (cb: (data: unknown) => void) => () => void
+    onRefresh: (cb: () => void) => () => void
+  }
+  // v3 Phase 3: IM
+  im: {
+    loadConfig: () => Promise<unknown>
+    saveConfig: (key: string, config: unknown) => Promise<void>
+    getStatus: () => Promise<unknown>
+    loadSettings: () => Promise<unknown>
+    saveSettings: (settings: unknown) => Promise<void>
+    onStatusUpdate: (cb: (data: unknown) => void) => () => void
+  }
 }
 
 declare global {

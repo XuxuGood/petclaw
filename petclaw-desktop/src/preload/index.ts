@@ -236,6 +236,47 @@ const api = {
     listEntries: (workspace: string) => ipcRenderer.invoke('memory:list-entries', workspace),
     updateEntry: (workspace: string, oldText: string, newText: string) =>
       ipcRenderer.invoke('memory:update-entry', workspace, oldText, newText)
+  },
+
+  // ── v3 Phase 3: Scheduler ──
+  scheduler: {
+    list: () => ipcRenderer.invoke('scheduler:list'),
+    create: (input: unknown) => ipcRenderer.invoke('scheduler:create', input),
+    update: (id: string, input: unknown) => ipcRenderer.invoke('scheduler:update', id, input),
+    delete: (id: string) => ipcRenderer.invoke('scheduler:delete', id),
+    toggle: (id: string, enabled: boolean) => ipcRenderer.invoke('scheduler:toggle', id, enabled),
+    runManually: (id: string) => ipcRenderer.invoke('scheduler:run-manually', id),
+    listRuns: (jobId: string, limit?: number, offset?: number) =>
+      ipcRenderer.invoke('scheduler:list-runs', jobId, limit, offset),
+    listAllRuns: (limit?: number, offset?: number) =>
+      ipcRenderer.invoke('scheduler:list-all-runs', limit, offset),
+    onStatusUpdate: (cb: (data: unknown) => void) => {
+      // 监听调度任务状态推送，返回取消订阅函数
+      const handler = (_e: Electron.IpcRendererEvent, data: unknown) => cb(data)
+      ipcRenderer.on('scheduler:status-update', handler)
+      return () => ipcRenderer.removeListener('scheduler:status-update', handler)
+    },
+    onRefresh: (cb: () => void) => {
+      // 监听调度列表刷新通知（任务增删后主进程广播）
+      const handler = () => cb()
+      ipcRenderer.on('scheduler:refresh', handler)
+      return () => ipcRenderer.removeListener('scheduler:refresh', handler)
+    }
+  },
+
+  // ── v3 Phase 3: IM ──
+  im: {
+    loadConfig: () => ipcRenderer.invoke('im:load-config'),
+    saveConfig: (key: string, config: unknown) => ipcRenderer.invoke('im:save-config', key, config),
+    getStatus: () => ipcRenderer.invoke('im:get-status'),
+    loadSettings: () => ipcRenderer.invoke('im:load-settings'),
+    saveSettings: (settings: unknown) => ipcRenderer.invoke('im:save-settings', settings),
+    onStatusUpdate: (cb: (data: unknown) => void) => {
+      // 监听 IM 连接状态变更推送，返回取消订阅函数
+      const handler = (_e: Electron.IpcRendererEvent, data: unknown) => cb(data)
+      ipcRenderer.on('im:status-update', handler)
+      return () => ipcRenderer.removeListener('im:status-update', handler)
+    }
   }
 }
 
