@@ -320,7 +320,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('app:version', async () => app.getVersion())
   let bootSuccess: boolean | null = null
   ipcMain.handle('boot:status', () => bootSuccess)
-  registerBootIpcHandlers({})
+  registerBootIpcHandlers({ db })
   registerSettingsIpcHandlers({ db })
 
   chatWindow?.webContents.on('did-finish-load', () => {
