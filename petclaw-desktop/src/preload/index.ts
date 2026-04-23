@@ -29,6 +29,11 @@ const api = {
     ipcRenderer.on('chat:ai-responding', handler)
     return () => ipcRenderer.removeListener('chat:ai-responding', handler)
   },
+  onChatSent: (callback: () => void) => {
+    const handler = () => callback()
+    ipcRenderer.on('pet:chat-sent', handler)
+    return () => ipcRenderer.removeListener('pet:chat-sent', handler)
+  },
   onHookEvent: (
     callback: (event: {
       type: string
@@ -87,6 +92,7 @@ const api = {
         label: string
         status: 'pending' | 'running' | 'done' | 'error'
         error?: string
+        hint?: string
       }>
     ) => void
   ) => {
@@ -97,6 +103,7 @@ const api = {
         label: string
         status: 'pending' | 'running' | 'done' | 'error'
         error?: string
+        hint?: string
       }>
     ) => callback(steps)
     ipcRenderer.on('boot:step-update', handler)
@@ -106,6 +113,79 @@ const api = {
     const handler = (_e: Electron.IpcRendererEvent, success: boolean) => callback(success)
     ipcRenderer.on('boot:complete', handler)
     return () => ipcRenderer.removeListener('boot:complete', handler)
+  },
+  retryBoot: () => ipcRenderer.send('boot:retry'),
+
+  // App lifecycle
+  petReady: () => ipcRenderer.send('app:pet-ready'),
+  getBootStatus: (): Promise<boolean | null> => ipcRenderer.invoke('boot:status'),
+  quitApp: () => ipcRenderer.send('app:quit'),
+  showPetContextMenu: (paused: boolean) => ipcRenderer.send('pet:context-menu', paused),
+  onPetTogglePause: (callback: () => void) => {
+    const handler = () => callback()
+    ipcRenderer.on('pet:toggle-pause', handler)
+    return () => ipcRenderer.removeListener('pet:toggle-pause', handler)
+  },
+
+  // ── v3 Cowork ──
+  cowork: {
+    send: (message: string, cwd: string) => ipcRenderer.invoke('chat:send', message, cwd),
+    continue: (sessionId: string, message: string) =>
+      ipcRenderer.invoke('chat:continue', sessionId, message),
+    stop: (sessionId: string) => ipcRenderer.invoke('chat:stop', sessionId),
+    sessions: () => ipcRenderer.invoke('chat:sessions'),
+    session: (id: string) => ipcRenderer.invoke('chat:session', id),
+    deleteSession: (id: string) => ipcRenderer.invoke('chat:delete-session', id),
+    respondPermission: (requestId: string, result: unknown) =>
+      ipcRenderer.invoke('cowork:permission:respond', requestId, result),
+    onMessage: (cb: (data: unknown) => void) => {
+      const handler = (_e: Electron.IpcRendererEvent, data: unknown) => cb(data)
+      ipcRenderer.on('cowork:stream:message', handler)
+      return () => ipcRenderer.removeListener('cowork:stream:message', handler)
+    },
+    onMessageUpdate: (cb: (data: unknown) => void) => {
+      const handler = (_e: Electron.IpcRendererEvent, data: unknown) => cb(data)
+      ipcRenderer.on('cowork:stream:message-update', handler)
+      return () => ipcRenderer.removeListener('cowork:stream:message-update', handler)
+    },
+    onPermission: (cb: (data: unknown) => void) => {
+      const handler = (_e: Electron.IpcRendererEvent, data: unknown) => cb(data)
+      ipcRenderer.on('cowork:stream:permission', handler)
+      return () => ipcRenderer.removeListener('cowork:stream:permission', handler)
+    },
+    onComplete: (cb: (data: unknown) => void) => {
+      const handler = (_e: Electron.IpcRendererEvent, data: unknown) => cb(data)
+      ipcRenderer.on('cowork:stream:complete', handler)
+      return () => ipcRenderer.removeListener('cowork:stream:complete', handler)
+    },
+    onError: (cb: (data: unknown) => void) => {
+      const handler = (_e: Electron.IpcRendererEvent, data: unknown) => cb(data)
+      ipcRenderer.on('cowork:stream:error', handler)
+      return () => ipcRenderer.removeListener('cowork:stream:error', handler)
+    }
+  },
+
+  // ── v3 Pet 统一入口 ──
+  pet: {
+    onStateEvent: (cb: (data: unknown) => void) => {
+      const handler = (_e: Electron.IpcRendererEvent, data: unknown) => cb(data)
+      ipcRenderer.on('pet:state-event', handler)
+      return () => ipcRenderer.removeListener('pet:state-event', handler)
+    },
+    onBubble: (cb: (data: unknown) => void) => {
+      const handler = (_e: Electron.IpcRendererEvent, data: unknown) => cb(data)
+      ipcRenderer.on('pet:bubble', handler)
+      return () => ipcRenderer.removeListener('pet:bubble', handler)
+    }
+  },
+
+  // ── v3 Engine 状态 ──
+  engine: {
+    onStatus: (cb: (status: unknown) => void) => {
+      const handler = (_e: Electron.IpcRendererEvent, status: unknown) => cb(status)
+      ipcRenderer.on('engine:status', handler)
+      return () => ipcRenderer.removeListener('engine:status', handler)
+    }
   }
 }
 
