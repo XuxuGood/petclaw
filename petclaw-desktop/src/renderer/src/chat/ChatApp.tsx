@@ -4,14 +4,15 @@ import { Sidebar } from './components/Sidebar'
 import { ChatView } from './components/ChatView'
 import { SkillsPage } from './components/SkillsPage'
 import { CronPage } from './components/CronPage'
+import { ImChannelsPage } from './components/ImChannelsPage'
 import { SettingsPage } from './components/settings/SettingsPage'
 import { StatusBar } from './components/StatusBar'
 
 import { OnboardingPanel } from '../panels/OnboardingPanel'
 import { BootCheckPanel } from '../panels/BootCheckPanel'
 
-// v3 路由类型：去掉 monitor，新增 skills / cron
-export type ViewType = 'chat' | 'skills' | 'cron' | 'settings'
+// v3 路由类型：去掉 monitor，新增 skills / cron / im-channels
+export type ViewType = 'chat' | 'skills' | 'cron' | 'im-channels' | 'settings'
 
 type AppPhase = 'bootcheck' | 'onboarding' | 'main'
 
@@ -69,7 +70,13 @@ export function ChatApp() {
   // 启动时恢复上次激活的 Tab
   useEffect(() => {
     window.api.getSetting('lastActiveTab').then((val) => {
-      if (val === 'chat' || val === 'skills' || val === 'cron' || val === 'settings') {
+      if (
+        val === 'chat' ||
+        val === 'skills' ||
+        val === 'cron' ||
+        val === 'im-channels' ||
+        val === 'settings'
+      ) {
         setActiveView(val as ViewType)
       }
     })
@@ -105,7 +112,13 @@ export function ChatApp() {
   // 监听主进程推送的面板切换指令（如托盘菜单点击）
   useEffect(() => {
     const unsub = window.api.onPanelOpen((panel) => {
-      if (panel === 'chat' || panel === 'skills' || panel === 'cron' || panel === 'settings') {
+      if (
+        panel === 'chat' ||
+        panel === 'skills' ||
+        panel === 'cron' ||
+        panel === 'im-channels' ||
+        panel === 'settings'
+      ) {
         handleViewChange(panel as ViewType)
       }
     })
@@ -160,6 +173,7 @@ export function ChatApp() {
             )}
             {activeView === 'skills' && <SkillsPage />}
             {activeView === 'cron' && <CronPage />}
+            {activeView === 'im-channels' && <ImChannelsPage />}
           </div>
         </main>
         <StatusBar />

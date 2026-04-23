@@ -140,6 +140,22 @@ export function Sidebar({
         </button>
       </div>
 
+      {/* IM 频道导航（独占一行） */}
+      <div className="px-3 pb-1">
+        <button
+          onClick={() => onViewChange('im-channels')}
+          title="IM 频道"
+          className={`no-drag w-full flex items-center gap-2.5 px-3 py-[7px] rounded-[10px] text-[13px] transition-all duration-[120ms] ease active:scale-[0.96] ${
+            activeView === 'im-channels'
+              ? 'bg-bg-active text-text-primary font-medium'
+              : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
+          }`}
+        >
+          <MessageSquare size={14} strokeWidth={activeView === 'im-channels' ? 2 : 1.75} />
+          <span>IM 频道</span>
+        </button>
+      </div>
+
       {/* 分隔线 */}
       <div className="mx-4 mt-1.5 mb-1.5 h-px bg-border" />
 
