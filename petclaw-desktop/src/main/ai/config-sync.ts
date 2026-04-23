@@ -1,13 +1,11 @@
+// config-sync.ts：将 Openclaw 运行时配置（openclaw.json）与当前 Manager 状态同步
+// 重构为直接依赖 Manager 对象（ConfigSyncOptions），移除 ConfigSyncDeps 函数注入接口
 import fs from 'fs'
 
-export interface ConfigSyncDeps {
-  getConfigPath: () => string
-  getStateDir: () => string
-  getModelConfig: () => { primary: string; providers: Record<string, unknown> }
-  getSkillsExtraDirs: () => string[]
-  getWorkspacePath: () => string
-  collectSecretEnvVars: () => Record<string, string>
-}
+import type { AgentManager } from '../agents/agent-manager'
+import type { ModelRegistry } from '../models/model-registry'
+import type { SkillManager } from '../skills/skill-manager'
+import type { McpManager } from '../mcp/mcp-manager'
 
 export interface ConfigSyncResult {
   ok: boolean
@@ -16,74 +14,83 @@ export interface ConfigSyncResult {
   error?: string
 }
 
+export interface ConfigSyncOptions {
+  configPath: string
+  stateDir: string
+  agentManager: AgentManager
+  modelRegistry: ModelRegistry
+  skillManager: SkillManager
+  mcpManager: McpManager
+  workspacePath: string
+}
+
 export class ConfigSync {
-  constructor(private deps: ConfigSyncDeps) {}
+  private configPath: string
+  private agentManager: AgentManager
+  private modelRegistry: ModelRegistry
+  private skillManager: SkillManager
+  private mcpManager: McpManager
+
+  constructor(private opts: ConfigSyncOptions) {
+    this.configPath = opts.configPath
+    this.agentManager = opts.agentManager
+    this.modelRegistry = opts.modelRegistry
+    this.skillManager = opts.skillManager
+    this.mcpManager = opts.mcpManager
+  }
 
   sync(_reason: string): ConfigSyncResult {
-    const configPath = this.deps.getConfigPath()
-
     try {
-      const existing = this.readExistingConfig(configPath)
+      const existing = this.readExistingConfig()
       const nextConfig = this.buildConfig(existing)
       const nextContent = JSON.stringify(nextConfig, null, 2)
-      const prevContent = this.readFileOrNull(configPath)
+      const prevContent = this.readFileOrNull(this.configPath)
 
       if (nextContent === prevContent) {
-        return { ok: true, changed: false, configPath }
+        return { ok: true, changed: false, configPath: this.configPath }
       }
 
-      // 原子写入
-      const tmpPath = `${configPath}.tmp-${Date.now()}`
+      // 原子写入：先写临时文件再 rename，防止写入中途崩溃导致配置文件损坏
+      const tmpPath = `${this.configPath}.tmp-${Date.now()}`
       fs.writeFileSync(tmpPath, nextContent, 'utf8')
-      fs.renameSync(tmpPath, configPath)
+      fs.renameSync(tmpPath, this.configPath)
 
-      return { ok: true, changed: true, configPath }
+      return { ok: true, changed: true, configPath: this.configPath }
     } catch (err) {
       return {
         ok: false,
         changed: false,
-        configPath,
+        configPath: this.configPath,
         error: err instanceof Error ? err.message : String(err)
       }
     }
   }
 
   collectSecretEnvVars(): Record<string, string> {
-    return this.deps.collectSecretEnvVars()
+    // 委托 ModelRegistry 收集需注入子进程环境的 API Key
+    return this.modelRegistry.collectSecretEnvVars()
   }
 
   private buildConfig(existing: Record<string, unknown>): Record<string, unknown> {
-    const model = this.deps.getModelConfig()
     return {
+      // gateway 字段保留已有配置，首次生成时使用默认本地模式
       gateway: existing.gateway ?? {
         mode: 'local',
         auth: { mode: 'token', token: '${OPENCLAW_GATEWAY_TOKEN}' }
       },
-      models: {
-        mode: 'replace',
-        providers: model.providers
-      },
-      agents: {
-        defaults: {
-          timeoutSeconds: 3600,
-          model: { primary: model.primary },
-          workspace: this.deps.getWorkspacePath()
-        }
-      },
-      skills: {
-        load: {
-          extraDirs: this.deps.getSkillsExtraDirs(),
-          watch: true
-        }
-      },
-      commands: { ownerAllowFrom: ['gateway-client', '*'] },
-      plugins: existing.plugins ?? {}
+      models: this.modelRegistry.toOpenclawConfig(),
+      agents: this.agentManager.toOpenclawConfig(),
+      skills: this.skillManager.toOpenclawConfig(),
+      // MCP 服务器映射为 plugins 配置块
+      plugins: this.mcpManager.toOpenclawConfig(),
+      hooks: { internal: { entries: { 'session-memory': { enabled: false } } } },
+      commands: { ownerAllowFrom: ['gateway-client', '*'] }
     }
   }
 
-  private readExistingConfig(configPath: string): Record<string, unknown> {
+  private readExistingConfig(): Record<string, unknown> {
     try {
-      return JSON.parse(fs.readFileSync(configPath, 'utf8'))
+      return JSON.parse(fs.readFileSync(this.configPath, 'utf8'))
     } catch {
       return {}
     }
