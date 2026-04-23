@@ -7,17 +7,16 @@ export type Platform = 'wechat' | 'wecom' | 'dingtalk' | 'feishu'
 // 支持多实例的平台
 export type MultiInstancePlatform = 'dingtalk' | 'feishu' | 'wecom'
 
-export const MULTI_INSTANCE_PLATFORMS: MultiInstancePlatform[] = [
-  'dingtalk', 'feishu', 'wecom'
-]
+export const MULTI_INSTANCE_PLATFORMS: MultiInstancePlatform[] = ['dingtalk', 'feishu', 'wecom']
 
 // 平台显示信息
-export const PLATFORM_INFO: Record<Platform, { name: string; icon: string; maxInstances: number }> = {
-  feishu: { name: '飞书', icon: '🐦', maxInstances: 3 },
-  dingtalk: { name: '钉钉', icon: '📌', maxInstances: 3 },
-  wecom: { name: '企业微信', icon: '🏢', maxInstances: 3 },
-  wechat: { name: '微信', icon: '💬', maxInstances: 1 }
-}
+export const PLATFORM_INFO: Record<Platform, { name: string; icon: string; maxInstances: number }> =
+  {
+    feishu: { name: '飞书', icon: '🐦', maxInstances: 3 },
+    dingtalk: { name: '钉钉', icon: '📌', maxInstances: 3 },
+    wecom: { name: '企业微信', icon: '🏢', maxInstances: 3 },
+    wechat: { name: '微信', icon: '💬', maxInstances: 1 }
+  }
 
 // IM 绑定规则：
 // - 一个平台实例同一时间只能被一个 Agent 持有（互斥锁）
