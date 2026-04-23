@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { Send, PawPrint } from 'lucide-react'
+import { PawPrint } from 'lucide-react'
 
 import { useChatStore } from '../../stores/chat-store'
-
-const SUGGESTED_PROMPTS = ['你是怎么实现的？', '现在什么模型？', '你有什么能力？']
+import { ChatHeader } from './ChatHeader'
+import { ChatInputBox } from './ChatInputBox'
+import { WelcomePage } from './WelcomePage'
+import { TaskMonitorPanel } from './TaskMonitorPanel'
 
 interface ChatViewProps {
   activeSessionId?: string | null
@@ -13,165 +15,168 @@ interface ChatViewProps {
   onToggleMonitor?: () => void
 }
 
-export function ChatView(_props: ChatViewProps) {
-  const [input, setInput] = useState('')
-  const { messages, isLoading, addMessage, appendToLastMessage, setLoading, loadHistory } =
-    useChatStore()
+export function ChatView({
+  activeSessionId,
+  onSessionCreated,
+  currentAgentId: _currentAgentId,
+  taskMonitorOpen,
+  onToggleMonitor
+}: ChatViewProps) {
+  const { messages, isLoading, addMessage, appendToLastMessage, setLoading } = useChatStore()
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    window.api.loadHistory(50).then((history) => {
-      loadHistory(
-        history.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }))
-      )
-    })
-  }, [loadHistory])
+  // 会话标题（后续可从 session 数据中读取，此处先用默认值）
+  const [sessionTitle, setSessionTitle] = useState('新对话')
 
+  // 订阅 v3 cowork 消息事件
   useEffect(() => {
-    const unsub1 = window.api.onAIResponding(() => {
-      setLoading(true)
-      addMessage({ role: 'assistant', content: '' })
+    // 收到助手新消息块时追加到最后一条 assistant 消息
+    const unsubMessage = window.api.cowork.onMessage((data) => {
+      // data 结构: { sessionId, role, content, ... }
+      const d = data as Record<string, unknown>
+      if (d.role === 'assistant') {
+        // 首次收到时表示新一轮响应开始
+        setLoading(true)
+        addMessage({ role: 'assistant', content: String(d.content ?? '') })
+      }
     })
-    const unsub2 = window.api.onChatChunk((chunk) => {
-      appendToLastMessage(chunk)
+
+    // 流式 chunk 更新
+    const unsubUpdate = window.api.cowork.onMessageUpdate((data) => {
+      const d = data as Record<string, unknown>
+      if (typeof d.delta === 'string') {
+        appendToLastMessage(d.delta)
+      }
     })
-    const unsub3 = window.api.onChatDone(() => {
+
+    // 任务完成
+    const unsubComplete = window.api.cowork.onComplete(() => {
       setLoading(false)
     })
-    const unsub4 = window.api.onChatError((error) => {
-      appendToLastMessage(`\n[Error: ${error}]`)
+
+    // 错误
+    const unsubError = window.api.cowork.onError((data) => {
+      const d = data as Record<string, unknown>
+      const msg = typeof d.message === 'string' ? d.message : '未知错误'
+      appendToLastMessage(`\n[错误：${msg}]`)
       setLoading(false)
     })
+
     return () => {
-      unsub1()
-      unsub2()
-      unsub3()
-      unsub4()
+      unsubMessage()
+      unsubUpdate()
+      unsubComplete()
+      unsubError()
     }
   }, [addMessage, appendToLastMessage, setLoading])
 
+  // 消息列表更新时自动滚动到底部
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages])
 
-  const inputRef = useRef<HTMLTextAreaElement>(null)
+  /**
+   * 发送消息主逻辑：
+   * - 无 activeSessionId 时调用 cowork.send 创建新会话，主进程返回 sessionId 后通知父组件
+   * - 有 activeSessionId 时调用 cowork.continue 追加消息
+   */
+  const handleSend = async (message: string, cwd: string) => {
+    if (!message || isLoading) return
+    addMessage({ role: 'user', content: message })
 
-  const handleSend = (text?: string) => {
-    const msg = (text ?? input).trim()
-    if (!msg || isLoading) return
-    addMessage({ role: 'user', content: msg })
-    if (!text) {
-      setInput('')
-      if (inputRef.current) inputRef.current.style.height = 'auto'
+    if (!activeSessionId) {
+      // 新建会话
+      const result = await window.api.cowork.send(message, cwd)
+      const r = result as Record<string, unknown>
+      // 主进程返回的 sessionId 通知父组件（Sidebar 侧边栏渲染任务列表）
+      if (typeof r.sessionId === 'string') {
+        onSessionCreated?.(r.sessionId)
+        setSessionTitle(message.slice(0, 30) || '新对话')
+      }
+    } else {
+      // 继续已有会话
+      await window.api.cowork.continue(activeSessionId, message)
     }
-    window.api.sendChat(msg)
   }
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
-    }
+  /** WelcomePage 快捷卡片点击时直接发送，使用空 cwd */
+  const handleSendFromWelcome = (text: string) => {
+    handleSend(text, '')
   }
-
-  const isEmpty = messages.length === 0
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      {/* Drag region */}
-      <div className="drag-region h-[52px] shrink-0" />
-
-      {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
-        {isEmpty ? (
-          <EmptyState onSend={handleSend} />
+    // 外层横向布局：左侧主聊天区 + 右侧可选任务监控面板
+    <div className="flex-1 flex min-h-0">
+      {/* 主聊天区 */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {activeSessionId ? (
+          <>
+            {/* 有会话：顶栏 + 消息列表 + 输入框 */}
+            <ChatHeader
+              sessionTitle={sessionTitle}
+              onToggleMonitor={onToggleMonitor ?? (() => {})}
+              monitorOpen={taskMonitorOpen}
+            />
+            <div ref={scrollRef} className="flex-1 overflow-y-auto">
+              <MessageList messages={messages} isLoading={isLoading} />
+            </div>
+            <ChatInputBox onSend={handleSend} disabled={isLoading} />
+          </>
         ) : (
-          <div className="px-6 py-2 space-y-5">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
-              >
-                {msg.role === 'assistant' && (
-                  <div className="w-7 h-7 rounded-full bg-accent flex items-center justify-center shrink-0 mt-0.5">
-                    <PawPrint size={13} className="text-white" strokeWidth={2.5} />
-                  </div>
-                )}
-
-                <div
-                  className={`max-w-[75%] px-4 py-2.5 text-[13.5px] leading-[1.65] ${
-                    msg.role === 'user'
-                      ? 'bg-bg-bubble-user text-text-bubble-user rounded-[14px] rounded-br-[6px]'
-                      : 'bg-bg-bubble-ai text-text-bubble-ai rounded-[14px] rounded-bl-[6px] shadow-[var(--shadow-card)]'
-                  }`}
-                >
-                  {msg.content ? (
-                    <pre className="message-prose">{msg.content}</pre>
-                  ) : isLoading ? (
-                    <TypingIndicator />
-                  ) : null}
-                </div>
-              </div>
-            ))}
-          </div>
+          <>
+            {/* 无会话：拖拽占位 + 欢迎页 + 输入框 */}
+            <div className="drag-region h-[52px] shrink-0" />
+            <div ref={scrollRef} className="flex-1 overflow-y-auto flex flex-col">
+              <WelcomePage onSendPrompt={handleSendFromWelcome} />
+            </div>
+            <ChatInputBox onSend={handleSend} disabled={isLoading} />
+          </>
         )}
       </div>
 
-      {/* Input */}
-      <div className="shrink-0 px-6 pb-4 pt-3">
-        <div>
-          <div className="flex items-end gap-2.5 bg-bg-input rounded-[16px] px-4 py-3 border border-border-input">
-            <textarea
-              ref={inputRef}
-              rows={1}
-              value={input}
-              onChange={(e) => {
-                setInput(e.target.value)
-                const el = e.target
-                el.style.height = 'auto'
-                el.style.height = Math.min(el.scrollHeight, 120) + 'px'
-              }}
-              onKeyDown={handleKeyDown}
-              placeholder="输入消息..."
-              className="flex-1 text-[14px] text-text-primary bg-transparent outline-none placeholder:text-text-tertiary resize-none leading-[1.5] min-h-[24px] max-h-[120px]"
-              disabled={isLoading}
-            />
-            <button
-              onClick={() => handleSend()}
-              disabled={isLoading || !input.trim()}
-              className="w-8 h-8 rounded-full bg-accent text-white flex items-center justify-center shrink-0 hover:bg-accent-hover disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-[120ms] ease active:scale-[0.96]"
-              aria-label="发送消息"
-            >
-              <Send size={14} strokeWidth={2} />
-            </button>
-          </div>
-        </div>
-      </div>
+      {/* 右侧任务监控面板：仅在 taskMonitorOpen 且有活跃会话时显示 */}
+      {taskMonitorOpen && activeSessionId && <TaskMonitorPanel sessionId={activeSessionId} />}
     </div>
   )
 }
 
-function EmptyState({ onSend }: { onSend: (text: string) => void }) {
+// ─── 内部子组件 ────────────────────────────────────────────────
+
+interface Message {
+  id: number
+  role: 'user' | 'assistant'
+  content: string
+}
+
+function MessageList({ messages, isLoading }: { messages: Message[]; isLoading: boolean }) {
   return (
-    <div className="flex flex-col items-center justify-center h-full px-6">
-      <div className="w-14 h-14 rounded-2xl bg-accent flex items-center justify-center mb-5">
-        <PawPrint size={26} className="text-white" strokeWidth={2} />
-      </div>
-      <h2 className="text-[17px] font-semibold text-text-primary mb-1 tracking-tight">
-        有什么可以帮你的？
-      </h2>
-      <p className="text-[13px] text-text-tertiary mb-8">我是 PetClaw AI 助手，随时为你服务</p>
-      <div className="flex flex-wrap gap-2 justify-center max-w-md">
-        {SUGGESTED_PROMPTS.map((prompt) => (
-          <button
-            key={prompt}
-            onClick={() => onSend(prompt)}
-            className="px-4 py-2 rounded-[10px] bg-bg-card text-[13px] text-text-secondary shadow-[var(--shadow-card)] border border-border hover:border-text-tertiary hover:shadow-[var(--shadow-dropdown)] transition-all duration-[120ms] ease active:scale-[0.96]"
+    <div className="px-6 py-4 space-y-5">
+      {messages.map((msg) => (
+        <div
+          key={msg.id}
+          className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
+        >
+          {msg.role === 'assistant' && (
+            <div className="w-7 h-7 rounded-full bg-accent flex items-center justify-center shrink-0 mt-0.5">
+              <PawPrint size={13} className="text-white" strokeWidth={2.5} />
+            </div>
+          )}
+
+          <div
+            className={`max-w-[75%] px-4 py-2.5 text-[13.5px] leading-[1.65] ${
+              msg.role === 'user'
+                ? 'bg-bg-bubble-user text-text-bubble-user rounded-[14px] rounded-br-[6px]'
+                : 'bg-bg-bubble-ai text-text-bubble-ai rounded-[14px] rounded-bl-[6px] shadow-[var(--shadow-card)]'
+            }`}
           >
-            {prompt}
-          </button>
-        ))}
-      </div>
+            {msg.content ? (
+              <pre className="message-prose">{msg.content}</pre>
+            ) : isLoading ? (
+              <TypingIndicator />
+            ) : null}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
