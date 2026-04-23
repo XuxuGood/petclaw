@@ -68,21 +68,21 @@ const api = {
 
   // Onboarding
   checkEnv: (): Promise<{ nodeOk: boolean; nodeVersion: string | null }> =>
-    ipcRenderer.invoke('onboarding:checkEnv'),
+    ipcRenderer.invoke('onboarding:check-env'),
   checkGateway: (url: string): Promise<{ connected: boolean; latencyMs: number | null }> =>
-    ipcRenderer.invoke('onboarding:checkGateway', url),
+    ipcRenderer.invoke('onboarding:check-gateway', url),
   installHooks: (): Promise<{
     success: boolean
     alreadyInstalled: boolean
     error?: string
-  }> => ipcRenderer.invoke('onboarding:installHooks'),
+  }> => ipcRenderer.invoke('onboarding:install-hooks'),
   saveOnboardingConfig: (data: {
     nickname: string
     roles: string[]
     selectedSkills: string[]
     voiceShortcut: string
     language: string
-  }): Promise<{ success: boolean }> => ipcRenderer.invoke('onboarding:saveConfig', data),
+  }): Promise<{ success: boolean }> => ipcRenderer.invoke('onboarding:save-config', data),
 
   // BootCheck
   onBootStepUpdate: (
@@ -186,6 +186,56 @@ const api = {
       ipcRenderer.on('engine:status', handler)
       return () => ipcRenderer.removeListener('engine:status', handler)
     }
+  },
+
+  // ── v3 Phase 2: Manager APIs ──
+  agents: {
+    list: () => ipcRenderer.invoke('agents:list'),
+    get: (id: string) => ipcRenderer.invoke('agents:get', id),
+    create: (data: unknown) => ipcRenderer.invoke('agents:create', data),
+    update: (id: string, patch: unknown) => ipcRenderer.invoke('agents:update', id, patch),
+    delete: (id: string) => ipcRenderer.invoke('agents:delete', id)
+  },
+  models: {
+    providers: () => ipcRenderer.invoke('models:providers'),
+    provider: (id: string) => ipcRenderer.invoke('models:provider', id),
+    addProvider: (data: unknown) => ipcRenderer.invoke('models:add-provider', data),
+    updateProvider: (id: string, patch: unknown) =>
+      ipcRenderer.invoke('models:update-provider', id, patch),
+    removeProvider: (id: string) => ipcRenderer.invoke('models:remove-provider', id),
+    toggleProvider: (id: string, enabled: boolean) =>
+      ipcRenderer.invoke('models:toggle-provider', id, enabled),
+    active: () => ipcRenderer.invoke('models:active'),
+    setActive: (id: string) => ipcRenderer.invoke('models:set-active', id),
+    testConnection: (id: string) => ipcRenderer.invoke('models:test-connection', id),
+    addModel: (providerId: string, model: unknown) =>
+      ipcRenderer.invoke('models:add-model', providerId, model),
+    removeModel: (providerId: string, modelId: string) =>
+      ipcRenderer.invoke('models:remove-model', providerId, modelId)
+  },
+  skills: {
+    list: () => ipcRenderer.invoke('skills:list'),
+    setEnabled: (id: string, enabled: boolean) =>
+      ipcRenderer.invoke('skills:set-enabled', id, enabled)
+  },
+  mcp: {
+    list: () => ipcRenderer.invoke('mcp:list'),
+    create: (data: unknown) => ipcRenderer.invoke('mcp:create', data),
+    update: (id: string, patch: unknown) => ipcRenderer.invoke('mcp:update', id, patch),
+    delete: (id: string) => ipcRenderer.invoke('mcp:delete', id),
+    setEnabled: (id: string, enabled: boolean) => ipcRenderer.invoke('mcp:set-enabled', id, enabled)
+  },
+  memory: {
+    read: (workspace: string) => ipcRenderer.invoke('memory:read', workspace),
+    append: (workspace: string, entry: string) =>
+      ipcRenderer.invoke('memory:append', workspace, entry),
+    remove: (workspace: string, text: string) =>
+      ipcRenderer.invoke('memory:remove', workspace, text),
+    search: (workspace: string, keyword: string) =>
+      ipcRenderer.invoke('memory:search', workspace, keyword),
+    listEntries: (workspace: string) => ipcRenderer.invoke('memory:list-entries', workspace),
+    updateEntry: (workspace: string, oldText: string, newText: string) =>
+      ipcRenderer.invoke('memory:update-entry', workspace, oldText, newText)
   }
 }
 

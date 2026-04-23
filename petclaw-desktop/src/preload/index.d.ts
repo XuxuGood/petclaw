@@ -78,6 +78,46 @@ interface ElectronAPI {
   engine: {
     onStatus: (cb: (status: unknown) => void) => () => void
   }
+  // v3 Phase 2: Manager APIs
+  agents: {
+    list: () => Promise<unknown>
+    get: (id: string) => Promise<unknown>
+    create: (data: unknown) => Promise<unknown>
+    update: (id: string, patch: unknown) => Promise<unknown>
+    delete: (id: string) => Promise<unknown>
+  }
+  models: {
+    providers: () => Promise<unknown>
+    provider: (id: string) => Promise<unknown>
+    addProvider: (data: unknown) => Promise<unknown>
+    updateProvider: (id: string, patch: unknown) => Promise<unknown>
+    removeProvider: (id: string) => Promise<unknown>
+    toggleProvider: (id: string, enabled: boolean) => Promise<unknown>
+    active: () => Promise<unknown>
+    setActive: (id: string) => Promise<unknown>
+    testConnection: (id: string) => Promise<unknown>
+    addModel: (providerId: string, model: unknown) => Promise<unknown>
+    removeModel: (providerId: string, modelId: string) => Promise<unknown>
+  }
+  skills: {
+    list: () => Promise<unknown>
+    setEnabled: (id: string, enabled: boolean) => Promise<unknown>
+  }
+  mcp: {
+    list: () => Promise<unknown>
+    create: (data: unknown) => Promise<unknown>
+    update: (id: string, patch: unknown) => Promise<unknown>
+    delete: (id: string) => Promise<unknown>
+    setEnabled: (id: string, enabled: boolean) => Promise<unknown>
+  }
+  memory: {
+    read: (workspace: string) => Promise<unknown>
+    append: (workspace: string, entry: string) => Promise<unknown>
+    remove: (workspace: string, text: string) => Promise<unknown>
+    search: (workspace: string, keyword: string) => Promise<unknown>
+    listEntries: (workspace: string) => Promise<unknown>
+    updateEntry: (workspace: string, oldText: string, newText: string) => Promise<unknown>
+  }
 }
 
 declare global {
