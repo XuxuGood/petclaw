@@ -5,6 +5,9 @@ import { app, BrowserWindow, shell, screen, ipcMain } from 'electron'
 import { is } from '@electron-toolkit/utils'
 import Database from 'better-sqlite3'
 
+import type { CronJobService } from './scheduler/cron-job-service'
+import type { ImGatewayManager } from './im/im-gateway-manager'
+
 import { initDatabase } from './data/db'
 import { migrateSettingsToKv } from './data/settings-migration'
 import { OpenclawEngineManager } from './ai/engine-manager'
@@ -44,6 +47,9 @@ let modelRegistry: ModelRegistry
 let skillManager: SkillManager
 let mcpManager: McpManager
 let memoryManager: MemoryManager
+// Phase 3 集成功能实例
+let cronJobService: CronJobService | null = null
+let imGatewayManager: ImGatewayManager
 // workspacePath 在 whenReady 中确定，setupV3Runtime 需要引用
 let workspacePath: string
 
@@ -288,6 +294,17 @@ async function setupV3Runtime(port: number, token: string): Promise<void> {
     workspacePath,
     engineManager.getStateDir()
   )
+
+  // Phase 3: CronJobService — 定时任务 Gateway RPC 代理
+  const { CronJobService: CronJobServiceClass } = await import('./scheduler/cron-job-service')
+  cronJobService = new CronJobServiceClass({
+    // gateway 已在 boot 阶段建立连接，此处直接透传底层 client
+    getGatewayClient: () => gateway?.getClient() ?? null,
+    ensureGatewayReady: async () => {
+      /* gateway 已在 boot 阶段就绪 */
+    }
+  })
+  cronJobService.startPolling()
 }
 
 app.whenReady().then(async () => {
@@ -336,6 +353,10 @@ app.whenReady().then(async () => {
   // MemoryManager：纯文件驱动，不依赖 db，无构造参数
   memoryManager = new MemoryManager()
 
+  // Phase 3: ImGatewayManager — IM 平台配置管理（不依赖 Gateway 连接，仅操作本地 SQLite）
+  const { ImGatewayManager: ImGatewayManagerClass } = await import('./im/im-gateway-manager')
+  imGatewayManager = new ImGatewayManagerClass(db)
+
   // 5. ConfigSync 初始化（新接口直接注入 Manager，移除旧函数注入方式）
   configSync = new ConfigSync({
     configPath: engineManager.getConfigPath(),
@@ -352,6 +373,7 @@ app.whenReady().then(async () => {
   modelRegistry.on('change', () => configSync.sync('model-change'))
   skillManager.on('change', () => configSync.sync('skill-change'))
   mcpManager.on('change', () => configSync.sync('mcp-change'))
+  imGatewayManager.on('change', () => configSync.sync('im-change'))
 
   // 7. 同步 auto-launch 设置到系统
   const initSettingsPath = path.join(app.getPath('home'), '.petclaw', 'petclaw-settings.json')
@@ -444,15 +466,23 @@ app.whenReady().then(async () => {
         skillManager,
         mcpManager,
         memoryManager,
+        cronJobService: cronJobService!,
+        imGatewayManager,
         getChatWindow: () => chatWindow,
         getPetWindow: () => petWindow,
         toggleChatWindow,
         hookServer
       })
 
-      // 宠物事件桥接：将 CoworkController 事件转发为宠物动画事件
+      // 宠物事件桥接：聚合 CoworkController / ImGateway / CronJob / HookServer 事件
       if (coworkController) {
-        petEventBridge = new PetEventBridge(petWindow, coworkController)
+        petEventBridge = new PetEventBridge(
+          petWindow,
+          coworkController,
+          imGatewayManager,
+          cronJobService ?? undefined,
+          hookServer
+        )
       }
 
       createTray(petWindow, chatWindow, toggleChatWindow)
@@ -481,6 +511,7 @@ app.on('before-quit', () => {
   gateway?.disconnect()
   db?.close()
   hookServer?.stop()
+  cronJobService?.stopPolling()
   unregisterShortcuts()
 })
 

@@ -147,6 +147,11 @@ export class OpenclawGateway extends EventEmitter {
     return this.connected
   }
 
+  // 暴露底层 client 供 CronJobService 等模块代理 Gateway RPC
+  getClient(): GatewayClientLike | null {
+    return this.client
+  }
+
   private ensureConnected(): void {
     if (!this.client || !this.connected) {
       throw new Error('Gateway not connected')
