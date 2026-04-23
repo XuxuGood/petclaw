@@ -11,6 +11,7 @@ import { OpenclawGateway } from './ai/gateway'
 import { CoworkController } from './ai/cowork-controller'
 import { CoworkStore } from './ai/cowork-store'
 import { SessionManager } from './ai/session-manager'
+import { AgentManager } from './agents/agent-manager'
 import { PetEventBridge } from './pet/pet-event-bridge'
 import { registerChatIpcHandlers } from './ipc/chat-ipc'
 import { registerSettingsIpcHandlers } from './ipc/settings-ipc'
@@ -34,6 +35,8 @@ let coworkStore: CoworkStore
 let gateway: OpenclawGateway | null = null
 let coworkController: CoworkController | null = null
 let sessionManager: SessionManager | null = null
+// Phase 2: Task 12 中初始化，此处声明保证类型安全
+const agentManager: AgentManager | null = null
 // 持有引用防止 GC，桥接器在构造时绑定事件
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 let petEventBridge: PetEventBridge | null = null
@@ -268,7 +271,14 @@ async function setupV3Runtime(port: number, token: string): Promise<void> {
 
   // 创建 CoworkController（事件路由）和 SessionManager（会话门面）
   coworkController = new CoworkController(gateway, coworkStore)
-  sessionManager = new SessionManager(coworkStore, coworkController)
+  // Phase 2: agentManager 在 Task 12 初始化，此处以 null 断言占位，Task 12 会传入真实实例
+  sessionManager = new SessionManager(
+    coworkStore,
+    coworkController,
+    agentManager!,
+    path.join(engineManager.getBaseDir(), 'workspace'),
+    engineManager.getStateDir()
+  )
 }
 
 app.whenReady().then(async () => {
