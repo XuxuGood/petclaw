@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Wifi } from 'lucide-react'
 
-export function StatusBar(): JSX.Element {
+export function StatusBar() {
   const [version, setVersion] = useState('')
 
   useEffect(() => {

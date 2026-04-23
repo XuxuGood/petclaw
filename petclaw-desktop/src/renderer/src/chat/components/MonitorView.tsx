@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { Activity, AlertCircle, Clock } from 'lucide-react'
 import { useHookStore, AgentSession } from '../../stores/hook-store'
 
-export function MonitorView(): JSX.Element {
+export function MonitorView() {
   const { sessions, updateSession, removeSession } = useHookStore()
 
   useEffect(() => {
@@ -36,7 +36,7 @@ export function MonitorView(): JSX.Element {
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 pb-4">
-        <div className="max-w-[680px] mx-auto">
+        <div>
           {sessionList.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-text-tertiary">
               <div className="w-12 h-12 rounded-2xl bg-bg-input flex items-center justify-center mb-4">
@@ -60,7 +60,7 @@ export function MonitorView(): JSX.Element {
   )
 }
 
-function SessionCard({ session }: { session: AgentSession }): JSX.Element {
+function SessionCard({ session }: { session: AgentSession }) {
   const isError = session.status === 'error'
   const StatusIcon = isError ? AlertCircle : Activity
 

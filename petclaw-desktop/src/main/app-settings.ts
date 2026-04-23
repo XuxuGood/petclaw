@@ -25,9 +25,72 @@ export interface PetclawSettings {
   modelTier?: string
   membershipTier?: string
   autoLaunchExplicitlySet?: boolean
+  autoLaunch?: boolean
   nickname?: string
   roles?: string[]
   selectedSkills?: string[]
+  windowBounds?: { x: number; y: number; width: number; height: number }
+  petPosition?: { x: number; y: number }
+  lastActiveTab?: string
+  soundEnabled?: boolean
+  notificationsEnabled?: boolean
+  managedWorkspaceMd?: {
+    userMdSyncedFrom?: string // "nickname|role1,role2" — USER.md 生成时的源数据指纹
+    soulMdSyncedFrom?: string // "zh" — SOUL.md 生成时的 language
+  }
+}
+
+/** Default settings for new installation. Dynamic fields (deviceId, gatewayToken) are set at runtime. */
+export const DEFAULT_GATEWAY_PORT = 29890
+export const DEFAULT_GATEWAY_URL = `ws://127.0.0.1:${DEFAULT_GATEWAY_PORT}`
+
+export function createDefaultSettings(overrides?: {
+  gatewayPort?: number
+  gatewayToken?: string
+  deviceId?: string
+}): PetclawSettings {
+  const port = overrides?.gatewayPort ?? DEFAULT_GATEWAY_PORT
+  return {
+    language: 'zh',
+    brainApiUrl: 'https://petclaw.ai/api/v1',
+    brainModel: 'petclaw-fast',
+    brainApiKey: '',
+    runtimeMode: 'chat',
+    region: 'china',
+    gatewayPort: port,
+    gatewayUrl: `ws://127.0.0.1:${port}`,
+    gatewayToken: overrides?.gatewayToken ?? '',
+    deviceId: overrides?.deviceId ?? '',
+    userEmail: '',
+    userToken: '',
+    inviteCode: '',
+    theme: 'light',
+    voiceShortcut: ['Meta', 'd'],
+    voiceInputDevice: 'default',
+    sopComplete: false,
+    onboardingComplete: false,
+    userCredits: 0,
+    modelTier: 'free',
+    membershipTier: 'free',
+    autoLaunchExplicitlySet: false,
+    autoLaunch: false,
+    soundEnabled: true,
+    notificationsEnabled: true
+  }
+}
+
+/** Merge defaults into existing settings, preserving existing values */
+export function mergeDefaults(
+  existing: PetclawSettings,
+  defaults: PetclawSettings
+): PetclawSettings {
+  const merged = { ...existing }
+  for (const [key, value] of Object.entries(defaults)) {
+    if ((merged as Record<string, unknown>)[key] === undefined) {
+      ;(merged as Record<string, unknown>)[key] = value
+    }
+  }
+  return merged
 }
 
 export interface OnboardingSettingsInput {
@@ -94,7 +157,15 @@ export function saveOnboardingSettings(
 }
 
 function parseSettingValue(key: string, value: string): unknown {
-  if (key === 'onboardingComplete' || key === 'sopComplete') {
+  const booleanKeys = [
+    'onboardingComplete',
+    'sopComplete',
+    'autoLaunchExplicitlySet',
+    'autoLaunch',
+    'soundEnabled',
+    'notificationsEnabled'
+  ]
+  if (booleanKeys.includes(key)) {
     return value === 'true'
   }
 

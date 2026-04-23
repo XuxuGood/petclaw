@@ -8,6 +8,19 @@
 coverage/
 *.tsbuildinfo
 
+# Native addons & prebuilds
+*.node
+**/prebuilds/
+
+# Vite cache
+.vite/
+
+# Openclaw runtime (built locally, too large for git)
+**/vendor/openclaw-runtime/
+
+# Electron packaging output
+**/release/
+
 # Environment files
 .env
 .env.local
@@ -17,18 +30,22 @@ coverage/
 .claude/
 .idea/
 .vscode/settings.json
+
+# Git hooks internals (husky manages these)
 .husky/_/
 
 # OS junk
 .DS_Store
 Thumbs.db
+*.swp
+*.swo
 
 # Logs
 **/*.log
 
-# Local reference assets
+# Local reference assets (design mockups)
 设计/
 
-# Bundled runtime resources (too large for git)
+# Legacy bundled resources (v1, removed in v3)
 petclaw-desktop/resources/node/
 petclaw-desktop/resources/openclaw/

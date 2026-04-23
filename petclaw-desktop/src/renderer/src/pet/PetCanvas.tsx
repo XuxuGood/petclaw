@@ -13,10 +13,12 @@ import taskLeaveVideo from '../assets/cat/task-leave.webm'
 
 interface PetCanvasProps {
   state: PetState
+  paused?: boolean
   onDragMove?: (dx: number, dy: number) => void
   onDragEnd?: () => void
   onClick?: () => void
   onContextMenu?: () => void
+  onSleepTimeout?: () => void
 }
 
 const DRAG_THRESHOLD = 5
@@ -49,7 +51,6 @@ class VideoPlayer {
   }
 
   playSequence(steps: VideoStep[]): void {
-    // Clean up previous
     this.clearEnded()
     this.queue = []
 
@@ -69,7 +70,6 @@ class VideoPlayer {
 
     const onCanPlay = (): void => {
       back.removeEventListener('canplay', onCanPlay)
-      // Swap: show back, hide old active
       this.activeIdx = 1 - this.activeIdx
       this.active.style.visibility = 'visible'
       this.back.style.visibility = 'hidden'
@@ -77,7 +77,6 @@ class VideoPlayer {
 
       this.active.play().catch(() => {})
 
-      // If not looping and there's more in queue, chain
       if (!step.loop && this.queue.length > 0) {
         const next = this.queue.shift()!
         this.endedHandler = () => {
@@ -97,21 +96,29 @@ class VideoPlayer {
       this.endedHandler = null
     }
   }
+
+  pause(): void {
+    this.active.pause()
+  }
+
+  resume(): void {
+    this.active.play().catch(() => {})
+  }
 }
 
 export function PetCanvas({
   state,
+  paused,
   onDragMove,
   onDragEnd,
   onClick,
-  onContextMenu
-}: PetCanvasProps): JSX.Element {
+  onContextMenu,
+  onSleepTimeout
+}: PetCanvasProps) {
   const video0Ref = useRef<HTMLVideoElement>(null)
   const video1Ref = useRef<HTMLVideoElement>(null)
   const playerRef = useRef<VideoPlayer | null>(null)
   const prevStateRef = useRef<PetState>(PetState.Idle)
-  const isSleepingRef = useRef(false)
-  const sleepTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
   const isMouseDown = useRef(false)
   const hasDragged = useRef(false)
   const dragStart = useRef({ x: 0, y: 0 })
@@ -127,37 +134,28 @@ export function PetCanvas({
       { src: beginVideo, loop: false },
       { src: staticVideo, loop: true }
     ])
+  }, [])
 
-    // Start sleep timer
-    sleepTimerRef.current = setTimeout(() => {
-      if (playerRef.current && prevStateRef.current === PetState.Idle) {
-        isSleepingRef.current = true
-        playerRef.current.playSequence([
-          { src: sleepStartVideo, loop: false },
-          { src: sleepLoopVideo, loop: true }
-        ])
-      }
-    }, SLEEP_DELAY)
+  // 睡眠计时器：Idle 状态下 2 分钟无互动触发
+  useEffect(() => {
+    if (state !== PetState.Idle || paused) return
+    const timer = setTimeout(() => onSleepTimeout?.(), SLEEP_DELAY)
+    return () => clearTimeout(timer)
+  }, [state, paused, onSleepTimeout])
 
-    return () => {
-      if (sleepTimerRef.current) clearTimeout(sleepTimerRef.current)
+  // Pause/resume video playback
+  useEffect(() => {
+    const player = playerRef.current
+    if (!player) return
+    if (paused) {
+      player.playSequence([{ src: staticVideo, loop: true }])
+      // Wait for static to load, then pause on first frame
+      const timer = setTimeout(() => player.pause(), 100)
+      return () => clearTimeout(timer)
+    } else {
+      player.resume()
     }
-  }, [])
-
-  // Reset sleep timer whenever state changes away from Idle
-  const resetSleepTimer = useCallback(() => {
-    if (sleepTimerRef.current) clearTimeout(sleepTimerRef.current)
-    isSleepingRef.current = false
-    sleepTimerRef.current = setTimeout(() => {
-      if (playerRef.current && prevStateRef.current === PetState.Idle) {
-        isSleepingRef.current = true
-        playerRef.current.playSequence([
-          { src: sleepStartVideo, loop: false },
-          { src: sleepLoopVideo, loop: true }
-        ])
-      }
-    }, SLEEP_DELAY)
-  }, [])
+  }, [paused])
 
   // State change handler
   useEffect(() => {
@@ -168,43 +166,29 @@ export function PetCanvas({
     if (prev === state) return
     prevStateRef.current = state
 
-    // Any activity resets sleep timer
-    resetSleepTimer()
+    // 从 Sleep 唤醒时，先播 sleep-leave 过渡
+    const wakePrefix: VideoStep[] =
+      prev === PetState.Sleep ? [{ src: sleepLeaveVideo, loop: false }] : []
+
+    if (state === PetState.Sleep) {
+      player.playSequence([
+        { src: sleepStartVideo, loop: false },
+        { src: sleepLoopVideo, loop: true }
+      ])
+      return
+    }
 
     if (state === PetState.Working) {
       player.playSequence([
+        ...wakePrefix,
         { src: taskStartVideo, loop: false },
         { src: taskLoopVideo, loop: true }
       ])
       return
     }
 
-    if (state === PetState.Idle) {
-      // Return to standing (not sleeping)
-      if (isSleepingRef.current) {
-        // Was sleeping → wake up
-        isSleepingRef.current = false
-        player.playSequence([
-          { src: sleepLeaveVideo, loop: false },
-          { src: staticVideo, loop: true }
-        ])
-      } else {
-        player.playSequence([{ src: staticVideo, loop: true }])
-      }
-      return
-    }
-
     if (state === PetState.Thinking) {
-      if (isSleepingRef.current) {
-        // Wake up first, then listen
-        isSleepingRef.current = false
-        player.playSequence([
-          { src: sleepLeaveVideo, loop: false },
-          { src: listeningVideo, loop: true }
-        ])
-      } else {
-        player.playSequence([{ src: listeningVideo, loop: true }])
-      }
+      player.playSequence([...wakePrefix, { src: listeningVideo, loop: true }])
       return
     }
 
@@ -216,19 +200,11 @@ export function PetCanvas({
       return
     }
 
-    if (state === PetState.Dragging) {
-      if (isSleepingRef.current) {
-        isSleepingRef.current = false
-        player.playSequence([
-          { src: sleepLeaveVideo, loop: false },
-          { src: staticVideo, loop: true }
-        ])
-      } else {
-        player.playSequence([{ src: staticVideo, loop: true }])
-      }
+    if (state === PetState.Idle || state === PetState.Dragging) {
+      player.playSequence([...wakePrefix, { src: staticVideo, loop: true }])
       return
     }
-  }, [state, resetSleepTimer])
+  }, [state])
 
   // Speech bubble
   const [bubbleText, setBubbleText] = useState('')

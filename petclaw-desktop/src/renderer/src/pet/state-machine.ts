@@ -3,7 +3,8 @@ export enum PetState {
   Thinking = 'thinking',
   Working = 'working',
   Happy = 'happy',
-  Dragging = 'dragging'
+  Dragging = 'dragging',
+  Sleep = 'sleep'
 }
 
 export enum PetEvent {
@@ -14,7 +15,9 @@ export enum PetEvent {
   DragStart = 'DRAG_START',
   DragEnd = 'DRAG_END',
   HookActive = 'HOOK_ACTIVE',
-  HookIdle = 'HOOK_IDLE'
+  HookIdle = 'HOOK_IDLE',
+  SleepStart = 'SLEEP_START',
+  WakeUp = 'WAKE_UP'
 }
 
 type TransitionCallback = (from: PetState, to: PetState) => void
@@ -23,7 +26,8 @@ const transitions: Record<PetState, Partial<Record<PetEvent, PetState>>> = {
   [PetState.Idle]: {
     [PetEvent.ChatSent]: PetState.Thinking,
     [PetEvent.DragStart]: PetState.Dragging,
-    [PetEvent.HookActive]: PetState.Working
+    [PetEvent.HookActive]: PetState.Working,
+    [PetEvent.SleepStart]: PetState.Sleep
   },
   [PetState.Thinking]: {
     [PetEvent.AIResponding]: PetState.Working,
@@ -43,6 +47,12 @@ const transitions: Record<PetState, Partial<Record<PetEvent, PetState>>> = {
   },
   [PetState.Dragging]: {
     [PetEvent.DragEnd]: PetState.Idle
+  },
+  [PetState.Sleep]: {
+    [PetEvent.WakeUp]: PetState.Idle,
+    [PetEvent.ChatSent]: PetState.Thinking,
+    [PetEvent.DragStart]: PetState.Dragging,
+    [PetEvent.HookActive]: PetState.Working
   }
 }
 

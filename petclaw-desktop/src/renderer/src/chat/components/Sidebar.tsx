@@ -30,7 +30,7 @@ interface SidebarProps {
   onViewChange: (view: ViewType) => void
 }
 
-export function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element {
+export function Sidebar({ activeView, onViewChange }: SidebarProps) {
   const handleNav = (id: string): void => {
     if (id === 'chat' || id === 'monitor' || id === 'settings') {
       onViewChange(id as ViewType)
@@ -59,7 +59,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element
       <div className="px-3 mb-1">
         <button
           onClick={() => onViewChange('chat')}
-          className="no-drag w-full flex items-center gap-2.5 px-3 py-[7px] rounded-[8px] text-[13px] text-text-secondary border border-border hover:text-text-primary hover:bg-bg-hover hover:border-text-tertiary active:scale-[0.98] transition-all duration-150 ease"
+          className="no-drag w-full flex items-center gap-2.5 px-3 py-[7px] rounded-[10px] text-[13px] text-text-secondary border border-border hover:text-text-primary hover:bg-bg-hover hover:border-text-tertiary active:scale-[0.96] transition-all duration-[120ms] ease"
         >
           <Plus size={15} strokeWidth={2} />
           <span>新建聊天</span>
@@ -75,7 +75,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element
             <button
               key={item.id}
               onClick={() => handleNav(item.id)}
-              className={`no-drag w-full flex items-center gap-2.5 px-3 py-[7px] rounded-[8px] text-[13px] transition-all duration-150 ease ${
+              className={`no-drag w-full flex items-center gap-2.5 px-3 py-[7px] rounded-[10px] text-[13px] transition-all duration-[120ms] ease ${
                 isActive
                   ? 'bg-bg-active text-text-primary font-medium'
                   : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
@@ -97,7 +97,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element
           <span className="text-[11px] text-text-tertiary font-medium">今天</span>
         </div>
         <div className="flex-1 overflow-y-auto space-y-0.5 pr-0.5">
-          <button className="no-drag w-full flex items-center gap-2.5 px-3 py-[7px] rounded-[8px] bg-bg-active text-[13px] text-text-primary hover:bg-bg-active/80 active:scale-[0.98] transition-all duration-150 ease text-left">
+          <button className="no-drag w-full flex items-center gap-2.5 px-3 py-[7px] rounded-[10px] bg-bg-active text-[13px] text-text-primary hover:bg-bg-active/80 active:scale-[0.96] transition-all duration-[120ms] ease text-left">
             <MessageSquare size={14} strokeWidth={1.75} className="shrink-0 text-text-tertiary" />
             <span className="truncate">当前对话</span>
           </button>
@@ -106,7 +106,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element
 
       {/* Invite code */}
       <div className="px-3 py-1.5">
-        <button className="no-drag w-full flex items-center gap-2.5 px-3 py-[7px] rounded-[8px] text-[13px] text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-all duration-150 ease">
+        <button className="no-drag w-full flex items-center gap-2.5 px-3 py-[7px] rounded-[10px] text-[13px] text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-all duration-[120ms] ease">
           <Gift size={15} strokeWidth={1.75} />
           <span>邀请码</span>
         </button>
@@ -118,7 +118,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element
       {/* Bottom: user + settings + dark mode */}
       <div className="px-3 py-2 flex items-center gap-1">
         {/* User avatar */}
-        <button className="no-drag w-8 h-8 rounded-full bg-bg-active flex items-center justify-center hover:bg-bg-active/70 active:scale-[0.95] transition-all duration-150 ease">
+        <button className="no-drag w-8 h-8 rounded-full bg-bg-active flex items-center justify-center hover:bg-bg-active/70 active:scale-[0.96] transition-all duration-[120ms] ease">
           <User size={15} className="text-text-secondary" strokeWidth={1.75} />
         </button>
 
@@ -127,7 +127,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element
         {/* Settings */}
         <button
           onClick={() => onViewChange('settings')}
-          className={`no-drag w-8 h-8 rounded-[8px] flex items-center justify-center transition-all duration-150 ease ${
+          className={`no-drag w-8 h-8 rounded-[10px] flex items-center justify-center transition-all duration-[120ms] ease ${
             activeView === 'settings'
               ? 'bg-bg-active text-text-primary'
               : 'text-text-tertiary hover:text-text-secondary hover:bg-bg-hover'
@@ -137,7 +137,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps): JSX.Element
         </button>
 
         {/* Dark mode toggle */}
-        <button className="no-drag w-8 h-8 rounded-[8px] flex items-center justify-center text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-all duration-150 ease">
+        <button className="no-drag w-8 h-8 rounded-[10px] flex items-center justify-center text-text-tertiary hover:text-text-secondary hover:bg-bg-hover transition-all duration-[120ms] ease">
           <Moon size={15} strokeWidth={1.75} />
         </button>
       </div>

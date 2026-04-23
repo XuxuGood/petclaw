@@ -7,33 +7,42 @@
 
 ## 1. 产品定位
 
-AI 桌面宠物助手。3D 黑猫驻留桌面，基于 Openclaw agent 运行时，连接 AI 工具链，陪伴用户工作。
+AI 桌面宠物助手。黑猫驻留桌面，基于 Openclaw agent 运行时，连接 AI 工具链，陪伴用户工作。
 
 ### 核心架构
 ```
-Electron (UI 壳)  ←WebSocket→  Openclaw (AI agent 运行时)  ←API→  LLM
-     ↓                              ↓
-  三窗口渲染                    workspace/（人格、记忆、技能）
+Electron (UI 壳)  ←GatewayClient→  Openclaw Runtime (utilityProcess)  ←API→  LLM
+     ↓                                      ↓
+  双窗口渲染                          workspace/（人格、记忆、技能）
 ```
 
 - **Electron**：负责窗口、动画、系统集成（托盘、快捷键、hooks）
-- **Openclaw**：AI agent 运行时，管理会话、记忆、工具调用、技能插件
-- Electron 通过本地 WebSocket 网关（默认端口 29890）与 Openclaw 通信
+- **Openclaw Runtime**：捆绑在 app 内，通过 `utilityProcess.fork()` 启动，动态端口 + token 认证
+- 通信：Electron 主进程动态加载 `GatewayClient`（ESM），与 Runtime 通信
+- **架构详情**：见 `docs/superpowers/specs/2026-04-22-petclaw-architecture-v3.md`
 
 ## 2. Monorepo 结构
 
 ```
-petclaw/
-├── petclaw-desktop/     # Electron 桌面应用（当前焦点）
-├── petclaw-web/         # Next.js 营销官网（Phase 3，未启动）
-├── petclaw-api/         # 后端服务（Phase 3，未启动）
-├── petclaw-shared/      # 共享 TypeScript 类型（未启动）
-├── .ai/                 # AI 编码助手统一指南（本目录）
-├── .github/workflows/   # CI/CD（GitHub Actions）
-├── 设计/                # 参考素材（视频、截图，不入 git）
-├── AGENTS.md            # Codex 入口（引用 .ai/）
-├── CLAUDE.md            # Claude Code 入口（引用 .ai/）
-└── .cursorrules         # Cursor 入口（引用 .ai/）
+petclaw/                           # pnpm monorepo 根目录
+├── petclaw-desktop/               # Electron 桌面应用（当前焦点）
+├── petclaw-web/                   # Next.js 营销官网（Phase 3，未启动）
+├── petclaw-api/                   # 后端服务（Phase 3，未启动）
+├── petclaw-shared/                # 共享 TypeScript 类型（未启动）
+├── .ai/                           # AI 编码助手统一指南（本目录）
+├── docs/                          # 设计文档 / 规格 / 计划
+│   └── superpowers/
+│       ├── specs/                 # 设计规格（v3 架构蓝图在此）
+│       └── plans/                 # 实现计划
+├── 设计/                           # 参考素材（视频、截图，不入 git）
+├── package.json                   # Root：husky + commitlint + lint-staged
+├── pnpm-workspace.yaml            # Monorepo workspace 声明
+├── commitlint.config.mjs          # Commit message 格式校验
+├── .editorconfig                  # 编辑器统一配置
+├── .husky/                        # Git hooks（pre-commit + commit-msg）
+├── AGENTS.md                      # Codex 入口（引用 .ai/）
+├── CLAUDE.md                      # Claude Code 入口（引用 .ai/）
+└── .cursorrules                   # Cursor 入口（引用 .ai/）
 ```
 
 ## 3. 技术栈
@@ -56,13 +65,25 @@ petclaw/
 ```bash
 # 从 monorepo 根目录执行
 pnpm --filter petclaw-desktop dev          # 启动开发服务器 + Electron
+pnpm --filter petclaw-desktop dev:openclaw # 确保 Openclaw runtime + 启动开发
 pnpm --filter petclaw-desktop test         # 运行单元测试（Vitest）
 pnpm --filter petclaw-desktop test:watch   # 测试监听模式
 pnpm --filter petclaw-desktop lint         # ESLint 检查
 pnpm --filter petclaw-desktop lint:fix     # ESLint 自动修复
 pnpm --filter petclaw-desktop typecheck    # TypeScript 类型检查（node + web）
 pnpm --filter petclaw-desktop build        # 生产构建（仅编译）
-pnpm --filter petclaw-desktop package      # 编译 + electron-builder 打包
+
+# Openclaw Runtime 构建（首次或版本变更时）
+pnpm --filter petclaw-desktop openclaw:ensure       # checkout 到锁定版本
+pnpm --filter petclaw-desktop openclaw:runtime:host  # 检测当前平台并构建
+pnpm --filter petclaw-desktop openclaw:plugins       # 下载安装 IM 插件
+pnpm --filter petclaw-desktop openclaw:extensions:local  # 同步本地扩展
+
+# 打包
+pnpm --filter petclaw-desktop dist:mac:arm64   # macOS Apple Silicon
+pnpm --filter petclaw-desktop dist:mac:x64     # macOS Intel
+pnpm --filter petclaw-desktop dist:win         # Windows NSIS 安装包
+pnpm --filter petclaw-desktop dist:linux       # Linux AppImage
 
 # 也可以 cd petclaw-desktop 后直接 pnpm dev
 ```
@@ -78,37 +99,35 @@ pnpm --filter petclaw-desktop package      # 编译 + electron-builder 打包
 ## 6. 构建 & 打包
 
 ```bash
-pnpm --filter petclaw-desktop package    # 输出到 petclaw-desktop/dist/
+pnpm --filter petclaw-desktop dist:mac:arm64   # → release/PetClaw-x.y.z-arm64.dmg
+pnpm --filter petclaw-desktop dist:win         # → release/PetClaw-x.y.z-Setup.exe
 ```
 
-- macOS：`.dmg` + `.zip`（`hardenedRuntime: true`）
-- Windows：`.exe`（NSIS 安装包）
-- electron-builder 配置在 `petclaw-desktop/package.json` → `"build"` 字段
+- 打包配置：`petclaw-desktop/electron-builder.json`（独立文件，优先于 package.json build 字段）
+- macOS：`.dmg`，`hardenedRuntime: true` + 签名公证
+- Windows：NSIS 安装包，Openclaw runtime 打 tar 加速安装
 - App ID：`ai.petclaw.desktop`
+- 详细打包设计见 v3 spec §24.7
 
 ## 7. CI/CD（GitHub Actions）
 
-文件：`.github/workflows/ci.yml`
+文件：`.github/workflows/build-platforms.yml` + `openclaw-check.yml`
 
-触发：push 到 `main` / `develop`，或 PR 到 `main`
-
-| Job                  | Runner                          | 内容                                       |
-| -------------------- | ------------------------------- | ------------------------------------------ |
-| `lint-and-typecheck` | ubuntu-latest                   | ESLint + TypeScript 检查                   |
-| `test`               | ubuntu-latest                   | Vitest 单元测试                            |
-| `build` (3 个并行)   | macos-latest / macos-13 / windows-latest | prepare-runtime → build → package → upload |
+| Workflow | 触发 | 内容 |
+|----------|------|------|
+| `build-platforms.yml` | push tag `v*` | 四平台并行构建 + Release |
+| `openclaw-check.yml` | PR | lint + typecheck + test |
 
 **Build 矩阵**：
 
-| Runner          | Platform | Arch  | 产物       |
-| --------------- | -------- | ----- | ---------- |
-| macos-latest    | darwin   | arm64 | .dmg + .zip |
-| macos-13        | darwin   | x64   | .dmg + .zip |
-| windows-latest  | win      | x64   | .exe       |
+| Runner | Platform | 产物 |
+|--------|----------|------|
+| macos-latest | darwin-arm64 | .dmg |
+| macos-13 | darwin-x64 | .dmg |
+| windows-latest | win-x64 | .exe (NSIS) |
+| ubuntu-latest | linux-x64 | .AppImage |
 
-**流程**：lint/test 通过 → 三平台并行运行 `prepare-runtime.sh` 打包运行时 → `electron-vite build` → `electron-builder` 打包 → 上传 artifact。
-
-**TODO**：自动发布到 GitHub Releases（tag 触发）。
+流程：lint/test 通过 → 四平台并行构建 Openclaw Runtime（13 步流水线）→ `electron-vite build` → `electron-builder` 打包 → 上传 artifact → 创建 Release。
 
 ## 8. Git 规范
 
@@ -124,50 +143,281 @@ Conventional Commits：`type(scope): subject`
 - `develop` — 开发分支
 - `feature/*` — 功能分支，PR 合入 develop
 
-## 9. 代码风格
+## 9. 编码规范
 
-- 中文注释，英文变量名和 commit message
-- 不加多余的 JSDoc / 类型注解 / 错误处理
-- 改动最小化，不做"顺手优化"
-- 2 空格缩进，LF 换行
-- Prettier + ESLint 统一格式（`lint-staged` 自动运行）
+> 所有代码必须遵守本节规范。Prettier + ESLint + lint-staged 自动执行格式化和 lint。
+
+### 9.1 基本原则
+
+- **不造轮子**：优先使用已有工具链（Zustand、lucide-react、Tailwind token），不引入同类库
+- **最小改动**：只改需求相关代码，不做"顺手优化"、不加多余的 JSDoc / 注释 / 类型注解 / 错误处理
+- **Token 驱动**：所有颜色、圆角、阴影必须使用 `chat.css` 中定义的 CSS token，禁止硬编码 hex 值
+- **中文注释，英文代码**：注释和 UI 文案用中文，变量名、函数名、commit message 用英文
+- **文档同步**：每次开发完功能后，必须将实现内容同步到 `.ai/README.md` 和 `docs/superpowers/specs/2026-04-22-petclaw-architecture-v3.md` 对应章节
+
+### 9.2 文件命名
+
+| 位置 | 规则 | 示例 |
+|---|---|---|
+| `src/main/**` | `kebab-case.ts` | `app-settings.ts`, `database-path.ts` |
+| `src/renderer/**/组件` | `PascalCase.tsx` | `ChatView.tsx`, `BootCheckPanel.tsx` |
+| `src/renderer/**/非组件` | `kebab-case.ts` | `state-machine.ts`, `chat-store.ts` |
+| `stores/` | `kebab-case-store.ts` | `chat-store.ts`, `hook-store.ts` |
+| `panels/` | `PascalCase + Panel.tsx` | `BootCheckPanel.tsx` |
+| `tests/` | 镜像 `src/` 结构，后缀 `.test.ts` | `chat-store.test.ts` |
+
+### 9.3 组件规范（React）
+
+```tsx
+// ✅ 正确：函数声明，不标注返回类型（TS 自动推断）
+export function ChatView() {
+  return <div>...</div>
+}
+
+// ❌ 错误：箭头函数导出、标注 JSX.Element
+export const ChatView = (): JSX.Element => { ... }
+```
+
+- **函数声明**：`export function ComponentName()` — 不用箭头函数导出组件
+- **不标注返回类型**：React 19 移除了全局 `JSX` namespace，让 TS 自动推断
+- **Props 内联**：简单 props 用 `{ prop }: { prop: Type }` 内联，3+ 个 props 才抽 interface
+- **不用 forwardRef**：React 19 支持 ref 作为普通 prop
+- **Hooks 顺序**：`useState` → `useRef` → `useEffect` → `useCallback` → `useMemo`
+
+### 9.4 状态管理（Zustand）
+
+```tsx
+// ✅ 标准模式
+interface ChatState {
+  // 数据
+  messages: Message[]
+  isLoading: boolean
+  // Actions
+  addMessage: (msg: Message) => void
+  setLoading: (v: boolean) => void
+}
+
+export const useChatStore = create<ChatState>()((set, get) => ({
+  messages: [],
+  isLoading: false,
+  addMessage: (msg) => set((s) => ({ messages: [...s.messages, msg] })),
+  setLoading: (v) => set({ isLoading: v })
+}))
+```
+
+- **命名**：`use` + `PascalCase` + `Store`（如 `useChatStore`）
+- **纯 set 驱动**：Actions 只做 `set()`，副作用（IPC、API）放组件 `useEffect` 中
+- **类型同文件导出**：相关 interface / type / enum / const 与 store 放同一文件
+- **不用 Redux / Context**：全局状态统一用 Zustand
+
+### 9.5 CSS / Tailwind v4
+
+```tsx
+// ✅ 使用 token
+<div className="bg-bg-root text-text-primary border-border rounded-[10px]">
+
+// ❌ 硬编码颜色
+<div className="bg-[#f5f5f5] text-[#18181b] border-[#e8e8ec] rounded-xl">
+```
+
+- **Token 优先**：在 `className` 中直接用 token 类名（如 `bg-bg-root`、`text-text-primary`、`border-border`）
+- **内联 style 中**：用 `var(--color-*)` 引用 token（如 `color: 'var(--color-text-primary)'`）
+- **禁止硬编码**：不使用 `bg-[#hexhex]` 写法，除非是不在 token 体系内的一次性装饰色
+- **圆角只用两档**：`rounded-[10px]`（按钮/输入框/卡片）和 `rounded-[14px]`（气泡/模态框）
+- **交互统一**：`active:scale-[0.96]` + `transition-all duration-[120ms]`
+- **不抽 CSS 类**：样式写在 className 内，不单独创建 `.btn-primary` 等自定义类
+- **Token 定义**：`chat.css` 的 `@theme` 块是唯一 token 来源，新增 token 在此添加
+
+### 9.6 TypeScript
+
+- **`strict: true`**：两个 tsconfig 均严格模式
+- **不用 `any`**：用 `unknown` + 类型收窄，`any` 只允许在第三方库类型缺失时加 `// eslint-disable`
+- **不标注可推断类型**：`const x = 'hello'` 而非 `const x: string = 'hello'`
+- **组件不标注返回类型**：不写 `: JSX.Element` 或 `: ReactNode`
+- **接口用 interface，联合用 type**：`interface Props { ... }` / `type Status = 'idle' | 'loading'`
+- **枚举用 const enum 或字面量联合**：小集合用 `type Status = 'a' | 'b'`，需要值映射用 `enum`
+
+### 9.7 IPC 通信
+
+```typescript
+// Channel 命名：模块:动作
+'chat:send'       // ✅
+'sendChatMessage'  // ❌
+```
+
+- **三处同步**：新增 channel 必须同时更新 `ipc.ts` + `preload/index.ts` + `preload/index.d.ts`
+- **单向**：`ipcRenderer.send()` → `ipcMain.on()`（如 UI 事件通知）
+- **双向**：`ipcRenderer.invoke()` → `ipcMain.handle()`（如获取数据）
+- **推送**：`win.webContents.send()`（如进度更新）
+- **进程隔离红线**：renderer 禁止 `require('electron')`，`nodeIntegration: false` + `contextIsolation: true` 永不改
+
+### 9.8 导入顺序
+
+```tsx
+// 1. React / 框架
+import { useState, useEffect } from 'react'
+// 2. 第三方库
+import { Send, PawPrint } from 'lucide-react'
+// 3. 内部模块（store、utils、types）
+import { useChatStore } from '../../stores/chat-store'
+// 4. 资源文件
+import catStaticSrc from '../assets/cat/static.webm'
+```
+
+各组之间空一行。同组内按字母序排列。
+
+### 9.9 测试
+
+> TDD 优先：新功能先写测试再实现，bug 修复先写复现测试再改代码。
+
+#### 测试分层
+
+| 层级 | 工具 | 位置 | 覆盖范围 | 运行频率 |
+|------|------|------|----------|----------|
+| **单元测试** | Vitest + jsdom | `tests/main/**`、`tests/renderer/**` | 纯逻辑：store、state-machine、utils、数据层 | 每次 commit（CI + husky） |
+| **集成测试** | Vitest + ws | `tests/main/**` | IPC handler、WebSocket 通信、数据库读写 | 每次 commit |
+| **组件测试** | Vitest + @testing-library/react（TODO） | `tests/renderer/**` | 关键交互组件的渲染和用户事件 | 每次 commit |
+| **E2E 测试** | Playwright + Electron（TODO） | `tests/e2e/**` | 完整用户流程：启动→聊天→状态切换 | PR 合入前 |
+
+#### TDD 工作流
+
+```
+1. 写失败的测试 → pnpm test:watch 红灯
+2. 写最少实现代码 → 绿灯
+3. 重构（仅在绿灯状态下） → 保持绿灯
+4. 提交
+```
+
+- **新增功能**：先在 `tests/` 中写测试描述期望行为，再实现 `src/` 中的代码
+- **修复 Bug**：先写一个能复现 bug 的测试（当前失败），修复后测试通过
+- **重构**：确保现有测试全部通过，再动代码结构
+
+#### 必须测试的模块
+
+| 模块 | 测试重点 | 不 mock |
+|------|----------|---------|
+| `state-machine.ts` | 所有状态转换、无效事件忽略、回调触发 | — |
+| `chat-store.ts` | 消息增删、加载历史、loading 状态 | — |
+| `openclaw.ts` | 连接、断连、流式 chat、错误处理 | WebSocket（用真实 ws mock server） |
+| `hooks/server.ts` | Socket 生命周期、事件接收、多客户端 | Unix socket |
+| `hooks/installer.ts` | 安装幂等性、保留已有配置 | 文件系统（用 tmp 目录） |
+| `data/db.ts` | 建表、消息存取、限制条数 | SQLite（用 `:memory:`） |
+| `app-settings.ts` | 读写设置、合并 onboarding 数据 | 文件系统（用 tmp 目录） |
+| `bootcheck.ts` | 正常启动 3 步 / 升级 5 步流程（TODO） | — |
+
+#### Openclaw 升级回归策略
+
+升级 Openclaw 运行时版本时，必须通过以下回归检查：
+
+```bash
+# 1. 全量单元测试
+pnpm --filter petclaw-desktop test
+
+# 2. 重点回归：WebSocket 通信
+pnpm --filter petclaw-desktop test -- tests/main/ai/openclaw.test.ts
+
+# 3. 重点回归：Hook 事件接收
+pnpm --filter petclaw-desktop test -- tests/main/hooks/server.test.ts
+
+# 4. 手动验证清单（E2E 自动化前）
+# □ BootCheck 5 步升级流程完成
+# □ Gateway 连接成功（StatusBar 显示绿色）
+# □ 发送消息 → AI 流式响应 → 猫咪状态 Thinking→Working→Happy
+# □ Hook 事件能触发猫咪 Working 状态
+# □ 历史消息正常加载
+```
+
+#### 测试规范
+
+- **框架**：Vitest，`globals: false`（显式 import `describe/it/expect`）
+- **环境**：`tests/renderer/**` 用 jsdom，`tests/main/**` 用 node
+- **Electron mock**：`tests/__mocks__/electron.ts` 统一 mock，vitest alias 自动替换
+- **不 mock 数据库**：集成测试用 `:memory:` SQLite
+- **不 mock WebSocket**：用 `ws` 库创建真实 mock server
+- **文件操作**：用 `os.tmpdir()` + 随机目录，测试后清理
+- **命名**：`describe('模块名')` → `it('should 行为描述')`，英文
+- **覆盖率**：`pnpm test:coverage`（TODO：设置 CI 阈值 ≥70%）
+
+### 9.10 格式化
+
+由工具链自动处理，不需手动关注：
+- **Prettier**：无分号、单引号、100 字符行宽、2 空格、LF 换行、无尾逗号
+- **ESLint**：`@typescript-eslint` recommended + `react-hooks` + `react-refresh`
+- **Husky + lint-staged**：commit 时自动格式化和 lint
+- **commitlint**：`type(scope): subject`（type: feat/fix/refactor/chore/docs/test，scope: desktop/web/api/shared/ci）
+
+### 9.11 禁止魔法值散落
+
+- **配置默认值集中定义**：端口、URL、模型名等配置默认值必须集中定义在对应的配置模块中（如 `app-settings.ts` 的 `DEFAULT_GATEWAY_PORT`、`DEFAULT_GATEWAY_URL`、`createDefaultSettings()`），禁止在各文件中硬编码
+- **Settings 单一维护点**：`PetclawSettings` 接口的类型定义、默认值工厂（`createDefaultSettings`）、合并逻辑（`mergeDefaults`）统一在 `app-settings.ts` 维护
+- **新增配置字段只改一处**：新增配置字段只需修改 `app-settings.ts`，bootcheck 和其他消费方自动继承
+- **parseSettingValue 布尔解析**：`autoLaunch`、`soundEnabled`、`notificationsEnabled` 等布尔字段通过 `parseSettingValue` 统一解析
 
 ---
 
 ## 10. petclaw-desktop 架构详解
 
-### 10.1 三窗口架构
+> **完整架构设计**见 `docs/superpowers/specs/2026-04-22-petclaw-architecture-v3.md`。
+> 本节保留对日常编码直接有用的规范和约定，避免重复。
+
+### 10.1 双窗口架构
 
 ```
-Pet Window (180×145, 透明, alwaysOnTop)     Chat Window (900×650, hiddenInset titleBar)
+Pet Window (180×145, 透明, alwaysOnTop)     Chat Window (动态尺寸, hiddenInset titleBar)
 ├── index.html → main.tsx → App.tsx          ├── chat.html → chat/main.tsx → ChatApp.tsx
 ├── PetCanvas.tsx  视频播放+拖拽              ├── Sidebar.tsx       深色侧边栏+会话列表
 └── state-machine.ts 宠物状态机               ├── ChatView.tsx      聊天界面
                                               ├── MonitorView.tsx   Hook 事件监控
-Pet Bubble Window (动态尺寸, 透明)            ├── SettingsView.tsx  设置面板
-├── pet-bubble.html（TODO，未实现）            └── StatusBar.tsx     底部状态栏
-└── 工具动作气泡提示
+                                              ├── SettingsView.tsx  设置面板
+                                              └── StatusBar.tsx     底部状态栏
 ```
 
-### 10.2 进程架构
+#### 窗口尺寸规范
+
+**规则**：所有窗口尺寸相关数值必须使用 `index.ts` 顶部定义的命名常量，禁止散落魔法数字。
+
+**Chat Window（动态计算）**：
+
+| 参数 | 公式 | 下限 | 上限 |
+|------|------|------|------|
+| 默认宽度 | `screenW × 0.55` | 800px | 1200px |
+| 默认高度 | `screenH × 0.7` | 560px | 900px |
+| 最小尺寸 | = 默认尺寸 | — | — |
+
+**Pet Window（固定尺寸）**：180×145，与猫动画素材绑定。
+
+**窗口交互行为**：
+- 顶部拖拽防误触（`will-resize` 阻止 top-left/top-right 缩放）
+- 生产环境禁用 DevTools（`webPreferences.devTools: is.dev`）
+- 窗口位置/尺寸持久化到 SQLite kv 表
+
+### 10.2 主进程模块化架构（v3）
 
 ```
-Main Process (Node.js)              Preload (Bridge)              Renderer (Browser)
-├── index.ts     入口+窗口创建       ├── index.ts  contextBridge    ├── Pet Window
-├── ipc.ts       IPC handler 注册   └── index.d.ts 类型声明         └── Chat Window
-├── ai/
-│   ├── openclaw.ts  WebSocket 客户端
-│   └── provider.ts  AI 接口抽象
-├── data/db.ts       SQLite 数据库（`~/.petclaw/petclaw.db`）
-├── hooks/
-│   ├── server.ts    Unix socket 服务器（接收 Claude Code hook 事件）
-│   ├── installer.ts Hook 配置安装器
-│   └── types.ts     Hook 事件类型
-├── system/
-│   ├── tray.ts      系统托盘
-│   └── shortcuts.ts 全局快捷键
-└── onboarding.ts    首次引导
+Main Process
+├── index.ts              入口+窗口创建+启动编排
+├── bootcheck.ts          启动检查（调用各 Manager）
+├── app-settings.ts       全局设置集中定义
+├── ai/                   基础层
+│   ├── engine-manager.ts   Runtime 生命周期（utilityProcess）
+│   ├── gateway.ts          GatewayClient 动态加载
+│   ├── session-manager.ts  会话 CRUD
+│   ├── cowork-controller.ts  执行+审批+流式事件
+│   └── config-sync.ts     openclaw.json 唯一写入者
+├── agents/               核心层
+├── skills/               功能层
+├── models/               功能层
+├── memory/               功能层
+├── mcp/                  功能层
+├── im/                   集成层
+├── scheduler/            集成层
+├── pet/                  宠物联动层
+│   └── pet-event-bridge.ts  多源事件聚合 → Pet 窗口
+├── ipc/                  模块化 IPC（chat-ipc、agent-ipc 等）
+└── data/                 SQLite
 ```
+
+详见 v3 spec §2-§18。
 
 ### 10.3 进程隔离规则（红线）
 
@@ -182,7 +432,9 @@ Main Process (Node.js)              Preload (Bridge)              Renderer (Brow
 - 渲染→主（单向）：`ipcRenderer.send()` → `ipcMain.on()`
 - 渲染→主（双向）：`ipcRenderer.invoke()` → `ipcMain.handle()`
 - 主→渲染（推送）：`win.webContents.send()`
-- **新增 IPC channel 必须同步更新三处**：`ipc.ts`、`preload/index.ts`、`preload/index.d.ts`
+- **v3 IPC 模块化**：按模块拆分到 `ipc/*.ts`（chat-ipc、agent-ipc、skill-ipc 等）
+- **新增 IPC channel 必须同步更新三处**：`ipc/*.ts` + `preload/index.ts` + `preload/index.d.ts`
+- 完整 Channel 列表见 v3 spec §18.2
 
 ### 10.5 宠物动画系统
 
@@ -200,9 +452,27 @@ Main Process (Node.js)              Preload (Bridge)              Renderer (Brow
 | `sleep-loop.webm` | 睡觉循环     | ✓    |
 | `sleep-leave.webm`| 醒来过渡     | ×    |
 
-状态机：`Idle → Thinking → Working → Happy`，任意状态可进入 `Dragging`。
+状态机：`Idle → Thinking → Working → Happy`，任意状态可进入 `Dragging`，`Idle` 闲置 2 分钟自动进入 `Sleep`。
 
-视频播放器（`PetCanvas.tsx`）：双缓冲 `<video>` 元素避免切换闪烁，`playSequence()` 支持过渡动画链，2 分钟无互动自动睡眠。
+```
+状态转换表：
+Idle:      ChatSent→Thinking | DragStart→Dragging | HookActive→Working | SleepStart→Sleep
+Thinking:  AIResponding→Working | DragStart→Dragging | Timeout→Idle
+Working:   AIDone→Happy | HookIdle→Idle | DragStart→Dragging | Timeout→Idle
+Happy:     Timeout→Idle | ChatSent→Thinking | DragStart→Dragging
+Dragging:  DragEnd→Idle
+Sleep:     WakeUp→Idle | ChatSent→Thinking | DragStart→Dragging | HookActive→Working
+```
+
+事件触发时机：
+- `ChatSent`：用户发送消息 / IM 消息到达 / 定时任务触发
+- `AIResponding`：AI 第一个 messageUpdate 到来
+- `AIDone`：所有活跃会话完成后触发（多会话计数器归零）
+- `SleepStart`：Idle 状态持续 2 分钟且无活跃会话
+- 从 `Sleep` 唤醒到任意状态时，`PetCanvas` 自动在动画序列前插入 `sleep-leave.webm` 过渡
+- **v3 多源联动**：PetEventBridge 聚合 CoworkController、ImGateway、SchedulerManager、HookServer 事件，详见 v3 spec §22.4
+
+视频播放器（`PetCanvas.tsx`）：双缓冲 `<video>` 元素避免切换闪烁，`playSequence()` 支持过渡动画链。睡眠由状态机统一管理（`PetState.Sleep`），不在 PetCanvas 内部维护。
 
 ### 10.6 CSP 安全策略
 
@@ -227,204 +497,128 @@ renderer.build.rollupOptions.input = {
 | 进程残留 / 端口冲突 | `pkill -9 -f electron && pkill -9 -f "node.*vite"` |
 | better-sqlite3 编译失败 | `pnpm --filter petclaw-desktop postinstall` |
 
-### 10.9 测试
+### 10.9 测试架构
 
-- 框架：Vitest + jsdom
-- 位置：`tests/` 目录，镜像 `src/` 结构
-- 运行：`pnpm test`（单次）、`pnpm test:watch`（监听）
+```
+tests/
+├── __mocks__/
+│   └── electron.ts          # Electron API 统一 mock（vitest alias 自动替换）
+├── main/                    # 主进程测试（node 环境）
+│   ├── ai/openclaw.test.ts  # WebSocket 客户端（真实 ws mock server）
+│   ├── hooks/server.test.ts # Unix socket 生命周期
+│   ├── hooks/installer.test.ts
+│   ├── data/db.test.ts      # SQLite（:memory:）
+│   ├── app-settings.test.ts
+│   ├── database-path.test.ts
+│   └── onboarding.test.ts
+└── renderer/                # 渲染进程测试（jsdom 环境）
+    ├── pet/state-machine.test.ts
+    └── stores/
+        ├── chat-store.test.ts
+        └── onboarding-store.test.ts
+```
+
+- 配置：`vitest.config.ts`，`environmentMatchGlobs` 路由 jsdom/node
+- CI：`.github/workflows/ci.yml` → `test` job 门控 build
+- 详细测试规范见 §9.9
 
 ---
 
 ## 11. Openclaw 集成架构
 
+> 详细设计见 v3 spec §4（EngineManager）、§5（Gateway）、§6（ConfigSync）、§20（版本管理）。
+
 ### 11.1 概述
 
-Openclaw 是 AI agent 运行时，负责 LLM 调用、会话管理、记忆系统、工具/技能执行。Electron 只是 UI 壳，所有 AI 逻辑通过 WebSocket 网关与 Openclaw 通信。
-
-### 11.2 自包含 Node.js 运行时（~/.petclaw/node/）
-
-PetClaw 自带完整的 Node.js 环境，与系统 Node.js 完全隔离：
+Openclaw 是 AI agent 运行时。v3 中 **捆绑在 app 内**，通过 `utilityProcess.fork()` 启动（非独立 Node.js 进程），动态端口 + token 认证。
 
 ```
-~/.petclaw/node/
-├── bin/
-│   ├── node              # 独立 Node.js 二进制（v22，~108MB）
-│   ├── npm / npx         # 包管理
-│   └── petclaw           # CLI 入口（shell 脚本）
-├── lib/node_modules/
-│   ├── openclaw/         # Openclaw 核心运行时
-│   ├── openai/           # OpenAI SDK
-│   ├── @anthropic-ai/    # Claude SDK
-│   ├── grammy/           # Telegram Bot（Channels）
-│   ├── @slack/           # Slack SDK（Channels）
-│   ├── @whiskeysockets/  # WhatsApp（Channels）
-│   ├── playwright-core/  # 浏览器自动化（Skills）
-│   ├── node-llama-cpp/   # 本地 LLM
-│   ├── express / ws      # Gateway 服务器
-│   └── ... 200+ 依赖
-└── include/node/         # native 模块编译头文件
+petclaw-desktop/
+├── vendor/openclaw-runtime/        # 构建产物（git 忽略）
+│   ├── current/ → darwin-arm64/    # symlink 到当前平台
+│   ├── darwin-arm64/               # 完整 runtime
+│   └── ...
+├── openclaw-extensions/            # 本地扩展（ask-user-question + mcp-bridge）
+├── SKILLs/                         # 28 个内置技能（源码）
+└── scripts/                        # 13 个构建脚本
 ```
 
-**安装来源**：首次启动时从 app 自带的 tar.gz 资源解压到 `~/.petclaw/node/`（不联网）：
-- `resources/node/<platform-arch>.tar.gz` — Node.js
-- `resources/openclaw/<platform-arch>.tar.gz` — Openclaw + 全部依赖
+### 11.2 Runtime 管理
 
-**petclaw CLI**：BootCheck Step 4 自动生成 `~/.petclaw/node/bin/petclaw` shell 脚本，设置 `OPENCLAW_HOME` 等环境变量后执行 `openclaw.mjs`。
-
-**Electron 集成方式**：
-1. 首次启动 → BootCheck 解压 tar.gz 到 `~/.petclaw/node/`
-2. 生成 `petclaw` CLI 脚本 + `openclaw.json` 默认配置
-3. 通过 `child_process.spawn` 启动 Gateway
-4. 通过 WebSocket 连接 Gateway 通信
-
-### 11.2.1 运行时打包流程
-
-运行时资源通过脚本自动打包，**不入 git**（`.gitignore` 中排除）。
-
-**打包脚本**：`petclaw-desktop/scripts/prepare-runtime.sh`
-
-```bash
-# 当前平台
-./scripts/prepare-runtime.sh
-
-# 指定平台
-./scripts/prepare-runtime.sh darwin arm64   # macOS Apple Silicon
-./scripts/prepare-runtime.sh darwin x64     # macOS Intel
-./scripts/prepare-runtime.sh win x64        # Windows
-```
-
-**版本管理**：脚本头部配置：
-```bash
-NODE_VERSION="v22.13.1"
-OPENCLAW_VERSION="latest"   # npm tag 或具体版本号
-```
-
-**更新 Openclaw**：改 `OPENCLAW_VERSION` → 重新运行脚本 → 测试 → 发版。
-
-**CI/CD 多架构**：GitHub Actions 并行运行三个平台的 prepare-runtime，再分别 electron-builder 打包。
-
-**electron-builder**：`asarUnpack` 确保 resources 不被压进 asar：
-```json
-"asarUnpack": ["resources/node/**", "resources/openclaw/**"]
-```
+- **版本锁定**：`package.json` → `openclaw.version` + `openclaw.plugins`
+- **构建流水线**：ensure → build → sync-current → bundle → plugins → extensions → precompile → channel-deps → prune（13 步）
+- **构建缓存**：`runtime-build-info.json`，版本未变则跳过
+- **启动**：`OpenclawEngineManager.startGateway()` → `utilityProcess.fork()` → 健康检查 → 就绪
 
 ### 11.3 通信架构
 
 ```
 Electron Main Process
-├── ai/openclaw.ts    WebSocket 客户端，连接本地网关
-│                     ws://127.0.0.1:{gatewayPort}
-│                     认证：Bearer token（gatewayToken）
+├── ai/gateway.ts     动态加载 GatewayClient（ESM import）
+│                     连接 http://127.0.0.1:{dynamicPort}
+│                     认证：Bearer token
 │
-Openclaw Runtime（独立进程）
-├── 内嵌 Node.js（~/.petclaw/node/）
-├── Gateway          本地 WebSocket 服务器（默认端口 29890）
-├── Agent Sessions   会话管理（~/.petclaw/agents/main/sessions/）
-└── LLM Provider     对接后端 API（petclaw.ai/api/v1 或自定义）
+├── ai/cowork-controller.ts   监听 Gateway 事件
+│   ├── message / messageUpdate  → 消息流
+│   ├── complete / error         → 会话完成
+│   └── permissionRequest        → Exec Approval 弹窗
+│
+Openclaw Runtime（utilityProcess）
+├── Gateway 服务器（动态端口）
+├── Agent Sessions
+└── LLM Provider 对接
 ```
 
-### 11.4 Workspace 目录（~/.petclaw/workspace/）
+### 11.4 ConfigSync — 配置唯一写入者
 
-Openclaw agent 的工作目录，包含人格、记忆和技能：
+`ConfigSync` 是唯一写入 `{userData}/openclaw/state/openclaw.json` 的模块，聚合所有 Manager 的配置：
 
-| 文件 | 用途 |
-| ---- | ---- |
-| `SOUL.md` | 猫咪人格定义（温暖、偶尔傲娇、有主见） |
-| `USER.md` | 用户档案（姓名、职业、偏好） |
-| `IDENTITY.md` | agent 身份（名字、形象、性格标签） |
-| `MEMORY.md` | 长期记忆（跨会话持久化） |
-| `AGENTS.md` | agent 工作规范（会话启动流程、记忆规则、红线） |
-| `AGENTS_CHAT.md` | 聊天模式指令 |
-| `AGENTS_WORK.md` | 工作模式指令（Think-Plan-Execute-Deliver） |
-| `TOOLS.md` | 环境特定工具笔记 |
-| `BOOTSTRAP.md` | 首次启动引导（完成后删除） |
-| `memory/YYYY-MM-DD.md` | 每日笔记 |
-| `skills/` | 50+ 技能插件（浏览器、日历、GitHub、邮件等） |
+- 模型配置（ModelRegistry → providers/models，API Key 不写入）
+- Skills 路径（SkillManager → skills.load.extraDirs + skills.entries）
+- MCP 服务器（McpManager → mcp-bridge 插件配置）
+- Agent 工作区（AgentManager → agents.defaults.workspace）
+- 本地扩展回调（ask-user-question + mcp-bridge 的 callbackUrl/secret）
 
-### 11.5 配置文件（~/.petclaw/）
+**设置变更流程**：UI 修改 → SQLite kv 表 → ConfigSync.sync() → `openclaw.json` → Gateway 热加载
 
-#### openclaw.json（Openclaw 运行时配置）
+### 11.5 用户数据目录（{userData}）
 
-唯一的 Openclaw 运行时配置源。Electron 可读取其中的网关信息，但不会用 `petclaw-settings.json` 直接替代它。
+> `{userData}` = `app.getPath('userData')`（macOS: `~/Library/Application Support/PetClaw/`）
 
-| 字段 | 来源 | 说明 |
-| ---- | ---- | ---- |
-| `models.providers.llm.baseUrl` | BootCheck 生成 | 默认 `https://petclaw.ai/api/v1` |
-| `models.providers.llm.apiKey` | Onboarding 登录后 | 用户认证后从服务端获取 |
-| `models.providers.llm.models[]` | BootCheck 生成 | petclaw-fast 模型 |
-| `agents.defaults.workspace` | BootCheck 生成 | `~/.petclaw/workspace` |
-| `agents.defaults.model.primary` | BootCheck 生成 | `llm/petclaw-fast` |
-| `agents.defaults.compaction` | BootCheck 生成 | 内存刷新策略 |
-| `hooks.internal.entries` | BootCheck 生成 | session-memory 等 |
-| `gateway.port` | BootCheck 生成 | 默认 29890 |
-| `gateway.auth.token` | BootCheck 生成 | 随机 token |
-| `gateway.remote.token` | BootCheck 生成 | 同 auth.token |
+```
+{userData}/
+├── petclaw.db               # SQLite 数据库
+├── openclaw/                # OPENCLAW_HOME
+│   └── state/               # OPENCLAW_STATE_DIR
+│       ├── openclaw.json    # ConfigSync 生成（Runtime 消费）
+│       ├── gateway-token    # 认证 token
+│       ├── gateway-port.json
+│       ├── bin/             # CLI shims（petclaw, openclaw, claw）
+│       ├── workspace/       # 默认 workspace（main agent）
+│       ├── agents/main/     # Agent 数据
+│       └── logs/            # 引擎日志
+├── SKILLs/                  # Skills 集中管理目录（从 Resources 同步）
+├── cowork/bin/              # node/npm/npx shim
+└── logs/                    # Electron 应用日志
+```
 
-#### petclaw-settings.json（应用设置）
+### 11.6 当前集成状态（v1 → v3 迁移中）
 
-仅用于 PetClaw Desktop 应用层配置，不直接作为 Openclaw 运行时配置源。涉及 Openclaw 的配置变更，应由主进程同步写入 `openclaw.json`。
+**v1 已实现（待重构）**：
+- ✅ WebSocket 客户端（`ai/openclaw.ts`）→ v3 替换为 GatewayClient
+- ✅ Hook 事件接收（`hooks/server.ts`）→ v3 保留
+- ✅ Workspace MD 同步（`syncWorkspaceMd()`）→ v3 由 ConfigSync 接管
+- ✅ 宠物状态机 + 动画系统 → v3 保留，新增 PetEventBridge
 
-| 字段 | 来源 | 说明 |
-| ---- | ---- | ---- |
-| `language` | BootCheck / Onboarding | 默认 zh |
-| `brainApiUrl` / `brainModel` / `brainApiKey` | BootCheck / 登录后 | AI 模型配置 |
-| `runtimeMode` | BootCheck 生成 | "chat" |
-| `gatewayPort` / `gatewayUrl` / `gatewayToken` | BootCheck 生成 | 网关连接 |
-| `deviceId` | BootCheck 生成 | 设备唯一 ID（随机 hex） |
-| `userEmail` / `userToken` | Onboarding 登录 | 用户认证 |
-| `inviteCode` | Onboarding | 邀请码 |
-| `voiceShortcut` | Onboarding Step 4 | 默认 ["Meta","d"] |
-| `voiceInputDevice` | Onboarding / 设置 | 默认 "default" |
-| `theme` | BootCheck / 设置页 | 默认 "light" |
-| `sopComplete` / `onboardingComplete` | Onboarding 完成后 | |
-| `lastLaunchedVersion` | 每次启动更新 | app 版本号 |
-| `userCredits` / `modelTier` / `membershipTier` | 登录后从服务端拉取 | 积分/会员 |
-
-#### 其他运行时文件
-
-- `~/.petclaw/petclaw.db` — PetClaw Desktop 本地 SQLite 数据库，保存消息和会话数据
-- 兼容迁移：如果旧版本曾把数据库放在 Electron `userData` 目录，首次启动会自动迁移到 `~/.petclaw/petclaw.db`
-
-| 文件 | 来源 | 说明 |
-| ---- | ---- | ---- |
-| `cron/jobs.json` | Openclaw 运行时 | 定时任务 |
-| `session-history.json` | Openclaw 运行时 | 会话文件路径映射 |
-| `session-previews.json` | Openclaw 运行时 | 会话摘要 |
-| `update-check.json` | Openclaw 运行时 | 自动更新检查记录 |
-| `cron-history.json` | Openclaw 运行时 | 定时任务执行历史 |
-| `logs/petclaw-gateway.log` | Electron 主进程 | Gateway stdout 重定向 |
-| `logs/startup-diagnostics.log` | Electron 主进程 | 启动诊断日志 |
-| `devices/` | Openclaw 运行时 | 设备信息 |
-
-### 11.6 Agent 运行模式
-
-| 模式 | 配置文件 | 特点 |
-| ---- | -------- | ---- |
-| Chat | `AGENTS_CHAT.md` | 闲聊陪伴，自动更新记忆，不主动确认琐事 |
-| Work | `AGENTS_WORK.md` | 任务执行，Think-Plan-Execute-Deliver 闭环，静默高效 |
-
-### 11.7 应用启动检查（BootCheck）
-
-每次启动依次执行 5 步检查，Pet Window 显示进度：
-
-1. **检测环境** — OS 版本、架构、磁盘空间
-2. **准备 Node.js** — 检查 `~/.petclaw/node/bin/node`，不存在则下载
-3. **更新运行时** — 检查 Openclaw 版本，需要则更新
-4. **配置大模型** — 检查 `openclaw.json`，无效则进入配置向导
-5. **启动连接** — spawn Gateway + WebSocket 握手
-
-非首次启动：1/2/3 秒过，直接到 5。
-
-### 11.8 当前集成状态
-
-- ✅ WebSocket 客户端（`ai/openclaw.ts`）
-- ✅ Gateway 连接（端口 29890，token 认证）
-- ✅ Hook 事件接收（`hooks/server.ts`，Unix socket）
-- ❌ Workspace 管理（SOUL.md/MEMORY.md 读写）— TODO
-- ❌ Pet Bubble 窗口（工具动作气泡）— TODO
-- ❌ 语音系统（TTS + 语音输入）— TODO
-- ❌ Skills 插件系统 — TODO
-- ❌ Cron 定时任务 — TODO
+**v3 待实现**：
+- OpenclawEngineManager（utilityProcess 启动 Runtime）
+- OpenclawGateway（GatewayClient 动态加载）
+- ConfigSync（openclaw.json 唯一写入）
+- AgentManager / SessionManager / CoworkController
+- SkillManager / ModelRegistry / MemoryManager / McpManager
+- ImGateway / SchedulerManager
+- PetEventBridge（宠物多源联动）
+- 透明区域点击穿透（alpha 检测）
 
 ---
 
@@ -575,14 +769,25 @@ ls /tmp/petclaw-extracted/dist/
 
 ### 13.5 动效
 
+#### 微交互（单元素状态变化）
 ```css
 --transition-fast: 120ms ease;      /* 按钮悬停、图标旋转 */
 --transition-default: 180ms ease;   /* 面板切换、颜色变化 */
 --transition-slow: 300ms ease-out;  /* 模态框、侧边栏展开 */
 ```
 
+#### 编排过渡（多元素协调动画）
+```css
+--transition-choreography: 400–500ms ease-out;  /* 状态机切换、crossfade 编排 */
+--transition-sequence-gap: 300–400ms;           /* 编排中元素间的错开延迟 */
+```
+
+适用场景：BootCheck 成功动画（进度环缩小 + 成功图标放大 + 标题切换）、Onboarding 步骤切换等多元素同时过渡的场景。编排动画需要足够时长让用户感知状态变化，强行压到 300ms 以内会显得仓促。
+
+#### 通用规则
 - 按钮点击：`active:scale(0.96)`
 - Toast 弹出：从上方滑入 + fade（160ms）
+- 进度条：`duration-700 ease-out`（缓慢填充，传达"正在工作"）
 - 避免过度使用动效
 
 ### 13.6 可访问性
