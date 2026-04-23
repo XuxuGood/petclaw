@@ -1,7 +1,7 @@
 import { ipcMain, app } from 'electron'
 import type Database from 'better-sqlite3'
 
-import { kvGet, kvSet } from '../data/db'
+import { kvGet, kvSet, getMessages } from '../data/db'
 
 export interface SettingsIpcDeps {
   db: Database.Database
@@ -18,5 +18,10 @@ export function registerSettingsIpcHandlers(deps: SettingsIpcDeps): void {
     if (key === 'autoLaunch') {
       app.setLoginItemSettings({ openAtLogin: value === 'true' })
     }
+  })
+
+  // v1 兼容：ChatView 加载历史消息（messages 表）
+  ipcMain.handle('chat:history', async (_event, limit: number) => {
+    return getMessages(deps.db, limit)
   })
 }
