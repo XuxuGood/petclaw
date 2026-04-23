@@ -671,48 +671,51 @@ memory: {
 
 ### 12.1 现有状态
 
-SettingsView 只有一个 Gateway URL 配置项 + 快捷键信息 + 版本号。
+SettingsView 是 Sidebar 中的一个页面 Tab，只有 Gateway URL 配置项 + 快捷键信息 + 版本号。
 
-### 12.2 新设计：分 Tab 结构
+### 12.2 新设计：弹窗 + 左右布局
 
-参考 LobsterAI Settings 布局，适配 PetClaw 设计语言。
+Settings 从页面改为**居中弹窗（Modal）**，内部采用**左侧菜单 + 右侧内容**的左右布局。
 
 ```
-┌──────────────────────────────────────────────┐
-│  设置                                         │
-├──────────────────────────────────────────────┤
-│  [模型] [Agent] [MCP] [记忆] [通用]           │
-├──────────────────────────────────────────────┤
-│                                              │
-│  ┌──────────┐  ┌──────────────────────┐      │
-│  │ Provider  │  │  配置面板            │      │
-│  │ 列表     │  │                      │      │
-│  │ (左栏)   │  │  API Key             │      │
-│  │          │  │  Base URL            │      │
-│  │  OpenAI  │  │  API 格式            │      │
-│  │  Claude  │  │  [测试连接]          │      │
-│  │  ...     │  │  模型列表            │      │
-│  │          │  │                      │      │
-│  │ [+自定义]│  │                      │      │
-│  └──────────┘  └──────────────────────┘      │
-│                                              │
-└──────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────┐
+│  设置                                        [✕]  │
+├──────────┬────────────────────────────────────────┤
+│          │                                        │
+│  通用     │  右侧内容区                            │
+│  Agent引擎│                                        │
+│  模型     │  （根据左侧选中菜单项切换）              │
+│  IM      │                                        │
+│  记忆     │                                        │
+│  Agent   │                                        │
+│  关于     │                                        │
+│          │                                        │
+└──────────┴────────────────────────────────────────┘
 ```
 
-### 12.3 Tab 内容
+### 12.3 菜单项内容
 
-| Tab | 组件 | 内容 |
-|-----|------|------|
-| 模型 | `ModelSettingsTab` | 左栏 Provider 列表 + 右栏配置面板（API Key、Base URL、模型列表、测试连接） |
-| Agent | `AgentSettingsTab` | Agent 列表 + 创建/编辑对话框（名称、描述、图标、System Prompt、模型选择、技能绑定） |
-| MCP | `McpSettingsTab` | 服务器列表 + 添加/编辑对话框（名称、传输协议、配置参数） |
-| 记忆 | `MemorySettingsTab` | MEMORY.md 内容查看/编辑 + 搜索 |
-| 通用 | `GeneralSettingsTab` | 快捷键、版本信息（保留原有内容） |
+| 菜单项 | 组件 | 内容 |
+|--------|------|------|
+| 通用 | `GeneralSettings` | 自启动、语言、快捷键等常规配置 |
+| Agent 引擎 | `EngineSettings` | Openclaw 引擎状态、版本、重启按钮、日志查看 |
+| 模型 | `ModelSettings` | Provider 列表 + 右侧配置面板（API Key、Base URL、模型列表、测试连接） |
+| IM | `ImSettings` | IM 平台配置（Phase 3 实现，Phase 2 占位） |
+| 记忆 | `MemorySettings` | MEMORY.md 内容查看/编辑 + 搜索 |
+| Agent | `AgentSettings` | Agent 列表 + 创建/编辑（名称、描述、图标、System Prompt、模型选择、技能绑定） |
+| 关于 | `AboutSettings` | 版本号、开源协议、反馈链接 |
 
-### 12.4 UI 规范
+### 12.4 弹窗触发方式
+
+- Sidebar 中的设置图标点击 → 打开 Settings Modal
+- 从 SettingsView 页面 Tab 改为弹窗入口（Sidebar 不再有 settings Tab）
+
+### 12.5 UI 规范
 
 遵循 PetClaw 设计系统：
 
+- 弹窗：`rounded-[14px]` 居中，backdrop 半透明遮罩
+- 左侧菜单：`w-[180px]` 固定宽度，菜单项 `rounded-[10px]` 选中态高亮
 - 圆角：`rounded-[10px]` / `rounded-[14px]`
 - 交互：`active:scale-[0.96] duration-[120ms]`
 - 卡片：`bg-bg-card shadow-[var(--shadow-card)] border border-border`
@@ -739,7 +742,7 @@ ChatView 中的输入区域是简单的 textarea + Send 按钮。
 │  输入消息...                                  │
 │                                              │
 ├──────────────────────────────────────────────┤
-│  [🔧 Skills: web-search, code +2]  [📎] [↑] │
+│  [🔧 Skills: web-search +2] [🔌 MCP] [📎] [↑]│
 └──────────────────────────────────────────────┘
 ```
 
@@ -750,9 +753,14 @@ ChatView 中的输入区域是简单的 textarea + Send 按钮。
 | `AgentSelector` | 下拉选择当前 Agent（显示 icon + name） |
 | `CwdSelector` | 工作目录选择器（最近目录列表 + 添加文件夹） |
 | `SkillSelector` | 多选已启用的 Skills（Popover 展示 Skill 列表 + checkbox） |
+| `McpPanel` | MCP 服务器管理面板（列表 + 添加/编辑/删除 + 传输协议选择） |
 | `AttachmentBar` | 附件预览栏（图片缩略图 + 文件图标，拖放或点击添加） |
 
-### 13.4 数据流
+### 13.4 MCP 管理
+
+MCP 服务器管理放在主页聊天区域，通过输入框底栏的 MCP 按钮打开管理面板（Popover 或侧面板），而非放在 Settings 弹窗中。
+
+### 13.5 数据流
 
 ```
 用户输入消息 + 选择 Agent/cwd/skills
@@ -807,11 +815,19 @@ Phase 1 步骤 5-15（窗口创建、BootCheck、IPC 注册等）
 | `src/main/ipc/skills-ipc.ts` | Skill IPC handlers |
 | `src/main/ipc/mcp-ipc.ts` | MCP IPC handlers |
 | `src/main/ipc/memory-ipc.ts` | Memory IPC handlers |
-| `src/renderer/src/chat/components/settings/*.tsx` | Settings 各 Tab 组件 |
+| `src/renderer/src/chat/components/settings/SettingsModal.tsx` | Settings 弹窗容器 |
+| `src/renderer/src/chat/components/settings/GeneralSettings.tsx` | 通用设置 |
+| `src/renderer/src/chat/components/settings/EngineSettings.tsx` | Agent 引擎设置 |
+| `src/renderer/src/chat/components/settings/ModelSettings.tsx` | 模型配置 |
+| `src/renderer/src/chat/components/settings/ImSettings.tsx` | IM 设置（Phase 3 占位） |
+| `src/renderer/src/chat/components/settings/MemorySettings.tsx` | 记忆管理 |
+| `src/renderer/src/chat/components/settings/AgentSettings.tsx` | Agent 管理 |
+| `src/renderer/src/chat/components/settings/AboutSettings.tsx` | 关于页面 |
 | `src/renderer/src/chat/components/ChatInputBox.tsx` | 增强输入框 |
 | `src/renderer/src/chat/components/AgentSelector.tsx` | Agent 选择器 |
 | `src/renderer/src/chat/components/CwdSelector.tsx` | 工作目录选择器 |
 | `src/renderer/src/chat/components/SkillSelector.tsx` | Skill 选择器 |
+| `src/renderer/src/chat/components/McpPanel.tsx` | MCP 服务器管理面板 |
 
 ### 15.2 修改文件
 
@@ -824,7 +840,9 @@ Phase 1 步骤 5-15（窗口创建、BootCheck、IPC 注册等）
 | `src/main/ipc/index.ts` | 注册新 IPC handlers |
 | `src/preload/index.ts` | 新增 agents/models/skills/mcp/memory channels |
 | `src/preload/index.d.ts` | 类型定义同步 |
-| `src/renderer/src/chat/components/SettingsView.tsx` | 改为分 Tab 结构 |
+| `src/renderer/src/chat/components/SettingsView.tsx` | 删除，改为 SettingsModal 弹窗 |
+| `src/renderer/src/chat/components/Sidebar.tsx` | Settings 入口从 Tab 改为弹窗触发按钮 |
+| `src/renderer/src/chat/ChatApp.tsx` | 移除 settings Tab，添加 SettingsModal |
 | `src/renderer/src/chat/components/ChatView.tsx` | 集成 ChatInputBox |
 
 ---
@@ -845,9 +863,10 @@ Phase 1 步骤 5-15（窗口创建、BootCheck、IPC 注册等）
 
 ### 前端验证
 
-- Settings 模型 Tab: Provider 列表 + API Key 配置 + 测试连接反馈
-- Settings Agent Tab: Agent 列表 + 创建/编辑/删除
-- Settings MCP Tab: 服务器列表 + 添加/编辑/删除 + 传输协议选择
-- Settings 记忆 Tab: MEMORY.md 查看/编辑/搜索
+- Settings 弹窗：左侧菜单 7 项 + 右侧内容区正确切换
+- Settings 模型：Provider 列表 + API Key 配置 + 测试连接反馈
+- Settings Agent：Agent 列表 + 创建/编辑/删除
+- Settings 记忆：MEMORY.md 查看/编辑/搜索
+- MCP 面板（主页）：服务器列表 + 添加/编辑/删除 + 传输协议选择
 - ChatInputBox: Agent 选择 + cwd 选择 + Skill 多选 + 附件添加
 - 所有 UI 组件遵循 PetClaw 设计系统（Tailwind token、圆角、动效）
