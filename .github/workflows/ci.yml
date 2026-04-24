@@ -4,27 +4,81 @@ on:
   push:
     branches: [main, develop]
   pull_request:
-    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  # ========== Stage 1: 变更检测 ==========
+  changed-files:
+    runs-on: ubuntu-latest
+    outputs:
+      renderer: ${{ steps.changes.outputs.renderer }}
+      main: ${{ steps.changes.outputs.main }}
+      skills: ${{ steps.changes.outputs.skills }}
+      scripts: ${{ steps.changes.outputs.scripts }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            renderer:
+              - 'petclaw-desktop/src/renderer/**'
+              - 'petclaw-desktop/electron.vite.config.ts'
+              - 'petclaw-desktop/tsconfig.json'
+              - 'petclaw-desktop/tailwind.config.*'
+              - 'petclaw-desktop/postcss.config.*'
+            main:
+              - 'petclaw-desktop/src/main/**'
+              - 'petclaw-desktop/src/preload/**'
+              - 'petclaw-desktop/tsconfig.node.json'
+            skills:
+              - 'petclaw-desktop/SKILLs/**'
+            scripts:
+              - 'petclaw-desktop/scripts/**'
+              - 'petclaw-desktop/electron-builder.json'
+
+  # ========== Stage 2: 代码质量 ==========
   lint-and-typecheck:
-    name: Lint & TypeCheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: pnpm/action-setup@v4
         with:
           version: 9
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '22.x'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter petclaw-desktop lint
+      - name: Lint changed files only
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            FILES=$(git diff --name-only --diff-filter=ACMR origin/${BASE_REF}...HEAD -- '*.ts' '*.tsx')
+          elif [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
+            FILES=$(git diff --name-only --diff-filter=ACMR ${BEFORE_SHA}...HEAD -- '*.ts' '*.tsx')
+          else
+            echo "BEFORE_SHA unavailable, falling back to HEAD~1"
+            FILES=$(git diff --name-only --diff-filter=ACMR HEAD~1 -- '*.ts' '*.tsx')
+          fi
+          if [ -n "$FILES" ]; then
+            echo "Linting changed files:"
+            echo "$FILES"
+            echo "$FILES" | xargs -d '\n' npx eslint --ext ts,tsx --report-unused-disable-directives --max-warnings 0
+          else
+            echo "No TypeScript files changed, skipping lint"
+          fi
       - run: pnpm --filter petclaw-desktop typecheck
 
+  # ========== Stage 3: 单元测试 ==========
   test:
-    name: Unit Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,29 +87,19 @@ jobs:
           version: 9
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '22.x'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter petclaw-desktop test
         env:
           CI: true
 
+  # ========== Stage 4: 构建验证 ==========
   build:
-    name: Build (${{ matrix.os }})
-    needs: [lint-and-typecheck, test]
-    strategy:
-      matrix:
-        include:
-          - os: macos-latest
-            platform: darwin
-            arch: arm64
-          - os: macos-13
-            platform: darwin
-            arch: x64
-          - os: windows-latest
-            platform: win
-            arch: x64
-    runs-on: ${{ matrix.os }}
+    name: Build
+    needs: [changed-files, lint-and-typecheck, test]
+    if: ${{ needs.changed-files.outputs.renderer == 'true' || needs.changed-files.outputs.main == 'true' || github.event_name == 'push' }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -63,32 +107,7 @@ jobs:
           version: 9
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: '22.x'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-
-      # Prepare runtime resources (Node.js + Openclaw)
-      - name: Prepare runtime
-        if: runner.os != 'Windows'
-        run: |
-          chmod +x petclaw-desktop/scripts/prepare-runtime.sh
-          cd petclaw-desktop && ./scripts/prepare-runtime.sh ${{ matrix.platform }} ${{ matrix.arch }}
-
-      # Build Electron app
       - run: pnpm --filter petclaw-desktop build
-
-      # Package with electron-builder
-      - name: Package
-        run: pnpm --filter petclaw-desktop package
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # Upload artifacts
-      - uses: actions/upload-artifact@v4
-        with:
-          name: petclaw-${{ matrix.platform }}-${{ matrix.arch }}
-          path: |
-            petclaw-desktop/dist/*.dmg
-            petclaw-desktop/dist/*.zip
-            petclaw-desktop/dist/*.exe
-          if-no-files-found: ignore

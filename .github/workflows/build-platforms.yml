@@ -6,9 +6,27 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      build_macos:
+        description: 'Build macOS'
+        required: true
+        default: true
+        type: boolean
+      build_windows:
+        description: 'Build Windows'
+        required: true
+        default: true
+        type: boolean
+      build_linux:
+        description: 'Build Linux'
+        required: true
+        default: true
+        type: boolean
 
 jobs:
+  # ========== macOS 构建 ==========
   build-macos:
+    if: ${{ github.event_name == 'push' || inputs.build_macos }}
     name: Build (macOS)
     runs-on: macos-latest
     steps:
@@ -48,7 +66,9 @@ jobs:
             petclaw-desktop/release/*.zip
           retention-days: 30
 
+  # ========== Windows 构建 ==========
   build-windows:
+    if: ${{ github.event_name == 'push' || inputs.build_windows }}
     name: Build (Windows)
     runs-on: windows-latest
     steps:
@@ -61,6 +81,13 @@ jobs:
           node-version: '22.x'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
+
+      # Windows 需要 Python 运行时
+      - name: Setup Python Runtime
+        run: pnpm --filter petclaw-desktop setup:python-runtime
+        env:
+          PETCLAW_PORTABLE_PYTHON_ARCHIVE: ${{ secrets.WINDOWS_PYTHON_ARCHIVE }}
+
       - run: pnpm --filter petclaw-desktop build
 
       - name: Package (Windows)
@@ -77,7 +104,9 @@ jobs:
             petclaw-desktop/release/*.exe
           retention-days: 30
 
+  # ========== Linux 构建 ==========
   build-linux:
+    if: ${{ github.event_name == 'push' || inputs.build_linux }}
     name: Build (Linux)
     runs-on: ubuntu-latest
     steps:
@@ -116,7 +145,7 @@ jobs:
             petclaw-desktop/release/*.deb
           retention-days: 30
 
-  # 打 tag 时自动创建 GitHub Release（draft 状态，人工审核后发布）
+  # ========== 创建 Release ==========
   create-release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [build-macos, build-windows, build-linux]
@@ -132,7 +161,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           draft: true
-          # beta / alpha / rc tag 标记为预发布
           prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-alpha') || contains(github.ref, '-rc') }}
           files: artifacts/**/*
           generate_release_notes: true

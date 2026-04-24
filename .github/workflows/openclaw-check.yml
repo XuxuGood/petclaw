@@ -1,15 +1,22 @@
-# Openclaw 版本检查工作流
-# 每周一 08:23 自动检查是否有新版本，也可手动触发
-name: Openclaw Version Check
+# Openclaw 版本检查和集成验证
+# 每周一 08:23 自动检查，也可手动触发，PR 修改 package.json 时也运行
+name: OpenClaw Integration Check
 
 on:
+  push:
+    paths:
+      - 'petclaw-desktop/package.json'
+      - 'petclaw-desktop/scripts/*openclaw*'
+  pull_request:
+    paths:
+      - 'petclaw-desktop/package.json'
   schedule:
     - cron: '23 8 * * 1'
   workflow_dispatch:
 
 jobs:
-  check:
-    name: Check Openclaw Version
+  check-openclaw:
+    name: Check OpenClaw Integration
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,23 +24,104 @@ jobs:
         with:
           node-version: '22.x'
 
-      - name: Check Openclaw version
+      - name: Check OpenClaw Version Format
         run: |
-          # 读取 package.json 中锁定的 openclaw 版本
-          CURRENT=$(node -e "console.log(require('./petclaw-desktop/package.json').openclaw.version)")
-          echo "Current Openclaw version: $CURRENT"
+          VERSION=$(node -p "require('./petclaw-desktop/package.json').openclaw.version")
+          if [[ ! $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Invalid OpenClaw version format: $VERSION"
+            echo "Expected format: vX.Y.Z (e.g., v2026.3.2)"
+            exit 1
+          fi
+          echo "✓ OpenClaw version format valid: $VERSION"
 
-          # 从远端 git tags 查最新正式版本（过滤 v 前缀的语义版本）
+      - name: Validate OpenClaw Repository
+        run: |
+          REPO=$(node -p "require('./petclaw-desktop/package.json').openclaw.repo")
+          if [[ ! $REPO =~ ^https://github\.com/.+/.+\.git$ ]]; then
+            echo "❌ Invalid OpenClaw repository URL: $REPO"
+            exit 1
+          fi
+          echo "✓ OpenClaw repository URL valid: $REPO"
+
+      - name: Validate OpenClaw Plugins
+        run: |
+          node -e "
+            const pkg = require('./petclaw-desktop/package.json');
+
+            if (!pkg.openclaw.plugins || !Array.isArray(pkg.openclaw.plugins)) {
+              console.error('❌ Invalid openclaw.plugins configuration: must be an array');
+              process.exit(1);
+            }
+
+            console.log('✓ OpenClaw plugins configuration valid');
+            console.log('  Total plugins:', pkg.openclaw.plugins.length);
+
+            let hasError = false;
+            pkg.openclaw.plugins.forEach((plugin, index) => {
+              if (!plugin.id) {
+                console.error('❌ Plugin at index ' + index + ' missing \"id\" field');
+                hasError = true;
+              }
+              if (!plugin.npm) {
+                console.error('❌ Plugin at index ' + index + ' missing \"npm\" field');
+                hasError = true;
+              }
+              if (!plugin.version) {
+                console.error('❌ Plugin at index ' + index + ' missing \"version\" field');
+                hasError = true;
+              }
+            });
+
+            if (hasError) {
+              process.exit(1);
+            }
+
+            console.log('✓ All plugins have required fields');
+          "
+
+      - name: Check OpenClaw Scripts Exist
+        run: |
+          SCRIPTS=(
+            "petclaw-desktop/scripts/ensure-openclaw-version.cjs"
+            "petclaw-desktop/scripts/bundle-openclaw-gateway.cjs"
+            "petclaw-desktop/scripts/ensure-openclaw-plugins.cjs"
+            "petclaw-desktop/scripts/sync-local-openclaw-extensions.cjs"
+            "petclaw-desktop/scripts/precompile-openclaw-extensions.cjs"
+            "petclaw-desktop/scripts/prune-openclaw-runtime.cjs"
+            "petclaw-desktop/scripts/run-build-openclaw-runtime.cjs"
+            "petclaw-desktop/scripts/sync-openclaw-runtime-current.cjs"
+          )
+
+          MISSING=0
+          for script in "${SCRIPTS[@]}"; do
+            if [ -f "$script" ]; then
+              echo "✓ $script"
+            else
+              echo "⚠ $script not found"
+              MISSING=$((MISSING + 1))
+            fi
+          done
+
+          if [ $MISSING -gt 0 ]; then
+            echo "⚠ $MISSING OpenClaw scripts missing (this may be expected for new projects)"
+          fi
+
+      - name: Check Latest Version
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: |
+          CURRENT=$(node -p "require('./petclaw-desktop/package.json').openclaw.version")
+          echo "Current OpenClaw version: $CURRENT"
+
           LATEST=$(git ls-remote --tags https://github.com/openclaw/openclaw.git \
             | grep -oP 'v\d+\.\d+\.\d+$' \
             | sort -V \
             | tail -1)
-          echo "Latest Openclaw version: $LATEST"
+          echo "Latest OpenClaw version: $LATEST"
 
           if [ -z "$LATEST" ]; then
-            echo "::warning::Unable to fetch latest Openclaw version from remote"
+            echo "::warning::Unable to fetch latest OpenClaw version from remote"
           elif [ "$CURRENT" != "$LATEST" ]; then
-            echo "::warning::Openclaw update available: $CURRENT → $LATEST"
+            echo "::warning::OpenClaw update available: $CURRENT → $LATEST"
           else
-            echo "Openclaw is up to date"
+            echo "✓ OpenClaw is up to date"
           fi
