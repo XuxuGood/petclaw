@@ -111,12 +111,13 @@ pnpm --filter petclaw-desktop dist:win         # → release/PetClaw-x.y.z-Setup
 
 ## 7. CI/CD（GitHub Actions）
 
-文件：`.github/workflows/build-platforms.yml` + `openclaw-check.yml`
+文件：`.github/workflows/ci.yml` + `build-platforms.yml` + `openclaw-check.yml`
 
 | Workflow | 触发 | 内容 |
 |----------|------|------|
-| `build-platforms.yml` | push tag `v*` | 四平台并行构建 + Release |
-| `openclaw-check.yml` | PR | lint + typecheck + test |
+| `ci.yml` | push main/develop, PR | lint + typecheck + test + build |
+| `build-platforms.yml` | push tag `v*` | 三平台并行构建 + 创建 Release |
+| `openclaw-check.yml` | 每周一 08:23 UTC | 检查 Openclaw 新版本 |
 
 **Build 矩阵**：
 
@@ -558,6 +559,28 @@ tests/
 - `CronEditDialog.tsx` — 频率+时间+星期选择器+Prompt
 - `ImChannelsPage.tsx` — IM 频道主视图（ViewType `'im-channels'`）
 - `ImConfigDialog.tsx` — 两栏配置弹窗（左平台列表+右配置面板）
+
+## 10.11 Phase 4 工程化模块
+
+### 自动更新 (`src/main/auto-updater.ts`)
+
+- `electron-updater` + `electron-log`，通过 GitHub Releases 分发更新
+- `autoDownload: false`（用户确认后手动下载）、`autoInstallOnAppQuit: true`
+- 生产环境启动后延迟 10 秒静默检查更新
+- IPC channels: `updater:check` / `updater:download` / `updater:install` / `updater:status`（6 种状态推送）
+
+### 构建脚本 (`scripts/`)
+
+- 13 个 CJS 构建脚本 + 1 个 shell 脚本，完整覆盖 Openclaw runtime 从源码到产物的流水线
+- `electron-builder-hooks.cjs` — beforePack/afterPack 生命周期钩子
+- `notarize.js` — macOS 公证（`@electron/notarize`）
+- `nsis-installer.nsh` — Windows NSIS 自定义安装/卸载脚本
+
+### CI/CD (`.github/workflows/`)
+
+- `ci.yml` — lint + typecheck + test + build（push/PR 触发）
+- `build-platforms.yml` — 三平台并行构建 + 创建 GitHub Release（tag 触发）
+- `openclaw-check.yml` — 每周检查 Openclaw 新版本
 
 ---
 

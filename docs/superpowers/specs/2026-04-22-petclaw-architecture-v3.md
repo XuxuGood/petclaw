@@ -3444,12 +3444,14 @@ git push origin v1.0.0               # 推送 tag → 触发 GitHub Actions
 **扩展**：
 - OnboardingPanel — 已重构为 5 步（permissions/profile/skills/shortcut/first-chat）
 
-### Phase 4: 工程化
+### Phase 4: 工程化 ✅
 
-- electron-builder 全平台打包配置
-- electron-updater 自动更新
-- CI/CD pipeline（GitHub Actions）
-- Openclaw 版本管理脚本（§20）
+- electron-builder 全平台打包配置（`electron-builder.json` + `build/entitlements.mac.plist`）
+- electron-updater 自动更新（`src/main/auto-updater.ts`）
+- CI/CD pipeline（`.github/workflows/ci.yml` + `build-platforms.yml` + `openclaw-check.yml`）
+- Openclaw 版本管理 13 个构建脚本（`scripts/*.cjs` + `scripts/build-openclaw-runtime.sh`）
+- electron-builder hooks（`scripts/electron-builder-hooks.cjs` + `scripts/notarize.js` + `scripts/nsis-installer.nsh`）
+- 本地扩展（`openclaw-extensions/ask-user-question/` + `openclaw-extensions/mcp-bridge/`）
 
 ### 现有代码保留清单
 
