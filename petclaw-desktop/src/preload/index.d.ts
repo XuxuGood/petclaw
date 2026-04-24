@@ -78,6 +78,20 @@ interface ElectronAPI {
   engine: {
     onStatus: (cb: (status: unknown) => void) => () => void
   }
+  // v3 Phase 4: Auto-updater
+  updater: {
+    check: () => Promise<void>
+    download: () => Promise<void>
+    install: () => Promise<void>
+    onStatus: (
+      cb: (data: {
+        status: 'checking' | 'available' | 'up-to-date' | 'downloading' | 'downloaded' | 'error'
+        info?: { version: string; releaseDate: string; releaseNotes: string | null }
+        progress?: { percent: number; bytesPerSecond: number; transferred: number; total: number }
+        error?: string
+      }) => void
+    ) => () => void
+  }
   // v3 Phase 2: Manager APIs
   agents: {
     list: () => Promise<unknown>

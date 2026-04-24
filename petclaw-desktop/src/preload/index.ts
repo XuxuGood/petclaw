@@ -188,6 +188,18 @@ const api = {
     }
   },
 
+  // ── v3 Phase 4: Auto-updater ──
+  updater: {
+    check: () => ipcRenderer.invoke('updater:check'),
+    download: () => ipcRenderer.invoke('updater:download'),
+    install: () => ipcRenderer.invoke('updater:install'),
+    onStatus: (cb: (data: unknown) => void) => {
+      const handler = (_e: Electron.IpcRendererEvent, data: unknown) => cb(data)
+      ipcRenderer.on('updater:status', handler)
+      return () => ipcRenderer.removeListener('updater:status', handler)
+    }
+  },
+
   // ── v3 Phase 2: Manager APIs ──
   agents: {
     list: () => ipcRenderer.invoke('agents:list'),

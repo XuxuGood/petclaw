@@ -30,6 +30,7 @@ import { runBootCheck } from './bootcheck'
 import { diagAppReady, diagBootResult, diagWindowLoad, diagError } from './diagnostics'
 import { readAppSettings, writeAppSettings } from './app-settings'
 import { resolveDatabasePath } from './database-path'
+import { initAutoUpdater } from './auto-updater'
 
 let petWindow: BrowserWindow | null = null
 let chatWindow: BrowserWindow | null = null
@@ -425,6 +426,11 @@ app.whenReady().then(async () => {
   // 13. Boot 成功 → 初始化 v3 运行时（Gateway + Controller + SessionManager）
   if (bootResult.success) {
     await setupV3Runtime(bootResult.port!, bootResult.token!)
+  }
+
+  // Phase 4: 初始化自动更新（boot 成功后，生产环境延迟检查）
+  if (!is.dev) {
+    initAutoUpdater(chatWindow!)
   }
 
   // 14. 启动 Hook Server
