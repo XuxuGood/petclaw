@@ -456,60 +456,62 @@ function ShortcutStep() {
 }
 
 /* ──────────────────────────────────────────
-   Step 5: First chat experience
+   Step 5: Starter cards — 快捷任务入口
+   用户点击卡片后直接完成 onboarding 并发送首条消息
    ────────────────────────────────────────── */
-function FirstChatStep() {
-  const [isRecording, setIsRecording] = useState(false)
 
+// 快捷任务卡片数据，集中定义避免魔法值散落
+const STARTER_CARDS = [
+  {
+    icon: '📰',
+    title: '帮我整理今日资讯',
+    description: '搜集 AI、科技领域的最新动态，整理成简报',
+    message: '请帮我整理今日 AI 和科技领域的最新资讯，按重要性排序'
+  },
+  {
+    icon: '✉️',
+    title: '帮我写一封邮件',
+    description: '根据你的描述，生成一封专业的邮件',
+    message: '我需要写一封邮件'
+  },
+  {
+    icon: '📋',
+    title: '整理代码仓库',
+    description: '分析项目结构，生成文档和改进建议',
+    message: '帮我分析当前项目结构，列出改进建议'
+  },
+  {
+    icon: '📅',
+    title: '创建每日工作计划',
+    description: '根据待办事项，制定今日工作安排',
+    message: '帮我制定今天的工作计划'
+  }
+]
+
+function StarterCardsStep({ onSelectCard }: { onSelectCard: (message: string) => void }) {
   return (
     <div className="flex-1 flex flex-col px-8 pt-2">
-      <h1 className="text-[24px] font-bold text-text-primary leading-tight">获取今日资讯</h1>
+      <h1 className="text-[24px] font-bold text-text-primary leading-tight">
+        试试让 PetClaw 帮你做点什么
+      </h1>
       <p className="mt-3 text-[14px] text-text-secondary leading-relaxed">
-        再来一次，让小猫帮您搜集整理信息。
+        选择一个快捷任务开始，或者跳过直接开始使用
       </p>
 
-      {/* Example conversation bubble */}
-      <div className="mt-6 flex items-center gap-3 p-4 bg-bg-input rounded-[10px]">
-        <div className="w-8 h-8 rounded-[10px] bg-border-input flex items-center justify-center shrink-0">
-          <span className="text-[14px]">🖼️</span>
-        </div>
-        <span className="text-[15px] text-text-primary">"请整理今日最新 AI 资讯"</span>
+      {/* 2x2 卡片网格，点击后触发 onSelectCard 完成 onboarding */}
+      <div className="mt-6 grid grid-cols-2 gap-3">
+        {STARTER_CARDS.map((card) => (
+          <button
+            key={card.title}
+            onClick={() => onSelectCard(card.message)}
+            className="flex flex-col items-start p-4 border border-border rounded-[14px] hover:bg-bg-hover hover:border-text-tertiary/30 transition-all active:scale-[0.96] duration-[120ms] text-left"
+          >
+            <span className="text-[24px] mb-2">{card.icon}</span>
+            <h3 className="text-[14px] font-semibold text-text-primary mb-1">{card.title}</h3>
+            <p className="text-[12px] text-text-tertiary leading-[1.5]">{card.description}</p>
+          </button>
+        ))}
       </div>
-
-      {/* Divider: "现在轮到您了" */}
-      <div className="flex items-center gap-3 my-6">
-        <div className="flex-1 h-px bg-border-input" />
-        <span className="text-[13px] text-text-tertiary">现在轮到您了</span>
-        <div className="flex-1 h-px bg-border-input" />
-      </div>
-
-      {/* Voice input */}
-      <button
-        onClick={() => setIsRecording(!isRecording)}
-        className={`w-full flex items-center gap-3 p-4 border rounded-[10px] transition-all ${
-          isRecording ? 'border-error bg-[#fef2f2]' : 'border-border-input hover:bg-bg-hover'
-        }`}
-      >
-        <Mic
-          size={20}
-          className={isRecording ? 'text-error animate-pulse' : 'text-text-tertiary'}
-        />
-        <span
-          className={`text-[15px] flex-1 text-left ${isRecording ? 'text-error' : 'text-text-tertiary'}`}
-        >
-          {isRecording ? '正在录音...' : '点击开始说话'}
-        </span>
-        {!isRecording && (
-          <div className="flex items-center gap-1.5">
-            <span className="px-2 py-0.5 bg-bg-input border border-border-input rounded text-[12px] font-mono text-text-secondary">
-              Command
-            </span>
-            <span className="px-2 py-0.5 bg-bg-input border border-border-input rounded text-[12px] font-mono text-text-secondary">
-              D
-            </span>
-          </div>
-        )}
-      </button>
     </div>
   )
 }
@@ -522,7 +524,8 @@ export function OnboardingPanel({ onComplete }: { onComplete: () => void }) {
   const isLastStep = step === 'first-chat'
   const isFirstStep = step === 'permissions'
 
-  const handleSkip = useCallback(async () => {
+  // 抽取保存配置逻辑，handleSkip / handleNext / handleSelectCard 都复用
+  const saveAndComplete = useCallback(async () => {
     const store = useOnboardingStore.getState()
     await window.api.saveOnboardingConfig({
       nickname: store.nickname.trim() || 'PetClaw',
@@ -534,30 +537,38 @@ export function OnboardingPanel({ onComplete }: { onComplete: () => void }) {
     onComplete()
   }, [onComplete])
 
+  const handleSkip = useCallback(async () => {
+    await saveAndComplete()
+  }, [saveAndComplete])
+
   const handleNext = useCallback(async () => {
     if (isLastStep) {
-      const store = useOnboardingStore.getState()
-      // Save to ~/.petclaw config files
-      await window.api.saveOnboardingConfig({
-        nickname: store.nickname.trim() || 'PetClaw',
-        roles: store.roles,
-        selectedSkills: store.skills.filter((s) => s.selected).map((s) => s.id),
-        voiceShortcut: store.shortcut,
-        language: store.language
-      })
-      onComplete()
+      // 最后一步点"开始使用"：保存配置后完成 onboarding
+      await saveAndComplete()
     } else {
       setCatBubbleText('')
       goNext()
     }
-  }, [isLastStep, onComplete, goNext, setCatBubbleText])
+  }, [isLastStep, saveAndComplete, goNext, setCatBubbleText])
 
   const handlePrev = useCallback(() => {
     setCatBubbleText('')
     goPrev()
   }, [goPrev, setCatBubbleText])
 
-  // Determine bubble text based on step
+  // 用户点击 StarterCards 卡片：完成 onboarding 后延迟发送首条消息
+  // 延迟 500ms 等 ChatView 完成挂载，避免消息丢失
+  const handleSelectCard = useCallback(
+    async (message: string) => {
+      await saveAndComplete()
+      setTimeout(() => {
+        window.api.cowork.send(message, '')
+      }, 500)
+    },
+    [saveAndComplete]
+  )
+
+  // profile 步骤显示猫咪对话气泡，其他步骤不显示
   const bubbleText = step === 'profile' ? catBubbleText : ''
 
   return (
@@ -581,7 +592,8 @@ export function OnboardingPanel({ onComplete }: { onComplete: () => void }) {
           {step === 'profile' && <ProfileStep />}
           {step === 'skills' && <SkillsStep />}
           {step === 'shortcut' && <ShortcutStep />}
-          {step === 'first-chat' && <FirstChatStep />}
+          {/* 第 5 步替换为 StarterCards，点击卡片直接完成 onboarding 并发送首条消息 */}
+          {step === 'first-chat' && <StarterCardsStep onSelectCard={handleSelectCard} />}
         </div>
 
         {/* Right side: cat mascot */}
