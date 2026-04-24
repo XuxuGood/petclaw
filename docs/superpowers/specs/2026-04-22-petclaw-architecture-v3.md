@@ -3371,7 +3371,7 @@ git push origin v1.0.0               # 推送 tag → 触发 GitHub Actions
 
 ## 25. 实现分期
 
-### Phase 1: 基础架构重构（替换运行时管理）
+### Phase 1: 基础架构重构（替换运行时管理） ✅ 已实现
 
 **新建文件**：
 - `ai/engine-manager.ts` — OpenclawEngineManager
@@ -3404,7 +3404,7 @@ git push origin v1.0.0               # 推送 tag → 触发 GitHub Actions
 - `OnboardingPanel.tsx` — UI 保留，配置写入目标调整
 - `app-settings.ts` — 保留默认值定义（端口、URL 等），不再管理 JSON 文件读写
 
-### Phase 2: 核心功能
+### Phase 2: 核心功能 ✅ 已实现
 
 **新建文件**：
 - `agents/agent-manager.ts` — AgentManager
