@@ -21,7 +21,8 @@ describe('resolveDatabasePath', () => {
       legacyUserDataPath: path.join(tmpDir, 'userData')
     })
 
-    expect(dbPath).toBe(path.join(tmpDir, '.petclaw', 'petclaw.db'))
+    // 实现已改为在 petclawHome/data/ 子目录存储数据库
+    expect(dbPath).toBe(path.join(tmpDir, '.petclaw', 'data', 'petclaw.db'))
   })
 
   it('migrates legacy userData database to ~/.petclaw on first run', () => {
@@ -34,7 +35,8 @@ describe('resolveDatabasePath', () => {
 
     const dbPath = resolveDatabasePath({ petclawHome, legacyUserDataPath })
 
-    expect(dbPath).toBe(path.join(petclawHome, 'petclaw.db'))
+    // 实现迁移到 petclawHome/data/ 子目录
+    expect(dbPath).toBe(path.join(petclawHome, 'data', 'petclaw.db'))
     expect(fs.existsSync(dbPath)).toBe(true)
     expect(fs.readFileSync(dbPath, 'utf-8')).toBe('legacy-db')
     expect(fs.existsSync(legacyDbPath)).toBe(false)

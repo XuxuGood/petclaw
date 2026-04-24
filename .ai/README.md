@@ -524,6 +524,43 @@ tests/
 
 ---
 
+## 10.10 Phase 3 集成功能层模块
+
+### CronJobService (`src/main/scheduler/`)
+
+- `cron-job-service.ts` — Gateway RPC 代理，所有定时任务 CRUD 委托给 OpenClaw `cron.*` RPC
+- `types.ts` — Schedule/ScheduledTask/TaskState/ScheduledTaskRun 类型定义
+- 15s 轮询同步任务状态，检测变更后推送到 renderer
+
+### ImGatewayManager (`src/main/im/`)
+
+- `im-gateway-manager.ts` — IM 平台配置管理 + 会话路由映射
+- `types.ts` — Platform(4个)/IMMessage/IMSettings/IMPlatformConfig 类型定义
+- PetClaw 不直接处理 IM 消息，所有平台通过 OpenClaw 插件运行
+
+### PetEventBridge 多源扩展 (`src/main/pet/`)
+
+- 扩展接受 ImGateway/CronService/HookServer 多源事件
+- `notifyImSessionCreated()` / `notifySchedulerTaskFired()` 新方法
+- `sendBubble(text, source)` 携带 `source` 字段区分消息来源（chat/approval/im/scheduler/system）
+
+### IPC 模块化扩展 (`src/main/ipc/`)
+
+- `scheduler-ipc.ts` — 定时任务 IPC handlers（`scheduler:list`、`scheduler:create`、`scheduler:update`、`scheduler:delete`、`scheduler:run`）
+- `im-ipc.ts` — IM 配置 IPC handlers（`im:get-settings`、`im:update-settings`、`im:test-connection`）
+
+### UI 组件 (`src/renderer/src/chat/components/`)
+
+- `CoworkPermissionModal.tsx` — 三种模式：标准工具审批 / 确认 / 多选
+- `AgentConfigDialog.tsx` — 三 Tab（基础信息/技能/IM渠道），底部 4 按钮
+- `AgentSkillSelector.tsx` — Agent 技能多选子组件
+- `CronPage.tsx` — 两栏卡片网格 + 两 Tab（任务/执行记录）
+- `CronEditDialog.tsx` — 频率+时间+星期选择器+Prompt
+- `ImChannelsPage.tsx` — IM 频道主视图（ViewType `'im-channels'`）
+- `ImConfigDialog.tsx` — 两栏配置弹窗（左平台列表+右配置面板）
+
+---
+
 ## 11. Openclaw 集成架构
 
 > 详细设计见 v3 spec §4（EngineManager）、§5（Gateway）、§6（ConfigSync）、§20（版本管理）。

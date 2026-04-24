@@ -3419,17 +3419,30 @@ git push origin v1.0.0               # 推送 tag → 触发 GitHub Actions
 **重构文件**：
 - `ChatView.tsx` — 集成新 ChatInputBox
 
-### Phase 3: 集成功能
+### Phase 3: 集成功能 ✅ 已实现
 
-**新建文件**：
-- `im/im-gateway.ts` + `im/platforms/*.ts` — IM 平台适配器
-- `scheduler/scheduler-manager.ts` — 定时任务
-- `pet/pet-event-bridge.ts` — PetEventBridge（宠物联动聚合层，§22.4）
-- 前端：Exec Approval 审批弹窗（CoworkPermissionModal）
-- 前端：Agent 配置对话框（三 Tab）
+**新增文件（实际路径）**：
+
+主进程：
+- `src/main/scheduler/types.ts` — Schedule/ScheduledTask/TaskState/ScheduledTaskRun 类型定义
+- `src/main/scheduler/cron-job-service.ts` — Gateway RPC 代理，所有定时任务 CRUD 委托给 OpenClaw `cron.*` RPC
+- `src/main/im/types.ts` — Platform(4个)/IMMessage/IMSettings/IMPlatformConfig 类型定义
+- `src/main/im/im-gateway-manager.ts` — IM 平台配置管理 + 会话路由映射
+- `src/main/ipc/scheduler-ipc.ts` — 定时任务 IPC handlers（`scheduler:*` 前缀）
+- `src/main/ipc/im-ipc.ts` — IM 配置 IPC handlers（`im:*` 前缀）
+- `src/main/pet/pet-event-bridge.ts` — PetEventBridge 多源事件聚合（已扩展支持 IM/Cron/Hook）
+
+渲染层：
+- `src/renderer/src/chat/components/CoworkPermissionModal.tsx` — Exec Approval 审批弹窗（三种模式）
+- `src/renderer/src/chat/components/AgentConfigDialog.tsx` — Agent 三 Tab 配置对话框（基础/技能/IM）
+- `src/renderer/src/chat/components/AgentSkillSelector.tsx` — Agent 技能多选子组件
+- `src/renderer/src/chat/components/ImChannelsPage.tsx` — IM 频道主视图（ViewType `'im-channels'`）
+- `src/renderer/src/chat/components/ImConfigDialog.tsx` — IM 配置弹窗（左平台列表+右配置面板）
+- `src/renderer/src/chat/components/CronPage.tsx` — 定时任务管理 UI（两栏卡片+两 Tab）
+- `src/renderer/src/chat/components/CronEditDialog.tsx` — 定时任务编辑弹窗
 
 **扩展**：
-- OnboardingPanel — AI 对话 + 推荐 skills + StarterCards
+- OnboardingPanel — 已重构为 5 步（permissions/profile/skills/shortcut/first-chat）
 
 ### Phase 4: 工程化
 

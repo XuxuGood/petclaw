@@ -74,7 +74,8 @@ describe('PetEventBridge', () => {
   it('messageUpdate 发送气泡文本（截取末尾50字符）', () => {
     const longText = 'a'.repeat(100)
     emitter.emit('messageUpdate', 's1', 'msg1', longText)
-    expect(send).toHaveBeenCalledWith('pet:bubble', { text: 'a'.repeat(50) })
+    // sendBubble 现在携带 source 字段标识消息来源
+    expect(send).toHaveBeenCalledWith('pet:bubble', { text: 'a'.repeat(50), source: 'chat' })
   })
 
   it('complete 递减计数，最后一个会话完成时触发 AI_DONE', () => {
@@ -130,11 +131,15 @@ describe('PetEventBridge', () => {
 
   it('permissionRequest 发送气泡消息包含工具名', () => {
     emitter.emit('permissionRequest', 's1', { toolName: 'bash' })
-    expect(send).toHaveBeenCalledWith('pet:bubble', { text: '等待审批：bash' })
+    // sendBubble 携带 source:'approval' 标识消息来源
+    expect(send).toHaveBeenCalledWith('pet:bubble', { text: '等待审批：bash', source: 'approval' })
   })
 
   it('permissionRequest 无工具名时显示 unknown', () => {
     emitter.emit('permissionRequest', 's1', {})
-    expect(send).toHaveBeenCalledWith('pet:bubble', { text: '等待审批：unknown' })
+    expect(send).toHaveBeenCalledWith('pet:bubble', {
+      text: '等待审批：unknown',
+      source: 'approval'
+    })
   })
 })
