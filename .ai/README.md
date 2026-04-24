@@ -610,10 +610,23 @@ tests/
 
 ### 构建脚本 (`scripts/`)
 
-- 13 个 CJS 构建脚本 + 1 个 shell 脚本，完整覆盖 Openclaw runtime 从源码到产物的流水线
-- `electron-builder-hooks.cjs` — beforePack/afterPack 生命周期钩子
-- `notarize.js` — macOS 公证（`@electron/notarize`）
-- `nsis-installer.nsh` — Windows NSIS 自定义安装/卸载脚本
+共 20 个脚本（~3800 行），完整覆盖 Openclaw runtime 从源码到产物的流水线：
+
+| 脚本 | 行数 | 职责 |
+|------|------|------|
+| `electron-builder-hooks.cjs` | 401 | beforePack/afterPack 生命周期钩子（runtime 同步、扩展验证、Python 设置、tar 打包、macOS 签名清理） |
+| `setup-python-runtime.js` | 836 | Windows 便携式 Python 下载/解压/pip bootstrap/健康检查 |
+| `ensure-openclaw-plugins.cjs` | 601 | OpenClaw CLI 安装第三方插件（git/npm/本地来源、缓存、symlink 修复、可选降级） |
+| `prune-openclaw-runtime.cjs` | 394 | runtime 裁剪（移除未用扩展、dual CJS+ESM stub、孤儿二进制清理、.bin 断链清理） |
+| `pack-openclaw-tar.cjs` | 252 | 纯 JS tar 打包（npm `tar` 包，多源合并，综合排除规则） |
+| `nsis-installer.nsh` | 246 | Windows NSIS 安装/卸载（进程清理、skill 备份恢复、Defender 排除、计时日志） |
+| `unpack-petmind.cjs` | 190 | NSIS 安装后 tar 解压（从 app.asar 加载 tar 包、进度日志、目录验证） |
+| `precompile-openclaw-extensions.cjs` | 170 | esbuild ESM 预编译（消除 jiti 运行时编译开销，智能入口解析） |
+| `openclaw-runtime-packaging.cjs` | 105 | 打包辅助常量和函数（ASAR 入口检查、dist 裁剪） |
+| `warmup-compile-cache.cjs` | 91 | V8 编译缓存预热（启动加速 35s→5s） |
+| `notarize.js` | 63 | macOS 公证（`@electron/notarize`） |
+| `sync-local-openclaw-extensions.cjs` | 62 | 本地扩展同步到 runtime third-party-extensions/ |
+| 其他 7 个脚本 | ~400 | runtime 构建流水线（bundle、channel-deps、finalize、host、version-check 等） |
 
 ### CI/CD (`.github/workflows/`)
 

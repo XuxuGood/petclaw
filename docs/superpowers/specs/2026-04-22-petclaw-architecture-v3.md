@@ -3449,8 +3449,18 @@ git push origin v1.0.0               # 推送 tag → 触发 GitHub Actions
 - electron-builder 全平台打包配置（`electron-builder.json` + `build/entitlements.mac.plist`）
 - electron-updater 自动更新（`src/main/auto-updater.ts`）
 - CI/CD pipeline（`.github/workflows/ci.yml` + `build-platforms.yml` + `openclaw-check.yml`）
-- Openclaw 版本管理 13 个构建脚本（`scripts/*.cjs` + `scripts/build-openclaw-runtime.sh`）
-- electron-builder hooks（`scripts/electron-builder-hooks.cjs` + `scripts/notarize.js` + `scripts/nsis-installer.nsh`）
+- 20 个构建脚本（~3800 行），完整覆盖打包到分发全流程：
+  - `electron-builder-hooks.cjs`（beforePack/afterPack + Python 集成 + 3 源 tar 打包）
+  - `setup-python-runtime.js`（Windows 便携式 Python 下载/解压/pip bootstrap）
+  - `ensure-openclaw-plugins.cjs`（OpenClaw CLI 安装、git/npm/local 来源、缓存、可选降级）
+  - `prune-openclaw-runtime.cjs`（扩展裁剪、dual CJS+ESM stub、孤儿清理）
+  - `pack-openclaw-tar.cjs`（纯 JS tar 打包、综合排除规则）
+  - `nsis-installer.nsh`（完整 NSIS 安装/卸载、进程清理、skill 备份恢复、Defender 排除）
+  - `unpack-petmind.cjs`（NSIS tar 解压、进度日志）
+  - `precompile-openclaw-extensions.cjs`（esbuild ESM 预编译、智能入口解析）
+  - `warmup-compile-cache.cjs`（V8 编译缓存预热）
+  - `openclaw-runtime-packaging.cjs`（打包辅助工具）
+  - `notarize.js` + `sync-local-openclaw-extensions.cjs` + 其他 runtime 构建脚本
 - 本地扩展（`openclaw-extensions/ask-user-question/` + `openclaw-extensions/mcp-bridge/`）
 
 ### 现有代码保留清单
