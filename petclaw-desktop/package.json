@@ -18,11 +18,27 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "openclaw:ensure": "node scripts/ensure-openclaw-version.cjs",
+    "openclaw:runtime:host": "node scripts/openclaw-runtime-host.cjs",
+    "openclaw:runtime:mac-arm64": "node scripts/run-build-openclaw-runtime.cjs --target=mac-arm64",
+    "openclaw:runtime:mac-x64": "node scripts/run-build-openclaw-runtime.cjs --target=mac-x64",
+    "openclaw:runtime:win-x64": "node scripts/run-build-openclaw-runtime.cjs --target=win-x64",
+    "openclaw:runtime:linux-x64": "node scripts/run-build-openclaw-runtime.cjs --target=linux-x64",
+    "openclaw:bundle": "node scripts/bundle-openclaw-gateway.cjs",
+    "openclaw:plugins": "node scripts/ensure-openclaw-plugins.cjs",
+    "openclaw:extensions": "node scripts/sync-local-openclaw-extensions.cjs",
+    "openclaw:precompile": "node scripts/precompile-openclaw-extensions.cjs",
+    "openclaw:channel-deps": "node scripts/install-openclaw-channel-deps.cjs",
+    "openclaw:prune": "node scripts/prune-openclaw-runtime.cjs",
+    "openclaw:finalize": "node scripts/finalize-openclaw-runtime.cjs",
+    "electron:dev": "electron-vite dev",
+    "electron:dev:openclaw": "npm run openclaw:ensure && npm run openclaw:runtime:host && electron-vite dev"
   },
   "dependencies": {
     "@electron-toolkit/utils": "^3.0.0",
     "better-sqlite3": "^11.0.0",
+    "electron-updater": "^6.0.0",
     "lucide-react": "^1.8.0",
     "pixi.js": "^8.0.0",
     "react": "^19.0.0",
@@ -62,32 +78,40 @@
       "prettier --write"
     ]
   },
-  "build": {
-    "appId": "ai.petclaw.desktop",
-    "productName": "PetClaw",
-    "directories": {
-      "output": "dist"
-    },
-    "asarUnpack": [
-      "resources/node/**",
-      "resources/openclaw/**"
-    ],
-    "mac": {
-      "category": "public.app-category.utilities",
-      "icon": "resources/icon.png",
-      "target": [
-        "dmg",
-        "zip"
-      ],
-      "hardenedRuntime": true
-    },
-    "win": {
-      "icon": "resources/icon.png",
-      "target": [
-        "nsis"
-      ]
-    },
-    "npmRebuild": true,
-    "nativeRebuilder": "sequential"
+  "openclaw": {
+    "version": "v2026.3.2",
+    "repo": "https://github.com/openclaw/openclaw.git",
+    "plugins": [
+      {
+        "id": "dingtalk-connector",
+        "npm": "@dingtalk-real-ai/dingtalk-connector",
+        "version": "0.8.16"
+      },
+      {
+        "id": "openclaw-lark",
+        "npm": "@larksuite/openclaw-lark",
+        "version": "2026.4.7"
+      },
+      {
+        "id": "wecom-openclaw-plugin",
+        "npm": "@wecom/wecom-openclaw-plugin",
+        "version": "2026.4.3"
+      },
+      {
+        "id": "openclaw-weixin",
+        "npm": "@tencent-weixin/openclaw-weixin",
+        "version": "2.1.7"
+      },
+      {
+        "id": "openclaw-nim-channel",
+        "npm": "openclaw-nim-channel",
+        "version": "1.1.1"
+      },
+      {
+        "id": "clawemail-email",
+        "npm": "@clawemail/email",
+        "version": "0.9.12"
+      }
+    ]
   }
 }

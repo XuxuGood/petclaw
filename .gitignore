@@ -18,6 +18,9 @@ coverage/
 # Openclaw runtime (built locally, too large for git)
 **/vendor/openclaw-runtime/
 
+# Openclaw build tarballs
+build-tar/
+
 # Electron packaging output
 **/release/
 
