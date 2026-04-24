@@ -1,0 +1,10 @@
+{
+  "name": "petclaw-ask-user-question",
+  "version": "1.0.0",
+  "description": "PetClaw 本地扩展：结构化确认弹窗",
+  "openclaw": {
+    "extensions": [
+      "index.ts"
+    ]
+  }
+}
