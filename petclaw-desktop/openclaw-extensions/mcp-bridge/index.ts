@@ -1,6 +1,32 @@
+// openclaw-extensions/mcp-bridge/index.ts
+// MCP Bridge — OpenClaw 本地扩展
+//
+// 将 PetClaw 管理的 MCP (Model Context Protocol) 服务器工具暴露为 OpenClaw 原生工具。
+// Agent 调用代理 tool 时，本扩展通过 HTTP POST 转发给 PetClaw，PetClaw 再调用真实的 MCP server。
+//
+// 工作流程：
+//   1. PetClaw 启动时，将用户配置的 MCP server 列表写入 openclaw.json → plugins → mcp-bridge → config.tools
+//   2. 本扩展读取 tools 数组，为每个 MCP tool 注册一个代理 tool（名称格式 mcp_{server}_{tool}）
+//   3. Agent 调用代理 tool → invokeBridge() 发起 HTTP POST 到 PetClaw callbackUrl
+//   4. PetClaw 收到请求后调用对应的 MCP server，将结果返回
+//   5. 本扩展将结果规范化后返回给 Agent
+//
+// 命名去重：
+//   如果两个不同 MCP server 暴露了同名 tool，buildRegisteredToolName() 会自动追加序号
+//   例如：mcp_server1_read、mcp_server2_read_2
+//
+// 配置来源：openclaw.json → plugins → mcp-bridge → config
+//   - callbackUrl: PetClaw HookServer 的 MCP 转发端点（如 http://127.0.0.1:{port}/mcp-bridge）
+//   - secret: 共享密钥，通过 x-mcp-bridge-secret 头验证
+//   - requestTimeoutMs: 单次 MCP 调用超时（默认 120s，最小 1s）
+//   - tools: MCP tool 描述数组 [{ server, name, description, inputSchema }]
+
 import { Type } from '@sinclair/typebox'
 import type { OpenClawPluginApi } from 'openclaw/plugin-sdk'
 
+// ── 类型定义 ────────────────────────────────────────────────────────────────────
+
+/** 单个 MCP tool 的配置（由 PetClaw 注入） */
 type McpBridgeToolConfig = {
   server: string
   name: string
@@ -8,6 +34,7 @@ type McpBridgeToolConfig = {
   inputSchema: Record<string, unknown>
 }
 
+/** 插件整体配置 */
 type McpBridgePluginConfig = {
   callbackUrl: string
   secret: string
@@ -15,20 +42,30 @@ type McpBridgePluginConfig = {
   tools: McpBridgeToolConfig[]
 }
 
+/** OpenClaw tool 执行结果的标准格式 */
 type ToolResultPayload = {
   content: Array<{ type: string; text?: string; [key: string]: unknown }>
   isError?: boolean
   details?: unknown
 }
 
+// ── 常量 ────────────────────────────────────────────────────────────────────────
+
 const DEFAULT_TIMEOUT_MS = 120_000
+// inputSchema 缺失时的降级 schema：接受任意对象
 const FALLBACK_INPUT_SCHEMA = Type.Object({}, { additionalProperties: true })
+
+// ── 工具函数 ────────────────────────────────────────────────────────────────────
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return !!value && typeof value === 'object' && !Array.isArray(value)
 }
 
-// 将 server/tool 名称规范化为合法的 tool 注册名片段（仅小写字母、数字、下划线）
+/**
+ * 将 server/tool 名称规范化为合法的 OpenClaw tool 注册名片段。
+ * 仅保留小写字母、数字、下划线，去除首尾下划线。
+ * 例如："My Server!" → "my_server"
+ */
 const sanitizeToolSegment = (value: string): string => {
   const sanitized = value
     .trim()
@@ -38,7 +75,10 @@ const sanitizeToolSegment = (value: string): string => {
   return sanitized || 'tool'
 }
 
-// 拼接 mcp_{server}_{tool}，冲突时自动追加序号，保证唯一性
+/**
+ * 拼接 mcp_{server}_{tool} 格式的注册名。
+ * 同名冲突时自动追加递增序号（_2、_3...），保证全局唯一。
+ */
 const buildRegisteredToolName = (server: string, tool: string, usedNames: Set<string>): string => {
   const base = `mcp_${sanitizeToolSegment(server)}_${sanitizeToolSegment(tool)}`
   let next = base
@@ -51,10 +91,12 @@ const buildRegisteredToolName = (server: string, tool: string, usedNames: Set<st
   return next
 }
 
+/** inputSchema 无效时降级为接受任意对象的 schema */
 const normalizeInputSchema = (value: unknown): Record<string, unknown> => {
   return isRecord(value) ? value : FALLBACK_INPUT_SCHEMA
 }
 
+/** 从 unknown 中安全解析单个 tool 配置，无效则返回 null 跳过 */
 const parseToolConfig = (value: unknown): McpBridgeToolConfig | null => {
   if (!isRecord(value)) {
     return null
@@ -74,6 +116,7 @@ const parseToolConfig = (value: unknown): McpBridgeToolConfig | null => {
   }
 }
 
+/** 从 unknown 中安全解析插件整体配置 */
 const parsePluginConfig = (value: unknown): McpBridgePluginConfig => {
   const raw = isRecord(value) ? value : {}
   const tools = Array.isArray(raw.tools)
@@ -93,6 +136,10 @@ const parsePluginConfig = (value: unknown): McpBridgePluginConfig => {
   }
 }
 
+/**
+ * 从 MCP server 的错误响应中提取人类可读的错误消息。
+ * 依次尝试：string → payload.error → payload.content[0].text
+ */
 const extractErrorMessage = (payload: unknown): string | null => {
   if (!payload) {
     return null
@@ -106,6 +153,7 @@ const extractErrorMessage = (payload: unknown): string | null => {
   if (typeof payload.error === 'string' && payload.error.trim()) {
     return payload.error.trim()
   }
+  // 尝试从 content 数组的第一个 text block 提取
   const content = Array.isArray(payload.content) ? payload.content : []
   for (const block of content) {
     if (!isRecord(block)) {
@@ -118,10 +166,15 @@ const extractErrorMessage = (payload: unknown): string | null => {
   return null
 }
 
+/**
+ * 将 MCP server 的任意响应规范化为 OpenClaw tool 结果格式。
+ * 如果响应已经是 { content: [...] } 格式则直接使用，否则包装为 text block。
+ */
 const ensureToolResultPayload = (
   payload: unknown,
   details: Record<string, unknown>
 ): ToolResultPayload => {
+  // 响应已经是标准格式，直接透传
   if (isRecord(payload) && Array.isArray(payload.content)) {
     return {
       ...payload,
@@ -129,6 +182,7 @@ const ensureToolResultPayload = (
     } as ToolResultPayload
   }
 
+  // 非标准格式，包装为 text block
   const text =
     typeof payload === 'string' ? payload : JSON.stringify(payload ?? { ok: true }, null, 2)
 
@@ -138,6 +192,7 @@ const ensureToolResultPayload = (
   }
 }
 
+/** 生成 tool 描述文本，包含 MCP server/tool 名称和可选的自定义描述 */
 const buildToolDescription = (tool: McpBridgeToolConfig): string => {
   const parts = [`Proxy to MCP tool "${tool.name}" on server "${tool.server}".`]
   if (tool.description) {
@@ -146,7 +201,13 @@ const buildToolDescription = (tool: McpBridgeToolConfig): string => {
   return parts.join(' ')
 }
 
-// 向 App 发起 HTTP POST，由 App 转发给实际 MCP server 并返回结果
+// ── 核心逻辑：向 PetClaw 发起 HTTP 转发 ────────────────────────────────────────
+
+/**
+ * 向 PetClaw callbackUrl 发起 MCP tool 调用请求。
+ * PetClaw 收到后转发给对应的 MCP server，将结果透传回来。
+ * 超时由 AbortController 控制，超时后抛出 AbortError。
+ */
 const invokeBridge = async (
   config: McpBridgePluginConfig,
   tool: McpBridgeToolConfig,
@@ -177,6 +238,7 @@ const invokeBridge = async (
       try {
         payload = JSON.parse(responseText)
       } catch {
+        // JSON 解析失败：如果 HTTP 也失败则抛错，否则当作纯文本
         if (!response.ok) {
           throw new Error(`MCP bridge HTTP ${response.status}: ${responseText.trim()}`)
         }
@@ -196,6 +258,8 @@ const invokeBridge = async (
   }
 }
 
+// ── 插件定义 ────────────────────────────────────────────────────────────────────
+
 const plugin = {
   id: 'mcp-bridge',
   name: 'MCP Bridge',
@@ -204,6 +268,7 @@ const plugin = {
     parse(value: unknown): McpBridgePluginConfig {
       return parsePluginConfig(value)
     },
+    // UI 提示：callbackUrl/secret 是内部配置，对用户隐藏在 Advanced 中
     uiHints: {
       callbackUrl: { label: 'Callback URL', advanced: true },
       secret: { label: 'Secret', sensitive: true, advanced: true },
@@ -212,6 +277,7 @@ const plugin = {
   },
   register(api: OpenClawPluginApi) {
     const config = parsePluginConfig(api.pluginConfig)
+    // 三者缺一则跳过注册（PetClaw 未配置 MCP server 时 tools 为空）
     if (!config.callbackUrl || !config.secret || config.tools.length === 0) {
       api.logger.info(
         '[mcp-bridge] skipped registration because callbackUrl/secret/tools are incomplete.'
@@ -224,6 +290,7 @@ const plugin = {
 
     for (const tool of config.tools) {
       const registeredName = buildRegisteredToolName(tool.server, tool.name, usedToolNames)
+      // details 附加在每次执行结果中，方便调试追溯
       const details = {
         alias: registeredName,
         server: tool.server,

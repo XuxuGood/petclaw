@@ -1,3 +1,20 @@
+# CI 持续集成工作流
+#
+# 触发时机：
+#   - push 到 main/develop 分支
+#   - 任何 Pull Request
+#
+# 流水线阶段：
+#   1. changed-files  — 检测变更范围（renderer/main/skills/scripts），决定后续哪些 job 需要运行
+#   2. lint-typecheck  — 仅 lint 变更的 .ts/.tsx 文件（diff-based，避免全量扫描）+ 全量类型检查
+#   3. test            — 运行 Vitest 单元测试
+#   4. build           — 仅在 renderer/main 代码变更或 push 事件时执行构建验证
+#
+# 优化策略：
+#   - concurrency: 同一 PR 的新 push 会取消正在运行的旧 CI，避免资源浪费
+#   - paths-filter: PR 只改文档不触发构建，只改 skills 不触发 renderer 构建
+#   - diff-based lint: 大仓库中全量 lint 耗时长，只 lint 本次变更的文件
+
 name: CI
 
 on:
@@ -5,12 +22,14 @@ on:
     branches: [main, develop]
   pull_request:
 
+# 同一 PR 的新 push 自动取消正在运行的旧 CI
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   # ========== Stage 1: 变更检测 ==========
+  # 用 dorny/paths-filter 检测哪些区域有变更，后续 job 据此决定是否跳过
   changed-files:
     runs-on: ubuntu-latest
     outputs:
@@ -41,12 +60,14 @@ jobs:
               - 'petclaw-desktop/electron-builder.json'
 
   # ========== Stage 2: 代码质量 ==========
+  # diff-based lint：PR 时对比 base branch，push 时对比上一个 commit
+  # 只 lint 新增/修改的 .ts/.tsx 文件，不 lint 删除的文件（--diff-filter=ACMR）
   lint-and-typecheck:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # 需要完整历史用于 git diff
       - uses: pnpm/action-setup@v4
         with:
           version: 9
@@ -55,11 +76,13 @@ jobs:
           node-version: '22.x'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
+
       - name: Lint changed files only
         env:
           BEFORE_SHA: ${{ github.event.before }}
           BASE_REF: ${{ github.base_ref }}
         run: |
+          # PR：对比 base branch；push：对比前一个 SHA；首次 push：对比 HEAD~1
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             FILES=$(git diff --name-only --diff-filter=ACMR origin/${BASE_REF}...HEAD -- '*.ts' '*.tsx')
           elif [ -n "$BEFORE_SHA" ] && [ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ]; then
@@ -75,6 +98,8 @@ jobs:
           else
             echo "No TypeScript files changed, skipping lint"
           fi
+
+      # 类型检查始终全量运行（增量 tsc 不可靠）
       - run: pnpm --filter petclaw-desktop typecheck
 
   # ========== Stage 3: 单元测试 ==========
@@ -95,6 +120,7 @@ jobs:
           CI: true
 
   # ========== Stage 4: 构建验证 ==========
+  # 仅在 renderer/main 代码变更或 push 事件时运行（纯文档/skills 变更不触发）
   build:
     name: Build
     needs: [changed-files, lint-and-typecheck, test]

@@ -1,5 +1,24 @@
 # 全平台构建和发布工作流
-# 触发时机：打 v* tag 或手动触发
+#
+# 触发时机：
+#   - push v* tag  → 自动构建全平台并创建 GitHub Release（draft）
+#   - workflow_dispatch → 手动触发，可选择构建哪些平台
+#
+# 构建矩阵：
+#   - macOS (arm64)  — macos-latest runner，prepare-runtime.sh 准备 OpenClaw runtime
+#   - Windows (x64)  — windows-latest runner，额外需要 Python 运行时（setup-python-runtime.js）
+#   - Linux (x64)    — ubuntu-latest runner，需要 GTK/NSS/ATK 等 Electron 系统依赖
+#
+# 打包产物：
+#   - macOS: .dmg + .zip → release/ 目录
+#   - Windows: .exe (NSIS installer) → release/ 目录
+#   - Linux: .AppImage + .deb → release/ 目录
+#
+# Release 策略：
+#   - tag push 时自动创建 draft Release，需要人工审核后发布
+#   - beta/alpha/rc tag 自动标记为 prerelease
+#   - 产物保留 30 天（比默认的 90 天短，节省存储）
+
 name: Build & Release
 
 on:
@@ -25,6 +44,7 @@ on:
 
 jobs:
   # ========== macOS 构建 ==========
+  # tag push 时始终构建；手动触发时根据 input 决定
   build-macos:
     if: ${{ github.event_name == 'push' || inputs.build_macos }}
     name: Build (macOS)
@@ -40,7 +60,7 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
 
-      # 准备运行时（openclaw runtime + 打包 tar）
+      # prepare-runtime.sh：克隆 OpenClaw 源码 → npm install → 构建 → 打包 tar
       - name: Prepare runtime
         run: |
           chmod +x petclaw-desktop/scripts/prepare-runtime.sh
@@ -48,13 +68,14 @@ jobs:
 
       - run: pnpm --filter petclaw-desktop build
 
+      # electron-builder 打包，签名环境变量从 Secrets 注入
       - name: Package (macOS)
         run: pnpm --filter petclaw-desktop package
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}              # 开发者证书 p12（base64）
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}               # 公证用 Apple ID
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
@@ -82,7 +103,8 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
 
-      # Windows 需要 Python 运行时
+      # Windows 需要内嵌 Python 运行时（供 Skill 依赖使用）
+      # PETCLAW_PORTABLE_PYTHON_ARCHIVE：预打包的 Python 压缩包 URL（可选，缺失时从官网下载）
       - name: Setup Python Runtime
         run: pnpm --filter petclaw-desktop setup:python-runtime
         env:
@@ -94,7 +116,7 @@ jobs:
         run: pnpm --filter petclaw-desktop package
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}           # Windows 代码签名证书
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
 
       - uses: actions/upload-artifact@v4
@@ -118,13 +140,14 @@ jobs:
         with:
           node-version: '22.x'
           cache: 'pnpm'
+
+      # Electron 在 Linux 上需要 GTK3、NSS、ATK-Bridge 等系统库
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libnotify-dev libnss3-dev libxss1 libgconf-2-4 libatk-bridge2.0-0 libdrm2 libgbm1
       - run: pnpm install --frozen-lockfile
 
-      # 准备运行时
       - name: Prepare runtime
         run: |
           chmod +x petclaw-desktop/scripts/prepare-runtime.sh
@@ -146,12 +169,13 @@ jobs:
           retention-days: 30
 
   # ========== 创建 Release ==========
+  # 仅 v* tag push 时运行，下载所有平台产物后创建 draft Release
   create-release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [build-macos, build-windows, build-linux]
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write  # 创建 Release 需要写权限
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -160,7 +184,8 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          draft: true
+          draft: true   # draft 状态，需要人工确认后发布
+          # beta/alpha/rc tag 自动标记为预发布版本
           prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-alpha') || contains(github.ref, '-rc') }}
           files: artifacts/**/*
-          generate_release_notes: true
+          generate_release_notes: true  # 自动生成变更日志

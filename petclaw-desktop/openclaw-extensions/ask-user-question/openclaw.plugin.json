@@ -1,18 +1,18 @@
 {
   "id": "ask-user-question",
   "name": "AskUserQuestion",
-  "description": "Structured user confirmation tool for PetClaw desktop.",
+  "description": "结构化用户确认工具。让 AI Agent 在执行危险操作（删除文件、git clean 等）前向用户弹出确认弹窗，支持 1-4 个问题、每个问题 2-4 个选项、单选/多选模式。通过 HTTP 回调 PetClaw 桌面端，120 秒超时自动拒绝。仅在 desktop 本地 session 中注入，IM 频道 session 不可见此工具。",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
     "properties": {
       "callbackUrl": {
         "type": "string",
-        "description": "PetClaw HTTP callback URL for approval requests"
+        "description": "PetClaw HookServer 的审批端点 URL（如 http://127.0.0.1:{port}/ask-user），由 PetClaw 启动时自动注入"
       },
       "secret": {
         "type": "string",
-        "description": "Shared secret for callback authentication"
+        "description": "共享密钥，通过 x-ask-user-secret 请求头验证调用方身份，随 Gateway 启动时自动生成"
       }
     }
   }

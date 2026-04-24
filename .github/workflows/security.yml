@@ -1,3 +1,30 @@
+# 安全扫描工作流
+#
+# 触发时机：
+#   - push 到 main/develop
+#   - 任何 Pull Request
+#   - 每周一 00:00 定时运行
+#
+# 四个并行扫描 job：
+#
+#   1. secrets-scan (TruffleHog)
+#      扫描 git 提交历史中是否泄露了 API Key、密码等敏感信息。
+#      --only-verified：只报告已验证可用的密钥（减少误报）。
+#      PR 时只扫描新增的 commits（base..head），push 时扫描 before..current。
+#
+#   2. dependency-audit (pnpm audit)
+#      检查项目依赖中是否有已知的高危漏洞（CVE）。
+#      设置为 non-blocking（|| echo），避免因第三方依赖的已知问题阻塞 CI。
+#
+#   3. skills-audit
+#      遍历 petclaw-desktop/SKILLs/ 下每个技能包，独立运行 npm audit。
+#      SKILLs 有独立的 package.json 和依赖树，需要单独审计。
+#      设置为 non-blocking，因为技能包的依赖可能由第三方维护。
+#
+#   4. codeql (GitHub CodeQL)
+#      对 JavaScript/TypeScript 代码做静态分析，检测 XSS、注入、原型污染等安全问题。
+#      需要 security-events: write 权限来上传扫描结果到 GitHub Security tab。
+
 name: Security Scan
 
 on:
@@ -5,23 +32,26 @@ on:
     branches: [main, develop]
   pull_request:
   schedule:
-    - cron: '0 0 * * 1'
+    - cron: '0 0 * * 1'  # 每周一 00:00
 
 jobs:
+  # ========== 密钥泄露检测 ==========
   secrets-scan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # TruffleHog 需要完整 git 历史来扫描提交
       - name: Run TruffleHog
         uses: trufflesecurity/trufflehog@v3.88.30
         with:
           path: ./
+          # PR 时扫描 base→head 的 diff；push 时扫描 before→current
           base: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
           head: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
-          extra_args: --only-verified
+          extra_args: --only-verified  # 只报告已验证有效的泄露密钥
 
+  # ========== 依赖漏洞扫描 ==========
   dependency-audit:
     runs-on: ubuntu-latest
     steps:
@@ -34,11 +64,14 @@ jobs:
           node-version: '22.x'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
+      # non-blocking：有漏洞时输出警告但不阻塞 CI（第三方依赖的已知问题可能无法立即修复）
       - name: Run pnpm audit
         run: |
           echo "Running pnpm audit..."
           pnpm audit --audit-level=high || echo "⚠ pnpm audit found issues (non-blocking)"
 
+  # ========== Skill 依赖扫描 ==========
+  # SKILLs 有独立的 package.json，需要逐个审计
   skills-audit:
     runs-on: ubuntu-latest
     steps:
@@ -48,23 +81,25 @@ jobs:
           node-version: '22.x'
       - name: Audit Skills
         run: |
-          set +e
+          set +e  # 不因单个 skill 审计失败而终止
           for skill in petclaw-desktop/SKILLs/*/; do
             if [ -f "$skill/package.json" ]; then
               echo ""
               echo "=== Auditing $skill ==="
+              # 先生成 package-lock.json（npm audit 需要），再审计
               (cd "$skill" && npm install --package-lock-only 2>/dev/null && npm audit --audit-level=moderate 2>/dev/null) || echo "⚠ Audit issues found in $skill (non-blocking)"
             fi
           done
           echo ""
           echo "=== Skill audit complete ==="
 
+  # ========== 代码静态分析 (CodeQL) ==========
   codeql:
     runs-on: ubuntu-latest
     permissions:
       actions: read
       contents: read
-      security-events: write
+      security-events: write  # 上传扫描结果到 GitHub Security tab
     steps:
       - uses: actions/checkout@v4
       - name: Initialize CodeQL

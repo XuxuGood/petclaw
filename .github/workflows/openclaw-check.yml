@@ -1,5 +1,18 @@
-# Openclaw 版本检查和集成验证
-# 每周一 08:23 自动检查，也可手动触发，PR 修改 package.json 时也运行
+# OpenClaw 集成检查工作流
+#
+# 触发时机：
+#   - push 修改了 petclaw-desktop/package.json 或 openclaw 相关脚本
+#   - PR 修改了 petclaw-desktop/package.json
+#   - 每周一 08:23 定时运行（检查是否有新版本）
+#   - 手动触发
+#
+# 检查内容：
+#   1. openclaw.version 格式校验（必须是 vX.Y.Z）
+#   2. openclaw.repo URL 格式校验（必须是 GitHub .git URL）
+#   3. openclaw.plugins 数组校验（每个插件必须有 id/npm/version 字段）
+#   4. 构建脚本存在性检查（8 个核心脚本）
+#   5. 远端最新版本比对（仅定时/手动触发时运行，避免每次 push 都查远端）
+
 name: OpenClaw Integration Check
 
 on:
@@ -11,7 +24,7 @@ on:
     paths:
       - 'petclaw-desktop/package.json'
   schedule:
-    - cron: '23 8 * * 1'
+    - cron: '23 8 * * 1'  # 每周一 08:23（避开整点拥堵）
   workflow_dispatch:
 
 jobs:
@@ -24,6 +37,8 @@ jobs:
         with:
           node-version: '22.x'
 
+      # Step 1: 版本格式校验
+      # package.json#openclaw.version 必须是 vX.Y.Z 语义版本
       - name: Check OpenClaw Version Format
         run: |
           VERSION=$(node -p "require('./petclaw-desktop/package.json').openclaw.version")
@@ -34,6 +49,8 @@ jobs:
           fi
           echo "✓ OpenClaw version format valid: $VERSION"
 
+      # Step 2: 仓库 URL 校验
+      # 必须是 https://github.com/{owner}/{repo}.git 格式
       - name: Validate OpenClaw Repository
         run: |
           REPO=$(node -p "require('./petclaw-desktop/package.json').openclaw.repo")
@@ -43,6 +60,8 @@ jobs:
           fi
           echo "✓ OpenClaw repository URL valid: $REPO"
 
+      # Step 3: 插件配置校验
+      # openclaw.plugins 必须是数组，每个元素必须有 id/npm/version
       - name: Validate OpenClaw Plugins
         run: |
           node -e "
@@ -79,6 +98,8 @@ jobs:
             console.log('✓ All plugins have required fields');
           "
 
+      # Step 4: 构建脚本存在性检查
+      # 这些脚本是 runtime 构建流水线的关键环节，缺一个就无法正常打包
       - name: Check OpenClaw Scripts Exist
         run: |
           SCRIPTS=(
@@ -106,12 +127,15 @@ jobs:
             echo "⚠ $MISSING OpenClaw scripts missing (this may be expected for new projects)"
           fi
 
+      # Step 5: 远端版本比对
+      # 仅定时/手动触发时运行，避免每次 push 都访问远端 git（节省时间 + 避免 rate limit）
       - name: Check Latest Version
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: |
           CURRENT=$(node -p "require('./petclaw-desktop/package.json').openclaw.version")
           echo "Current OpenClaw version: $CURRENT"
 
+          # 从远端 git tags 查最新正式版本（过滤 v 前缀的语义版本，排除 -beta/-rc 等）
           LATEST=$(git ls-remote --tags https://github.com/openclaw/openclaw.git \
             | grep -oP 'v\d+\.\d+\.\d+$' \
             | sort -V \

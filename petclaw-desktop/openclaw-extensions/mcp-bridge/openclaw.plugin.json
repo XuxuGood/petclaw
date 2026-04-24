@@ -1,42 +1,50 @@
 {
   "id": "mcp-bridge",
   "name": "MCP Bridge",
-  "description": "Expose PetClaw-managed MCP servers as native OpenClaw tools.",
+  "description": "MCP 工具代理桥接器。将 PetClaw 管理的 MCP (Model Context Protocol) 服务器工具暴露为 OpenClaw 原生工具，每个 MCP tool 注册一个代理（名称格式 mcp_{server}_{tool}），Agent 调用代理时通过 HTTP POST 转发给 PetClaw，由 PetClaw 调用实际 MCP server 并返回结果。支持同名去重、可配置超时、响应格式自动规范化。",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
     "properties": {
       "callbackUrl": {
         "type": "string",
-        "minLength": 1
+        "minLength": 1,
+        "description": "PetClaw HookServer 的 MCP 转发端点 URL（如 http://127.0.0.1:{port}/mcp-bridge），由 PetClaw 启动时自动注入"
       },
       "secret": {
         "type": "string",
-        "minLength": 1
+        "minLength": 1,
+        "description": "共享密钥，通过 x-mcp-bridge-secret 请求头验证调用方身份"
       },
       "requestTimeoutMs": {
         "type": "number",
-        "minimum": 1000
+        "minimum": 1000,
+        "description": "单次 MCP tool 调用的超时时间（毫秒），默认 120000（2 分钟），最小 1000"
       },
       "tools": {
         "type": "array",
+        "description": "需要注册的 MCP tool 列表，由 PetClaw 根据用户配置的 MCP server 自动生成",
         "items": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
             "server": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "description": "MCP server 名称（如 'filesystem'、'github'）"
             },
             "name": {
               "type": "string",
-              "minLength": 1
+              "minLength": 1,
+              "description": "MCP tool 名称（如 'read_file'、'search_repositories'）"
             },
             "description": {
-              "type": "string"
+              "type": "string",
+              "description": "tool 的功能描述，会透传给 Agent 作为 tool description"
             },
             "inputSchema": {
-              "type": "object"
+              "type": "object",
+              "description": "tool 的输入参数 JSON Schema，由 MCP server 的 tools/list 接口返回"
             }
           }
         }

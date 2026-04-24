@@ -1,3 +1,22 @@
+# Electron 构建验证工作流
+#
+# 在 Ubuntu 上执行完整构建，验证 electron-vite 输出目录结构是否完整。
+# 这是一个轻量级冒烟测试：不打包 .dmg/.exe，只验证源码能编译且产物齐全。
+#
+# 触发时机：
+#   - push 到 main/develop
+#   - PR 修改了 src/、electron-builder.json、package.json、electron.vite.config.ts
+#
+# 验证的文件：
+#   - out/renderer/index.html      — Vite 构建的前端入口
+#   - out/main/index.js            — Electron 主进程入口
+#   - out/preload/index.js         — Preload 脚本（contextBridge）
+#
+# 为什么需要这个 workflow：
+#   CI 的 build job 只验证 "能不能编译"，不验证 "编译产物结构是否正确"。
+#   曾出现过 vite 配置改动导致 index.html 输出路径变化、electron-builder 找不到入口的问题。
+#   这个 workflow 用 4 行 shell 就能捕获此类问题。
+
 name: Electron Verify
 
 on:
@@ -23,6 +42,7 @@ jobs:
           node-version: '22.x'
           cache: 'pnpm'
 
+      # Electron 在 Linux 上即使只做编译（不运行），也需要部分系统库
       - name: Install Electron Linux Dependencies
         run: |
           sudo apt-get update
@@ -38,6 +58,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter petclaw-desktop build
 
+      # 验证 electron-vite 输出目录结构
+      # electron-vite 默认输出到 out/（非 dist/dist-electron/）
       - name: Verify Build Structure
         run: |
           echo "=== Verifying petclaw-desktop/out/renderer/ structure ==="
