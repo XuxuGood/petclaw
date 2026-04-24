@@ -109,6 +109,45 @@ pnpm --filter petclaw-desktop dist:win         # → release/PetClaw-x.y.z-Setup
 - App ID：`ai.petclaw.desktop`
 - 详细打包设计见 v3 spec §24.7
 
+### npm scripts 速查表
+
+**开发 & 构建**：
+
+| 脚本 | 说明 |
+|------|------|
+| `dev` | 启动 electron-vite HMR 开发模式 |
+| `build` | 编译 main/preload/renderer 到 out/ |
+| `package` | build + electron-builder 打包 |
+| `electron:dev` | 同 dev（别名） |
+| `electron:dev:openclaw` | 完整开发流程：ensure 版本 → 构建 runtime → 启动 dev |
+
+**代码质量**：
+
+| 脚本 | 说明 |
+|------|------|
+| `typecheck` | 同时检查 node + web 两个 tsconfig |
+| `lint` / `lint:fix` | ESLint 检查 / 自动修复 |
+| `format` / `format:check` | Prettier 格式化 / 检查 |
+| `test` / `test:watch` / `test:coverage` | Vitest 运行 / 监听 / 覆盖率 |
+
+**Openclaw Runtime 构建流水线**（按执行顺序）：
+
+| 脚本 | 说明 |
+|------|------|
+| `openclaw:ensure` | git checkout 到 package.json 锁定的 Openclaw 版本 |
+| `openclaw:runtime:host` | 自动检测当前平台架构，触发对应构建 |
+| `openclaw:runtime:mac-arm64` | 构建 macOS ARM64 runtime |
+| `openclaw:runtime:mac-x64` | 构建 macOS x64 runtime |
+| `openclaw:runtime:win-x64` | 构建 Windows x64 runtime |
+| `openclaw:runtime:linux-x64` | 构建 Linux x64 runtime |
+| `openclaw:bundle` | esbuild 将 1000+ ESM 模块打包为 gateway-bundle.mjs 单文件 |
+| `openclaw:plugins` | 从 npm 安装 6 个第三方 IM 插件到 runtime |
+| `openclaw:extensions` | 复制本地扩展（ask-user-question + mcp-bridge）到 runtime |
+| `openclaw:precompile` | esbuild 预编译 TS 扩展为 JS（消除 jiti 运行时编译） |
+| `openclaw:channel-deps` | 修复 Openclaw v2026.4.x 缺失的 channel 依赖（临时） |
+| `openclaw:prune` | 裁剪 runtime 体积（删除未用扩展、stub 大包、清理冗余文件） |
+| `openclaw:finalize` | 开发模式下重打包 gateway.asar |
+
 ## 7. CI/CD（GitHub Actions）
 
 文件：`.github/workflows/ci.yml` + `build-platforms.yml` + `openclaw-check.yml`
