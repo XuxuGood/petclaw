@@ -1,0 +1,171 @@
+{
+  "appId": "ai.petclaw.desktop",
+  "productName": "PetClaw",
+  "executableName": "PetClaw",
+  "directories": {
+    "output": "release"
+  },
+  "beforePack": "./scripts/electron-builder-hooks.cjs",
+  "afterPack": "./scripts/electron-builder-hooks.cjs",
+  "files": [
+    "package.json",
+    {
+      "from": "out",
+      "to": "out",
+      "filter": ["**/*"]
+    },
+    "!**/*.map",
+    "!**/*.d.ts",
+    "!**/*.d.cts",
+    "!**/*.d.mts",
+    "!**/README.md",
+    "!**/CHANGELOG.md",
+    "!**/LICENSE",
+    "!**/LICENSE.md",
+    "!**/LICENSE.txt",
+    "!**/.eslintrc*",
+    "!**/.prettierrc*",
+    "!**/tsconfig.json",
+    "!**/tsconfig.*.json",
+    "!**/*.test.*",
+    "!**/*.spec.*",
+    "!**/tests/**",
+    "!**/test/**",
+    "!**/__tests__/**"
+  ],
+  "extraResources": [
+    {
+      "from": "resources/tray",
+      "to": "tray",
+      "filter": ["**/*"]
+    }
+  ],
+  "protocols": [
+    {
+      "name": "PetClaw",
+      "schemes": ["petclaw"]
+    }
+  ],
+  "publish": {
+    "provider": "github",
+    "owner": "xuxu03",
+    "repo": "petclaw"
+  },
+  "mac": {
+    "target": ["dmg", "zip"],
+    "icon": "resources/icon.png",
+    "category": "public.app-category.utilities",
+    "hardenedRuntime": true,
+    "gatekeeperAssess": false,
+    "entitlements": "build/entitlements.mac.plist",
+    "entitlementsInherit": "build/entitlements.mac.plist",
+    "extraResources": [
+      {
+        "from": "SKILLs",
+        "to": "SKILLs",
+        "filter": [
+          "**/*",
+          "!**/.env",
+          "!**/.env.*",
+          "!**/*.map",
+          "!**/*.d.ts",
+          "!**/README.md",
+          "!**/CHANGELOG.md",
+          "!**/LICENSE",
+          "!**/tests/**",
+          "!**/test/**",
+          "!**/__tests__/**"
+        ]
+      },
+      {
+        "from": "vendor/openclaw-runtime/current",
+        "to": "petmind",
+        "filter": [
+          "**/*",
+          "!**/*.map",
+          "!**/*.d.ts",
+          "!**/README.md",
+          "!**/CHANGELOG.md",
+          "!**/LICENSE",
+          "!**/tests/**",
+          "!**/test/**",
+          "!**/__tests__/**"
+        ]
+      }
+    ]
+  },
+  "dmg": {
+    "sign": false
+  },
+  "afterSign": "scripts/notarize.js",
+  "win": {
+    "target": ["nsis", "portable"],
+    "icon": "resources/icon.png",
+    "requestedExecutionLevel": "asInvoker",
+    "extraResources": [
+      {
+        "from": "build-tar/win-resources.tar",
+        "to": "win-resources.tar"
+      },
+      {
+        "from": "scripts/unpack-petmind.cjs",
+        "to": "unpack-petmind.cjs"
+      }
+    ]
+  },
+  "linux": {
+    "target": ["AppImage", "deb"],
+    "icon": "resources/icon.png",
+    "category": "Utility",
+    "extraResources": [
+      {
+        "from": "SKILLs",
+        "to": "SKILLs",
+        "filter": [
+          "**/*",
+          "!**/.env",
+          "!**/.env.*",
+          "!**/*.map",
+          "!**/*.d.ts",
+          "!**/README.md",
+          "!**/CHANGELOG.md",
+          "!**/LICENSE",
+          "!**/tests/**",
+          "!**/test/**",
+          "!**/__tests__/**"
+        ]
+      },
+      {
+        "from": "vendor/openclaw-runtime/current",
+        "to": "petmind",
+        "filter": [
+          "**/*",
+          "!**/*.map",
+          "!**/*.d.ts",
+          "!**/README.md",
+          "!**/CHANGELOG.md",
+          "!**/LICENSE",
+          "!**/tests/**",
+          "!**/test/**",
+          "!**/__tests__/**"
+        ]
+      }
+    ],
+    "desktop": {
+      "Name": "PetClaw",
+      "Comment": "AI Desktop Pet Assistant",
+      "Terminal": "false"
+    }
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "runAfterFinish": true,
+    "deleteAppDataOnUninstall": true,
+    "include": "scripts/nsis-installer.nsh"
+  },
+  "asarUnpack": ["node_modules/better-sqlite3/**"],
+  "asar": true,
+  "npmRebuild": true,
+  "nativeRebuilder": "sequential"
+}
