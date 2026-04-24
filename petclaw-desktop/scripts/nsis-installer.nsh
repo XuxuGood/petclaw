@@ -128,9 +128,10 @@
   FileClose $2
   DetailPrint "[Installer] Preparing installation steps"
 
-  ; PetClaw 暂不打包 python，只创建 petmind + SKILLs
+  ; 创建资源目录：petmind（OpenClaw runtime）、SKILLs（技能包）、python-win（便携式 Python）
   CreateDirectory "$INSTDIR\resources\petmind"
   CreateDirectory "$INSTDIR\resources\SKILLs"
+  CreateDirectory "$INSTDIR\resources\python-win"
   DetailPrint "[Installer] Preparing resource directories"
 
   ; 解压前先加 Defender 排除，防止扫描导致解压失败或速度极慢
@@ -140,7 +141,7 @@
   FileWrite $2 "$8 phase=defender-exclusion-start$\r$\n"
   FileClose $2
   System::Call 'kernel32::GetTickCount()i .r7'
-  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "try { Add-MpPreference -ExclusionPath $\"$INSTDIR\resources\petmind$\",$\"$INSTDIR\resources\SKILLs$\",$\"$INSTDIR\resources\app.asar.unpacked$\" -ErrorAction Stop; Write-Output \"[Installer] Windows Defender exclusions added\" } catch { Write-Output (\"[Installer] Windows Defender exclusions skipped: \" + $$_.Exception.Message) }"'
+  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "try { Add-MpPreference -ExclusionPath $\"$INSTDIR\resources\petmind$\",$\"$INSTDIR\resources\SKILLs$\",$\"$INSTDIR\resources\python-win$\",$\"$INSTDIR\resources\app.asar.unpacked$\" -ErrorAction Stop; Write-Output \"[Installer] Windows Defender exclusions added\" } catch { Write-Output (\"[Installer] Windows Defender exclusions skipped: \" + $$_.Exception.Message) }"'
   Pop $0
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $5 $6 - $7
@@ -240,7 +241,7 @@
 
 ; 卸载后：移除 Windows Defender 排除规则（忽略失败）
 !macro customUnInstall
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "try { Remove-MpPreference -ExclusionPath $\"$INSTDIR\resources\petmind$\",$\"$INSTDIR\resources\SKILLs$\",$\"$INSTDIR\resources\app.asar.unpacked$\" -ErrorAction SilentlyContinue } catch {}"'
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "try { Remove-MpPreference -ExclusionPath $\"$INSTDIR\resources\petmind$\",$\"$INSTDIR\resources\SKILLs$\",$\"$INSTDIR\resources\python-win$\",$\"$INSTDIR\resources\app.asar.unpacked$\" -ErrorAction SilentlyContinue } catch {}"'
   Pop $0
   Pop $1
 !macroend

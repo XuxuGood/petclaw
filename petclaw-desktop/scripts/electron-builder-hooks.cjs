@@ -9,7 +9,8 @@ const { existsSync, readdirSync, statSync, mkdirSync, readFileSync, rmSync, cpSy
 const { spawnSync } = require('child_process');
 const { syncLocalOpenClawExtensions } = require('./sync-local-openclaw-extensions.cjs');
 const { precompileExtensions } = require('./precompile-openclaw-extensions.cjs');
-const { packWinCombined } = require('./pack-openclaw-tar.cjs');
+const { packMultipleSources } = require('./pack-openclaw-tar.cjs');
+const { ensurePortablePythonRuntime } = require('./setup-python-runtime.js');
 
 // ── 平台/架构辅助 ────────────────────────────────────────────────────────────
 
@@ -353,12 +354,32 @@ async function beforePack(context) {
   // 6. 安装 SKILLs 依赖
   installSkillDependencies();
 
-  // 7. Windows：打包 runtime + SKILLs 为单个 tar，加速 NSIS 解压
+  // 7. Windows：设置便携式 Python 运行时（resources/python-win/）
+  // required: true 确保非 Windows 宿主机也必须准备好（跨平台打包场景）
   if (isWindowsTarget(context)) {
-    const buildTarDir = path.join(__dirname, '..', 'build-tar');
+    console.log('[electron-builder-hooks] 设置 Windows Python 运行时...');
+    await ensurePortablePythonRuntime({ required: true });
+  }
+
+  // 8. Windows：打包 runtime + SKILLs + python-win 为单个 tar，加速 NSIS 解压
+  if (isWindowsTarget(context)) {
+    const projectRoot = path.join(__dirname, '..');
+    const buildTarDir = path.join(projectRoot, 'build-tar');
     mkdirSync(buildTarDir, { recursive: true });
+    const outputTar = path.join(buildTarDir, 'win-resources.tar');
+    // 先删除旧文件，防止 tar.replace 追加到过期内容
+    if (existsSync(outputTar)) {
+      const { unlinkSync } = require('fs');
+      unlinkSync(outputTar);
+    }
     console.log('[electron-builder-hooks] 打包 Windows tar...');
-    packWinCombined();
+    // 三个来源：OpenClaw runtime（petmind）、技能包（SKILLs）、Python 运行时（python-win）
+    const sources = [
+      { dir: path.join(projectRoot, 'vendor', 'openclaw-runtime', 'current'), prefix: 'petmind' },
+      { dir: path.join(projectRoot, 'SKILLs'), prefix: 'SKILLs' },
+      { dir: path.join(projectRoot, 'resources', 'python-win'), prefix: 'python-win' },
+    ];
+    packMultipleSources(sources, outputTar);
   }
 }
 

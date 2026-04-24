@@ -170,8 +170,8 @@ try {
     logLine(`[unpack-petmind] phase=root-summary root=${root} entries=${stats.entries} bytes=${stats.bytes} mb=${formatMegabytes(stats.bytes)} elapsed_ms=${rootElapsedMs}`);
   }
 
-  // PetClaw 只验证 petmind + SKILLs（暂不打包 python-win）
-  const expectedDirs = ['petmind', 'SKILLs'];
+  // 验证三个预期目录：petmind（OpenClaw runtime）、SKILLs（技能包）、python-win（便携式 Python）
+  const expectedDirs = ['petmind', 'SKILLs', 'python-win'];
   for (const dir of expectedDirs) {
     const dirPath = path.join(destDir, dir);
     if (fs.existsSync(dirPath)) {
