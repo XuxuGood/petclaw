@@ -1,0 +1,138 @@
+# 全平台构建和发布工作流
+# 触发时机：打 v* tag 或手动触发
+name: Build & Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    name: Build (macOS)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+
+      # 准备运行时（openclaw runtime + 打包 tar）
+      - name: Prepare runtime
+        run: |
+          chmod +x petclaw-desktop/scripts/prepare-runtime.sh
+          cd petclaw-desktop && ./scripts/prepare-runtime.sh mac arm64
+
+      - run: pnpm --filter petclaw-desktop build
+
+      - name: Package (macOS)
+        run: pnpm --filter petclaw-desktop package
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-build
+          path: |
+            petclaw-desktop/release/*.dmg
+            petclaw-desktop/release/*.zip
+          retention-days: 30
+
+  build-windows:
+    name: Build (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter petclaw-desktop build
+
+      - name: Package (Windows)
+        run: pnpm --filter petclaw-desktop package
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: |
+            petclaw-desktop/release/*.exe
+          retention-days: 30
+
+  build-linux:
+    name: Build (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+          cache: 'pnpm'
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libnotify-dev libnss3-dev libxss1 libgconf-2-4 libatk-bridge2.0-0 libdrm2 libgbm1
+      - run: pnpm install --frozen-lockfile
+
+      # 准备运行时
+      - name: Prepare runtime
+        run: |
+          chmod +x petclaw-desktop/scripts/prepare-runtime.sh
+          cd petclaw-desktop && ./scripts/prepare-runtime.sh linux x64
+
+      - run: pnpm --filter petclaw-desktop build
+
+      - name: Package (Linux)
+        run: pnpm --filter petclaw-desktop package
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-build
+          path: |
+            petclaw-desktop/release/*.AppImage
+            petclaw-desktop/release/*.deb
+          retention-days: 30
+
+  # 打 tag 时自动创建 GitHub Release（draft 状态，人工审核后发布）
+  create-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-macos, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          # beta / alpha / rc tag 标记为预发布
+          prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-alpha') || contains(github.ref, '-rc') }}
+          files: artifacts/**/*
+          generate_release_notes: true

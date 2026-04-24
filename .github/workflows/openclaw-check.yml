@@ -1,0 +1,39 @@
+# Openclaw 版本检查工作流
+# 每周一 08:23 自动检查是否有新版本，也可手动触发
+name: Openclaw Version Check
+
+on:
+  schedule:
+    - cron: '23 8 * * 1'
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Check Openclaw Version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Check Openclaw version
+        run: |
+          # 读取 package.json 中锁定的 openclaw 版本
+          CURRENT=$(node -e "console.log(require('./petclaw-desktop/package.json').openclaw.version)")
+          echo "Current Openclaw version: $CURRENT"
+
+          # 从远端 git tags 查最新正式版本（过滤 v 前缀的语义版本）
+          LATEST=$(git ls-remote --tags https://github.com/openclaw/openclaw.git \
+            | grep -oP 'v\d+\.\d+\.\d+$' \
+            | sort -V \
+            | tail -1)
+          echo "Latest Openclaw version: $LATEST"
+
+          if [ -z "$LATEST" ]; then
+            echo "::warning::Unable to fetch latest Openclaw version from remote"
+          elif [ "$CURRENT" != "$LATEST" ]; then
+            echo "::warning::Openclaw update available: $CURRENT → $LATEST"
+          else
+            echo "Openclaw is up to date"
+          fi
