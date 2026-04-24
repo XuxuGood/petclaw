@@ -1,37 +1,193 @@
-// 让 Agent 在执行危险操作前弹出结构化确认弹窗
-// 通过 HTTP POST 回调 App（callbackUrl），携带 x-ask-user-secret 头
-// App 在 Renderer 显示审批弹窗，用户选择后返回 { behavior: 'allow'|'deny', answers }
-// 120s 超时自动 deny
+import { Type } from '@sinclair/typebox'
+import type { OpenClawPluginApi } from 'openclaw/plugin-sdk'
 
-export interface AskUserQuestionConfig {
+type PluginConfig = {
   callbackUrl: string
   secret: string
-  requestTimeoutMs?: number
 }
 
-export interface QuestionOption {
+type QuestionOption = {
   label: string
   description?: string
 }
 
-export interface AskUserQuestionInput {
-  questions: Array<{
-    question: string
-    header: string
-    options: QuestionOption[]
-    multiSelect?: boolean
-  }>
+type Question = {
+  question: string
+  header?: string
+  options: QuestionOption[]
+  multiSelect?: boolean
 }
 
-// 插件入口由 Openclaw plugin-sdk 约定
-// 实际实现依赖 plugin-sdk 类型，此处仅提供骨架
-// 完整实现参考 LobsterAI openclaw-extensions/ask-user-question/
-export function register(_sdk: unknown): void {
-  // _sdk.registerTool('AskUserQuestion', { ... })
-  // tool handler:
-  //   1. 构建 HTTP POST body: { requestId, questions }
-  //   2. fetch(config.callbackUrl, { method: 'POST', headers: { 'x-ask-user-secret': config.secret }, body })
-  //   3. 等待响应或 120s 超时
-  //   4. 返回 { behavior, answers }
-  console.warn('[ask-user-question] Extension registered (skeleton)')
+type AskUserInput = {
+  questions: Question[]
 }
+
+type AskUserResponse = {
+  behavior: 'allow' | 'deny'
+  answers?: Record<string, string>
+}
+
+const DEFAULT_TIMEOUT_MS = 120_000
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
+const parsePluginConfig = (value: unknown): PluginConfig => {
+  const raw = isRecord(value) ? value : {}
+  return {
+    callbackUrl: typeof raw.callbackUrl === 'string' ? raw.callbackUrl.trim() : '',
+    secret: typeof raw.secret === 'string' ? raw.secret.trim() : ''
+  }
+}
+
+const QuestionOptionSchema = Type.Object({
+  label: Type.String({ description: 'Display text for this option (1-5 words).' }),
+  description: Type.Optional(Type.String({ description: 'Explanation of what this option means.' }))
+})
+
+const QuestionSchema = Type.Object({
+  question: Type.String({
+    description: 'The question to ask. Should be clear and end with a question mark.'
+  }),
+  header: Type.Optional(
+    Type.String({
+      description:
+        'Short label displayed as a tag (max 12 chars). Examples: "Auth method", "Confirm".'
+    })
+  ),
+  options: Type.Array(QuestionOptionSchema, {
+    minItems: 2,
+    maxItems: 4,
+    description: 'Available choices (2-4 options).'
+  }),
+  multiSelect: Type.Optional(Type.Boolean({ description: 'Allow selecting multiple options.' }))
+})
+
+const AskUserQuestionSchema = Type.Object({
+  questions: Type.Array(QuestionSchema, {
+    minItems: 1,
+    maxItems: 4,
+    description: 'Questions to ask the user (1-4 questions).'
+  })
+})
+
+async function askUser(config: PluginConfig, input: AskUserInput): Promise<AskUserResponse> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS)
+
+  try {
+    const response = await fetch(config.callbackUrl, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-ask-user-secret': config.secret
+      },
+      body: JSON.stringify(input),
+      signal: controller.signal
+    })
+
+    const text = await response.text()
+
+    if (!response.ok) {
+      throw new Error(
+        `AskUserQuestion callback HTTP ${response.status}: ${text.trim() || response.statusText}`
+      )
+    }
+
+    if (!text.trim()) {
+      return { behavior: 'deny' }
+    }
+
+    const parsed = JSON.parse(text)
+    return {
+      behavior: parsed?.behavior === 'allow' ? 'allow' : 'deny',
+      answers: isRecord(parsed?.answers) ? (parsed.answers as Record<string, string>) : undefined
+    }
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      return { behavior: 'deny' }
+    }
+    throw error
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+const plugin = {
+  id: 'ask-user-question',
+  name: 'AskUserQuestion',
+  description: 'Structured user confirmation tool for PetClaw desktop.',
+  configSchema: {
+    parse(value: unknown): PluginConfig {
+      return parsePluginConfig(value)
+    }
+  },
+  register(api: OpenClawPluginApi) {
+    const config = parsePluginConfig(api.pluginConfig)
+    if (!config.callbackUrl || !config.secret) {
+      api.logger.info('[ask-user-question] skipped: callbackUrl or secret not configured.')
+      return
+    }
+
+    // 工厂模式：仅向 desktop 本地 session 注入此工具，避免污染其他 agent session
+    api.registerTool((ctx) => {
+      const sessionKey = ctx.sessionKey ?? ''
+      const isLocalDesktop = sessionKey.startsWith('agent:main:petclaw:')
+      if (!isLocalDesktop) {
+        return null
+      }
+
+      return {
+        name: 'AskUserQuestion',
+        label: 'Ask User Question',
+        description: [
+          'Ask the user a question with predefined options and wait for their response.',
+          'Use this tool BEFORE executing any delete operation (rm, trash, rmdir, unlink, git clean).',
+          'The user will see a confirmation dialog with the options you provide.',
+          'Do NOT use this tool for non-delete commands.'
+        ].join(' '),
+        parameters: AskUserQuestionSchema,
+        async execute(_id: string, params: unknown) {
+          const input = params as AskUserInput
+          if (!input?.questions?.length) {
+            return {
+              content: [{ type: 'text', text: 'No questions provided.' }],
+              isError: true
+            }
+          }
+
+          try {
+            const response = await askUser(config, input)
+
+            if (response.behavior === 'deny') {
+              return {
+                content: [{ type: 'text', text: 'User denied the operation.' }]
+              }
+            }
+
+            const answerLines = response.answers
+              ? Object.entries(response.answers)
+                  .map(([q, a]) => `${q}: ${a}`)
+                  .join('\n')
+              : 'User approved.'
+
+            return {
+              content: [{ type: 'text', text: answerLines }]
+            }
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            return {
+              content: [{ type: 'text', text: `AskUserQuestion failed: ${message}` }],
+              isError: true
+            }
+          }
+        }
+      }
+    })
+
+    api.logger.info('[ask-user-question] registered AskUserQuestion tool factory.')
+  }
+}
+
+export default plugin
