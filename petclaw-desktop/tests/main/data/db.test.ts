@@ -1,15 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+// tests/main/data/db.test.ts
+import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
-import {
-  initDatabase,
-  saveMessage,
-  getMessages,
-  kvGet,
-  kvSet,
-  kvGetAll
-} from '../../../src/main/data/db'
 
-describe('Database', () => {
+import { initDatabase, kvGet, kvSet, kvGetAll } from '../../../src/main/data/db'
+
+describe('initDatabase', () => {
   let db: Database.Database
 
   beforeEach(() => {
@@ -17,113 +12,34 @@ describe('Database', () => {
     initDatabase(db)
   })
 
-  afterEach(() => {
-    db.close()
+  it('should create all 9 tables', () => {
+    const tables = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+      .all() as Array<{ name: string }>
+    const names = tables.map((t) => t.name)
+    expect(names).toContain('app_config')
+    expect(names).toContain('directories')
+    expect(names).toContain('sessions')
+    expect(names).toContain('messages')
+    expect(names).toContain('im_instances')
+    expect(names).toContain('im_conversation_bindings')
+    expect(names).toContain('im_session_mappings')
+    expect(names).toContain('scheduled_task_meta')
+    expect(names).toContain('mcp_servers')
   })
 
-  describe('messages', () => {
-    it('saves and retrieves a message', () => {
-      saveMessage(db, { role: 'user', content: 'hello' })
-      const messages = getMessages(db, 10)
-      expect(messages).toHaveLength(1)
-      expect(messages[0].role).toBe('user')
-      expect(messages[0].content).toBe('hello')
-    })
-
-    it('returns messages in chronological order', () => {
-      saveMessage(db, { role: 'user', content: 'first' })
-      saveMessage(db, { role: 'assistant', content: 'second' })
-      const messages = getMessages(db, 10)
-      expect(messages[0].content).toBe('first')
-      expect(messages[1].content).toBe('second')
-    })
-
-    it('respects limit parameter', () => {
-      saveMessage(db, { role: 'user', content: 'a' })
-      saveMessage(db, { role: 'user', content: 'b' })
-      saveMessage(db, { role: 'user', content: 'c' })
-      const messages = getMessages(db, 2)
-      expect(messages).toHaveLength(2)
-      expect(messages[0].content).toBe('b')
-      expect(messages[1].content).toBe('c')
-    })
-  })
-
-  describe('kv table', () => {
-    it('should set and get a value via kvSet/kvGet', () => {
-      kvSet(db, 'theme', '"dark"')
-      const val = kvGet(db, 'theme')
-      expect(val).toBe('"dark"')
-    })
-
-    it('should return null for missing key', () => {
-      expect(kvGet(db, 'nonexistent')).toBeNull()
-    })
-
-    it('should upsert on conflict', () => {
-      kvSet(db, 'port', '29890')
-      kvSet(db, 'port', '18789')
-      expect(kvGet(db, 'port')).toBe('18789')
-    })
-
-    it('should get all kv pairs', () => {
-      kvSet(db, 'a', '1')
-      kvSet(db, 'b', '2')
-      const all = kvGetAll(db)
-      expect(all).toEqual({ a: '1', b: '2' })
-    })
-  })
-
-  describe('cowork_sessions table', () => {
-    it('should create a session with defaults', () => {
-      const now = Date.now()
-      db.prepare(
-        'INSERT INTO cowork_sessions (id, title, cwd, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
-      ).run('s1', 'Test', '/tmp', now, now)
-      const row = db.prepare('SELECT * FROM cowork_sessions WHERE id = ?').get('s1') as Record<
-        string,
-        unknown
-      >
-      expect(row.title).toBe('Test')
-      expect(row.status).toBe('idle')
-      expect(row.agent_id).toBe('main')
-      expect(row.execution_mode).toBe('local')
-      expect(row.pinned).toBe(0)
-    })
-  })
-
-  describe('cowork_messages table', () => {
-    it('should insert and query messages by session', () => {
-      const now = Date.now()
-      db.prepare(
-        'INSERT INTO cowork_sessions (id, title, cwd, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
-      ).run('s1', 'Test', '/tmp', now, now)
-      db.prepare(
-        'INSERT INTO cowork_messages (id, session_id, type, content, timestamp) VALUES (?, ?, ?, ?, ?)'
-      ).run('m1', 's1', 'user', 'hello', now)
-      const msgs = db
-        .prepare('SELECT * FROM cowork_messages WHERE session_id = ?')
-        .all('s1') as Record<string, unknown>[]
-      expect(msgs).toHaveLength(1)
-      expect(msgs[0].content).toBe('hello')
-    })
-
-    it('should cascade delete messages when session deleted', () => {
-      const now = Date.now()
-      db.prepare(
-        'INSERT INTO cowork_sessions (id, title, cwd, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
-      ).run('s1', 'Test', '/tmp', now, now)
-      db.prepare(
-        'INSERT INTO cowork_messages (id, session_id, type, content, timestamp) VALUES (?, ?, ?, ?, ?)'
-      ).run('m1', 's1', 'user', 'hello', now)
-      db.prepare('DELETE FROM cowork_sessions WHERE id = ?').run('s1')
-      const msgs = db.prepare('SELECT * FROM cowork_messages WHERE session_id = ?').all('s1')
-      expect(msgs).toHaveLength(0)
-    })
+  it('should create indexes', () => {
+    const indexes = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='index' AND name NOT LIKE 'sqlite_%'")
+      .all() as Array<{ name: string }>
+    const names = indexes.map((i) => i.name)
+    expect(names).toContain('idx_messages_session')
+    expect(names).toContain('idx_sessions_agent')
+    expect(names).toContain('idx_sessions_directory')
   })
 })
 
-describe('agents table', () => {
+describe('app_config (kv helpers)', () => {
   let db: Database.Database
 
   beforeEach(() => {
@@ -131,45 +47,197 @@ describe('agents table', () => {
     initDatabase(db)
   })
 
-  afterEach(() => {
-    db.close()
+  it('should set and get a value', () => {
+    kvSet(db, 'theme', '"dark"')
+    expect(kvGet(db, 'theme')).toBe('"dark"')
   })
 
-  it('should create an agent with defaults', () => {
+  it('should upsert on conflict', () => {
+    kvSet(db, 'port', '29890')
+    kvSet(db, 'port', '18789')
+    expect(kvGet(db, 'port')).toBe('18789')
+  })
+
+  it('should return null for missing key', () => {
+    expect(kvGet(db, 'nonexistent')).toBeNull()
+  })
+
+  it('should return all entries', () => {
+    kvSet(db, 'a', '1')
+    kvSet(db, 'b', '2')
+    expect(kvGetAll(db)).toEqual({ a: '1', b: '2' })
+  })
+})
+
+describe('directories table', () => {
+  let db: Database.Database
+
+  beforeEach(() => {
+    db = new Database(':memory:')
+    initDatabase(db)
+  })
+
+  it('should insert and query a directory', () => {
     const now = Date.now()
-    db.prepare(`INSERT INTO agents (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)`).run(
-      'main',
-      '默认助手',
-      now,
-      now
-    )
-    const row = db.prepare('SELECT * FROM agents WHERE id = ?').get('main') as Record<
-      string,
-      unknown
-    >
-    expect(row.name).toBe('默认助手')
-    expect(row.enabled).toBe(1)
-    expect(row.is_default).toBe(0)
-    expect(row.source).toBe('custom')
+    db.prepare(
+      'INSERT INTO directories (agent_id, path, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+    ).run('ws-abc123', '/tmp/proj', 'My Project', now, now)
+    const row = db
+      .prepare('SELECT * FROM directories WHERE agent_id = ?')
+      .get('ws-abc123') as Record<string, unknown>
+    expect(row.path).toBe('/tmp/proj')
+    expect(row.model_override).toBe('')
     expect(row.skill_ids).toBe('[]')
   })
 
-  it('should enforce primary key uniqueness', () => {
+  it('should enforce unique path', () => {
     const now = Date.now()
-    db.prepare(`INSERT INTO agents (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)`).run(
-      'a1',
-      'Agent',
-      now,
-      now
-    )
-    expect(() => {
-      db.prepare(`INSERT INTO agents (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)`).run(
-        'a1',
-        'Dup',
-        now,
-        now
+    db.prepare(
+      'INSERT INTO directories (agent_id, path, created_at, updated_at) VALUES (?, ?, ?, ?)'
+    ).run('ws-aaa', '/tmp/a', now, now)
+    expect(() =>
+      db
+        .prepare(
+          'INSERT INTO directories (agent_id, path, created_at, updated_at) VALUES (?, ?, ?, ?)'
+        )
+        .run('ws-bbb', '/tmp/a', now, now)
+    ).toThrow()
+  })
+})
+
+describe('sessions table', () => {
+  let db: Database.Database
+
+  beforeEach(() => {
+    db = new Database(':memory:')
+    initDatabase(db)
+  })
+
+  it('should insert with directory_path and agent_id', () => {
+    const now = Date.now()
+    db.prepare(
+      `INSERT INTO sessions (id, title, directory_path, agent_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    ).run('s1', 'Test', '/tmp/proj', 'ws-abc123', now, now)
+    const row = db.prepare('SELECT * FROM sessions WHERE id = ?').get('s1') as Record<
+      string,
+      unknown
+    >
+    expect(row.directory_path).toBe('/tmp/proj')
+    expect(row.agent_id).toBe('ws-abc123')
+    expect(row.status).toBe('idle')
+  })
+})
+
+describe('messages table', () => {
+  let db: Database.Database
+
+  beforeEach(() => {
+    db = new Database(':memory:')
+    initDatabase(db)
+  })
+
+  it('should insert and query messages by session', () => {
+    const now = Date.now()
+    // Create session first (FK dependency)
+    db.prepare(
+      `INSERT INTO sessions (id, title, directory_path, agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`
+    ).run('s1', 'Test', '/tmp', 'ws-abc', now, now)
+    db.prepare(
+      'INSERT INTO messages (id, session_id, type, content, created_at) VALUES (?, ?, ?, ?, ?)'
+    ).run('m1', 's1', 'user', 'hello', now)
+    const msgs = db.prepare('SELECT * FROM messages WHERE session_id = ?').all('s1') as Record<
+      string,
+      unknown
+    >[]
+    expect(msgs).toHaveLength(1)
+    expect(msgs[0].content).toBe('hello')
+  })
+
+  it('should cascade delete messages when session deleted', () => {
+    const now = Date.now()
+    db.prepare(
+      `INSERT INTO sessions (id, title, directory_path, agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`
+    ).run('s1', 'Test', '/tmp', 'ws-abc', now, now)
+    db.prepare(
+      'INSERT INTO messages (id, session_id, type, content, created_at) VALUES (?, ?, ?, ?, ?)'
+    ).run('m1', 's1', 'user', 'hello', now)
+    db.prepare('DELETE FROM sessions WHERE id = ?').run('s1')
+    const msgs = db.prepare('SELECT * FROM messages WHERE session_id = ?').all('s1')
+    expect(msgs).toHaveLength(0)
+  })
+})
+
+describe('im_instances table', () => {
+  let db: Database.Database
+
+  beforeEach(() => {
+    db = new Database(':memory:')
+    initDatabase(db)
+  })
+
+  it('should insert an IM instance', () => {
+    const now = Date.now()
+    db.prepare(
+      `INSERT INTO im_instances (id, platform, credentials, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
+    ).run('inst-1', 'dingtalk', '{"appKey":"abc"}', now, now)
+    const row = db.prepare('SELECT * FROM im_instances WHERE id = ?').get('inst-1') as Record<
+      string,
+      unknown
+    >
+    expect(row.platform).toBe('dingtalk')
+    expect(row.enabled).toBe(1)
+  })
+})
+
+describe('im_conversation_bindings table', () => {
+  let db: Database.Database
+
+  beforeEach(() => {
+    db = new Database(':memory:')
+    initDatabase(db)
+  })
+
+  it('should bind a conversation to a directory', () => {
+    const now = Date.now()
+    db.prepare(
+      `INSERT INTO im_instances (id, platform, credentials, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
+    ).run('inst-1', 'dingtalk', '{}', now, now)
+    db.prepare(
+      `INSERT INTO im_conversation_bindings (conversation_id, instance_id, peer_kind, directory_path, agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run('conv-1', 'inst-1', 'group', '/tmp/proj', 'ws-abc', now, now)
+    const row = db
+      .prepare(
+        'SELECT * FROM im_conversation_bindings WHERE conversation_id = ? AND instance_id = ?'
       )
-    }).toThrow()
+      .get('conv-1', 'inst-1') as Record<string, unknown>
+    expect(row.directory_path).toBe('/tmp/proj')
+  })
+})
+
+describe('im_session_mappings table', () => {
+  let db: Database.Database
+
+  beforeEach(() => {
+    db = new Database(':memory:')
+    initDatabase(db)
+  })
+
+  it('should insert a session mapping', () => {
+    const now = Date.now()
+    db.prepare(
+      `INSERT INTO im_instances (id, platform, credentials, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
+    ).run('inst-1', 'dingtalk', '{}', now, now)
+    db.prepare(
+      `INSERT INTO sessions (id, title, directory_path, agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`
+    ).run('sess-1', 'Test', '/tmp', 'main', now, now)
+    db.prepare(
+      `INSERT INTO im_session_mappings (conversation_id, instance_id, session_id, agent_id, created_at, last_active_at) VALUES (?, ?, ?, ?, ?, ?)`
+    ).run('conv-1', 'inst-1', 'sess-1', 'main', now, now)
+    const row = db
+      .prepare('SELECT * FROM im_session_mappings WHERE conversation_id = ? AND instance_id = ?')
+      .get('conv-1', 'inst-1') as Record<string, unknown>
+    expect(row.session_id).toBe('sess-1')
   })
 })
 
@@ -179,10 +247,6 @@ describe('mcp_servers table', () => {
   beforeEach(() => {
     db = new Database(':memory:')
     initDatabase(db)
-  })
-
-  afterEach(() => {
-    db.close()
   })
 
   it('should create an mcp server', () => {
@@ -212,7 +276,7 @@ describe('mcp_servers table', () => {
   })
 })
 
-describe('im_config table', () => {
+describe('scheduled_task_meta table', () => {
   let db: Database.Database
 
   beforeEach(() => {
@@ -220,115 +284,13 @@ describe('im_config table', () => {
     initDatabase(db)
   })
 
-  afterEach(() => {
-    db.close()
-  })
-
-  it('should set and get a single platform config', () => {
-    const now = Date.now()
-    // 直接写入单一平台 key
-    db.prepare('INSERT OR REPLACE INTO im_config (key, value, updated_at) VALUES (?, ?, ?)').run(
-      'dingtalk',
-      '{"appKey":"abc"}',
-      now
-    )
-    const row = db.prepare('SELECT * FROM im_config WHERE key = ?').get('dingtalk') as Record<
-      string,
-      unknown
-    >
-    expect(row.value).toBe('{"appKey":"abc"}')
-  })
-
-  it('should support multi-instance keys like platform:instance-id', () => {
-    const now = Date.now()
-    // 多实例 key 格式：平台:实例ID
-    db.prepare('INSERT OR REPLACE INTO im_config (key, value, updated_at) VALUES (?, ?, ?)').run(
-      'dingtalk:instance-1',
-      '{"appKey":"k1"}',
-      now
-    )
-    db.prepare('INSERT OR REPLACE INTO im_config (key, value, updated_at) VALUES (?, ?, ?)').run(
-      'dingtalk:instance-2',
-      '{"appKey":"k2"}',
-      now
-    )
-    const rows = db.prepare("SELECT * FROM im_config WHERE key LIKE 'dingtalk:%'").all() as Record<
-      string,
-      unknown
-    >[]
-    expect(rows).toHaveLength(2)
-  })
-
-  it('should upsert on conflict', () => {
-    const now = Date.now()
-    db.prepare('INSERT OR REPLACE INTO im_config (key, value, updated_at) VALUES (?, ?, ?)').run(
-      'feishu',
-      '{"v":1}',
-      now
-    )
-    db.prepare('INSERT OR REPLACE INTO im_config (key, value, updated_at) VALUES (?, ?, ?)').run(
-      'feishu',
-      '{"v":2}',
-      now
-    )
-    const row = db.prepare('SELECT value FROM im_config WHERE key = ?').get('feishu') as Record<
-      string,
-      unknown
-    >
-    expect(row.value).toBe('{"v":2}')
-  })
-})
-
-describe('im_session_mappings table', () => {
-  let db: Database.Database
-
-  beforeEach(() => {
-    db = new Database(':memory:')
-    initDatabase(db)
-  })
-
-  afterEach(() => {
-    db.close()
-  })
-
-  it('should insert and query a session mapping', () => {
-    const now = Date.now()
+  it('should insert task metadata', () => {
     db.prepare(
-      'INSERT INTO im_session_mappings (im_conversation_id, platform, cowork_session_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
-    ).run('conv-001', 'dingtalk', 'sess-abc', now, now)
+      `INSERT INTO scheduled_task_meta (task_id, directory_path, agent_id, origin, binding) VALUES (?, ?, ?, ?, ?)`
+    ).run('task-1', '/tmp/proj', 'ws-abc', 'cron', null)
     const row = db
-      .prepare('SELECT * FROM im_session_mappings WHERE im_conversation_id = ? AND platform = ?')
-      .get('conv-001', 'dingtalk') as Record<string, unknown>
-    expect(row.cowork_session_id).toBe('sess-abc')
-    // agent_id 应有默认值 'main'
-    expect(row.agent_id).toBe('main')
-  })
-
-  it('should enforce composite primary key uniqueness', () => {
-    const now = Date.now()
-    db.prepare(
-      'INSERT INTO im_session_mappings (im_conversation_id, platform, cowork_session_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
-    ).run('conv-001', 'dingtalk', 'sess-abc', now, now)
-    // 相同 (im_conversation_id, platform) 组合不可重复插入
-    expect(() => {
-      db.prepare(
-        'INSERT INTO im_session_mappings (im_conversation_id, platform, cowork_session_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
-      ).run('conv-001', 'dingtalk', 'sess-xyz', now, now)
-    }).toThrow()
-  })
-
-  it('should allow same conversation id on different platforms', () => {
-    const now = Date.now()
-    // 同一 IM 会话 ID 在不同平台可以独立映射
-    db.prepare(
-      'INSERT INTO im_session_mappings (im_conversation_id, platform, cowork_session_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
-    ).run('conv-001', 'dingtalk', 'sess-1', now, now)
-    db.prepare(
-      'INSERT INTO im_session_mappings (im_conversation_id, platform, cowork_session_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
-    ).run('conv-001', 'feishu', 'sess-2', now, now)
-    const rows = db
-      .prepare('SELECT * FROM im_session_mappings WHERE im_conversation_id = ?')
-      .all('conv-001') as Record<string, unknown>[]
-    expect(rows).toHaveLength(2)
+      .prepare('SELECT * FROM scheduled_task_meta WHERE task_id = ?')
+      .get('task-1') as Record<string, unknown>
+    expect(row.directory_path).toBe('/tmp/proj')
   })
 })
