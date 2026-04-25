@@ -1,6 +1,8 @@
 // v3 Cowork 共享类型
 
-export type CoworkExecutionMode = 'auto' | 'local' | 'sandbox'
+import crypto from 'crypto'
+import path from 'path'
+
 export type CoworkSessionStatus = 'idle' | 'running' | 'completed' | 'error'
 export type CoworkMessageType = 'user' | 'assistant' | 'tool_use' | 'tool_result' | 'system'
 
@@ -26,15 +28,12 @@ export interface CoworkMessageMetadata {
 export interface CoworkSession {
   id: string
   title: string
+  directoryPath: string // 替代 cwd
+  agentId: string // deriveAgentId(directoryPath)
   claudeSessionId: string | null
   status: CoworkSessionStatus
+  modelOverride: string // 会话级模型覆盖
   pinned: boolean
-  cwd: string
-  systemPrompt: string
-  modelOverride: string
-  executionMode: CoworkExecutionMode
-  activeSkillIds: string[]
-  agentId: string
   messages: CoworkMessage[]
   createdAt: number
   updatedAt: number
@@ -61,12 +60,8 @@ export interface CoworkRuntimeEvents {
 }
 
 export interface CoworkStartOptions {
-  skillIds?: string[]
-  systemPrompt?: string
   autoApprove?: boolean
-  workspaceRoot?: string
   confirmationMode?: 'modal' | 'text'
-  agentId?: string
 }
 
 export type EnginePhase = 'not_installed' | 'starting' | 'ready' | 'error'
@@ -84,23 +79,23 @@ export interface RuntimeMetadata {
   expectedPathHint: string
 }
 
-// ── Phase 2: Agent ──
+// ── Directory（替代 Agent） ──
 
-export interface Agent {
-  id: string
-  name: string
-  description: string
-  systemPrompt: string
-  identity: string
-  model: string
-  icon: string
-  skillIds: string[]
-  enabled: boolean
-  isDefault: boolean
-  source: 'preset' | 'custom'
-  presetId: string
+export interface Directory {
+  agentId: string // deriveAgentId(path)
+  path: string // 绝对路径
+  name: string | null // 用户自定义别名
+  modelOverride: string // 空=跟全局
+  skillIds: string[] // skill 白名单
   createdAt: number
   updatedAt: number
+}
+
+// 由目录绝对路径派生确定性 Agent ID
+export function deriveAgentId(dir: string): string {
+  const resolved = path.resolve(dir)
+  const hash = crypto.createHash('sha256').update(resolved).digest('hex').slice(0, 12)
+  return `ws-${hash}`
 }
 
 // ── Phase 2: Model ──
