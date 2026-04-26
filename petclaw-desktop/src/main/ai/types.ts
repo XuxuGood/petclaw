@@ -64,13 +64,22 @@ export interface CoworkStartOptions {
   confirmationMode?: 'modal' | 'text'
 }
 
-export type EnginePhase = 'not_installed' | 'starting' | 'ready' | 'error'
+export type EnginePhase = 'not_installed' | 'starting' | 'ready' | 'running' | 'error'
 
 export interface EngineStatus {
   phase: EnginePhase
   version: string | null
+  progressPercent?: number
   message: string
   canRetry: boolean
+}
+
+export interface GatewayConnectionInfo {
+  version: string | null
+  port: number | null
+  token: string | null
+  url: string | null
+  clientEntryPath: string | null
 }
 
 export interface RuntimeMetadata {
