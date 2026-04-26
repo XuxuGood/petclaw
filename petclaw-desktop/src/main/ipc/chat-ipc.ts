@@ -14,23 +14,10 @@ export interface ChatIpcDeps {
 export function registerChatIpcHandlers(deps: ChatIpcDeps): void {
   const { sessionManager, coworkController, getChatWindow } = deps
 
-  ipcMain.handle(
-    'chat:send',
-    async (
-      _event,
-      message: string,
-      cwd: string,
-      agentId?: string,
-      skillIds?: string[],
-      // modelOverride 预留参数，CoworkStartOptions 当前版本尚不支持，暂时忽略
-      _modelOverride?: string
-    ) => {
-      return sessionManager.createAndStart('Chat', cwd, message, {
-        agentId,
-        skillIds
-      })
-    }
-  )
+  ipcMain.handle('chat:send', async (_event, message: string, cwd: string) => {
+    // agentId 不再由前端传入，SessionManager 内部通过 cwd 自动派生
+    return sessionManager.createAndStart('Chat', cwd, message)
+  })
 
   ipcMain.handle('chat:continue', async (_event, sessionId: string, message: string) => {
     sessionManager.continueSession(sessionId, message)

@@ -3,7 +3,7 @@ import { registerSettingsIpcHandlers, type SettingsIpcDeps } from './settings-ip
 import { registerWindowIpcHandlers, type WindowIpcDeps } from './window-ipc'
 import { registerBootIpcHandlers, type BootIpcDeps } from './boot-ipc'
 import { registerPetIpcHandlers, type PetIpcDeps } from './pet-ipc'
-import { registerAgentsIpcHandlers, type AgentsIpcDeps } from './agents-ipc'
+import { registerDirectoryIpcHandlers, type DirectoryIpcDeps } from './directory-ipc'
 import { registerModelsIpcHandlers, type ModelsIpcDeps } from './models-ipc'
 import { registerSkillsIpcHandlers, type SkillsIpcDeps } from './skills-ipc'
 import { registerMcpIpcHandlers, type McpIpcDeps } from './mcp-ipc'
@@ -17,7 +17,7 @@ export type AllIpcDeps = ChatIpcDeps &
   WindowIpcDeps &
   BootIpcDeps &
   PetIpcDeps &
-  AgentsIpcDeps &
+  DirectoryIpcDeps &
   ModelsIpcDeps &
   SkillsIpcDeps &
   McpIpcDeps &
@@ -32,7 +32,7 @@ export function registerAllIpcHandlers(deps: AllIpcDeps): void {
   registerBootIpcHandlers(deps)
   registerPetIpcHandlers(deps)
   // Phase 2: Manager IPC 模块
-  registerAgentsIpcHandlers(deps)
+  registerDirectoryIpcHandlers(deps)
   registerModelsIpcHandlers(deps)
   registerSkillsIpcHandlers(deps)
   registerMcpIpcHandlers(deps)
