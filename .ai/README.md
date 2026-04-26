@@ -444,7 +444,7 @@ Main Process
 │   ├── session-manager.ts  会话 CRUD
 │   ├── cowork-controller.ts  执行+审批+流式事件
 │   └── config-sync.ts     openclaw.json 唯一写入者
-├── agents/               核心层
+├── directories/          核心层（目录驱动 Agent）
 ├── skills/               功能层
 ├── models/               功能层
 ├── memory/               功能层
@@ -453,7 +453,7 @@ Main Process
 ├── scheduler/            集成层
 ├── pet/                  宠物联动层
 │   └── pet-event-bridge.ts  多源事件聚合 → Pet 窗口
-├── ipc/                  模块化 IPC（chat-ipc、agent-ipc 等）
+├── ipc/                  模块化 IPC（chat-ipc、directory-ipc 等）
 └── data/                 SQLite
 ```
 
@@ -472,7 +472,7 @@ Main Process
 - 渲染→主（单向）：`ipcRenderer.send()` → `ipcMain.on()`
 - 渲染→主（双向）：`ipcRenderer.invoke()` → `ipcMain.handle()`
 - 主→渲染（推送）：`win.webContents.send()`
-- **v3 IPC 模块化**：按模块拆分到 `ipc/*.ts`（chat-ipc、agent-ipc、skill-ipc 等）
+- **v3 IPC 模块化**：按模块拆分到 `ipc/*.ts`（chat-ipc、directory-ipc、skill-ipc 等）
 - **新增 IPC channel 必须同步更新三处**：`ipc/*.ts` + `preload/index.ts` + `preload/index.d.ts`
 - 完整 Channel 列表见 v3 spec §18.2
 
@@ -571,10 +571,11 @@ tests/
 - `cron-job-service.ts` — Gateway RPC 代理，所有定时任务 CRUD 委托给 OpenClaw `cron.*` RPC
 - `types.ts` — Schedule/ScheduledTask/TaskState/ScheduledTaskRun 类型定义
 - 15s 轮询同步任务状态，检测变更后推送到 renderer
+- `scheduled_task_meta` DB 表存储任务元数据（directory_path、agent_id、im_push_target 等）
 
 ### ImGatewayManager (`src/main/im/`)
 
-- `im-gateway-manager.ts` — IM 平台配置管理 + 会话路由映射
+- `im-gateway-manager.ts` — IM 平台配置管理 + 两层绑定（ImInstance 默认 + ImConversationBinding 覆盖）+ 会话路由映射
 - `types.ts` — Platform(4个)/IMMessage/IMSettings/IMPlatformConfig 类型定义
 - PetClaw 不直接处理 IM 消息，所有平台通过 OpenClaw 插件运行
 
@@ -592,8 +593,8 @@ tests/
 ### UI 组件 (`src/renderer/src/chat/components/`)
 
 - `CoworkPermissionModal.tsx` — 三种模式：标准工具审批 / 确认 / 多选
-- `AgentConfigDialog.tsx` — 三 Tab（基础信息/技能/IM渠道），底部 4 按钮
-- `AgentSkillSelector.tsx` — Agent 技能多选子组件
+- `DirectoryConfigDialog.tsx` — 目录配置对话框（模型覆盖 + 技能白名单）
+- `DirectorySkillSelector.tsx` — 目录技能多选子组件
 - `CronPage.tsx` — 两栏卡片网格 + 两 Tab（任务/执行记录）
 - `CronEditDialog.tsx` — 频率+时间+星期选择器+Prompt
 - `ImChannelsPage.tsx` — IM 频道主视图（ViewType `'im-channels'`）
@@ -677,7 +678,7 @@ Electron Main Process
 │
 Openclaw Runtime（utilityProcess）
 ├── Gateway 服务器（动态端口）
-├── Agent Sessions
+├── Directory-derived Agent Sessions
 └── LLM Provider 对接
 ```
 
@@ -688,10 +689,10 @@ Openclaw Runtime（utilityProcess）
 - 模型配置（ModelRegistry → providers/models，API Key 不写入）
 - Skills 路径（SkillManager → skills.load.extraDirs + skills.entries）
 - MCP 服务器（McpManager → mcp-bridge 插件配置）
-- Agent 工作区（AgentManager → agents.defaults.workspace）
+- 目录 Agent 工作区（DirectoryManager → agents.list[i].workspace）
 - 本地扩展回调（ask-user-question + mcp-bridge 的 callbackUrl/secret）
 
-**设置变更流程**：UI 修改 → SQLite kv 表 → ConfigSync.sync() → `openclaw.json` → Gateway 热加载
+**设置变更流程**：UI 修改 → SQLite app_config 表 → ConfigSync.sync() → `openclaw.json` → Gateway 热加载
 
 ### 11.5 用户数据目录（{userData}）
 
@@ -707,7 +708,7 @@ Openclaw Runtime（utilityProcess）
 │       ├── gateway-port.json
 │       ├── bin/             # CLI shims（petclaw, openclaw, claw）
 │       ├── workspace/       # 默认 workspace（main agent）
-│       ├── agents/main/     # Agent 数据
+│       ├── agents/main/     # Agent 数据（目录驱动，自动派生）
 │       └── logs/            # 引擎日志
 ├── SKILLs/                  # Skills 集中管理目录（从 Resources 同步）
 ├── cowork/bin/              # node/npm/npx shim
@@ -726,7 +727,7 @@ Openclaw Runtime（utilityProcess）
 - OpenclawEngineManager（utilityProcess 启动 Runtime）
 - OpenclawGateway（GatewayClient 动态加载）
 - ConfigSync（openclaw.json 唯一写入）
-- AgentManager / SessionManager / CoworkController
+- DirectoryManager（目录驱动，已实现） / SessionManager / CoworkController
 - SkillManager / ModelRegistry / MemoryManager / McpManager
 - ImGateway / SchedulerManager
 - PetEventBridge（宠物多源联动）

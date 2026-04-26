@@ -904,7 +904,7 @@ private syncPerDirectoryWorkspaces(): void {
 | 现有代码 | 处置 | 说明 |
 |----------|------|------|
 | `bootcheck.ts` → `checkModelConfig()` | **迁移** | openclaw.json 生成逻辑移到 ConfigSync.sync() |
-| `petclaw-settings.json` 的模型配置字段 | **迁移到 DB** | API Keys 存 SQLite kv 表，模型列表迁移到 ModelRegistry |
+| `petclaw-settings.json` 的模型配置字段 | **迁移到 DB** | API Keys 存 SQLite app_config 表，模型列表迁移到 ModelRegistry |
 | `bootcheck.ts` 中 openclaw.json 合并逻辑 | **删除** | ConfigSync 统一管理，不需要手动合并 |
 | `bootcheck.ts` → `syncWorkspaceMd()` | **迁移** | 移到 ConfigSync.syncAgentsMd() + syncPerAgentWorkspaces() |
 | `ipc.ts` 中 USER.md 写入逻辑 | **删除** | 由 Agent 运行时自主管理 |
@@ -1198,7 +1198,7 @@ export class SkillManager extends EventEmitter {
 
 ### 11.1 工作原理
 
-管理多 LLM Provider 和 Model，支持 11 个预设提供商 + 自定义提供商。配置持久化到 SQLite kv 表，API Key 不写入 openclaw.json。
+管理多 LLM Provider 和 Model，支持 11 个预设提供商 + 自定义提供商。配置持久化到 SQLite app_config 表，API Key 不写入 openclaw.json。
 
 ### 11.2 预设提供商
 
@@ -1259,8 +1259,8 @@ export class ModelRegistry extends EventEmitter {
 
   // 序列化
   toOpenclawConfig(): OpenclawModelsConfig
-  save(): void   // → SQLite kv 表
-  load(): void   // ← SQLite kv 表
+  save(): void   // → SQLite app_config 表
+  load(): void   // ← SQLite app_config 表
 }
 ```
 
@@ -1920,7 +1920,7 @@ CREATE INDEX idx_im_session_mappings_session ON im_session_mappings(session_id);
         └──────────────────────┘
 ```
 
-**最近目录来源**：直接从 `cowork_sessions` 表查询（`SELECT DISTINCT cwd ... ORDER BY updated_at DESC`），去重 + 路径归一化，默认 8 个。
+**最近目录来源**：直接从 `sessions` 表查询（`SELECT DISTINCT directory_path ... ORDER BY updated_at DESC`），去重 + 路径归一化，默认 8 个。
 
 **展示逻辑**：
 - 新会话/首页：显示 cwd tag（可选择、可 × 清除）
@@ -3565,7 +3565,7 @@ git push origin v1.0.0               # 推送 tag → 触发 GitHub Actions
 - `ai/provider.ts` — 删除 AIProvider 抽象层
 - `ws` npm 依赖 — 移除
 - v1 `~/.petclaw/node/` 目录逻辑 — 清理
-- v1 `petclaw-settings.json` 读写逻辑 — 配置迁移到 SQLite kv 表
+- v1 `petclaw-settings.json` 读写逻辑 — 配置迁移到 SQLite app_config 表
 
 **不动的文件**：
 - `state-machine.ts` / `PetCanvas.tsx` — 宠物动画系统（状态机 + 视频播放器不变）
@@ -3633,6 +3633,36 @@ git push origin v1.0.0               # 推送 tag → 触发 GitHub Actions
   - `notarize.js` + `sync-local-openclaw-extensions.cjs` + 其他 runtime 构建脚本
 - 本地扩展（`openclaw-extensions/ask-user-question/` + `openclaw-extensions/mcp-bridge/`）
 
+### Phase 5: 目录驱动架构重构 ✅
+
+将 Agent 中心模型替换为目录驱动模型，用户只选工作目录，Agent ID 由 `deriveAgentId(path)` 自动派生。
+
+**DB Schema 重构**：
+- `agents` 表 → `directories` 表（字段映射：agent_id/path/name/model_override/skill_ids）
+- `cowork_sessions` → `sessions`（cwd → directory_path，新增 status/model_override/pinned）
+- `cowork_messages` → `messages`（timestamp → created_at，新增 metadata）
+- `kv` → `app_config`
+- 新增 `im_instances` + `im_conversation_bindings`（两层 IM 绑定）
+- 新增 `scheduled_task_meta`（定时任务元数据持久化）
+- 自动数据迁移脚本（`data/migration.ts`），启动时检测旧表并迁移
+
+**主进程重构**：
+- `AgentManager` → `DirectoryManager`（`src/main/ai/directory-manager.ts`）
+- ConfigSync / SessionManager / CoworkStore 切换到新表名和新字段
+- IM Gateway 两层绑定：`ImInstance`（实例级默认目录）+ `ImConversationBinding`（对话级覆盖）
+- CronJobService 新增 `scheduled_task_meta` DB 持久化
+
+**IPC 层重构**：
+- `agents:*` channels → `directory:*` channels
+- Preload：`window.api.agents.*` → `window.api.directories.*`
+- 三处同步更新：`ipc/directory-ipc.ts` + `preload/index.ts` + `preload/index.d.ts`
+
+**前端重构**：
+- `AgentConfigDialog` → `DirectoryConfigDialog`
+- `AgentSkillSelector` → `DirectorySkillSelector`
+- `AgentSettings` → `DirectorySettings`
+- Store 层适配新 IPC channel 和新表名
+
 ### 现有代码保留清单
 
 以下模块在 v3 全阶段**不涉及重构**，直接保留：
@@ -3666,7 +3696,7 @@ git push origin v1.0.0               # 推送 tag → 触发 GitHub Actions
 - CoworkStore 会话/消息 CRUD → SQLite 持久化
 - CoworkController 流式事件完整（message → messageUpdate → complete/error）
 - executionMode 切换正常（auto/local/sandbox）
-- v1 → v3 数据迁移：`petclaw-settings.json` → DB kv 表
+- v1 → v3 数据迁移：`petclaw-settings.json` → DB app_config 表
 - IPC channel 三处同步（ipc/*.ts + preload/index.ts + preload/index.d.ts）
 - Pet 窗口适配：`pet:state-event` + `pet:bubble` 统一入口工作正常
 - 删除 `{userData}/` → 重启 → 自动初始化
@@ -3706,3 +3736,12 @@ git push origin v1.0.0               # 推送 tag → 触发 GitHub Actions
 - Openclaw 版本管理：`package.json` 中 `openclaw.version` 变更后 `openclaw:ensure` 自动 checkout 到锁定版本
 - Openclaw 版本管理：`runtime-build-info.json` 缓存命中时跳过构建，版本变更时触发重新构建
 - Openclaw 版本管理：升级后运行回归测试（WebSocket 通信 + Hook 事件 + 手动验证清单）通过
+
+### Phase 5 验证
+- DB 迁移：旧 `agents`/`cowork_sessions`/`cowork_messages`/`kv` 表自动迁移到新表
+- DirectoryManager：`ensureRegistered(path)` → `directories` 表注册 + `deriveAgentId` 正确
+- IPC：`directory:*` channels 替代 `agents:*`，preload 三处同步
+- 前端：DirectoryConfigDialog / DirectorySkillSelector / DirectorySettings 正常渲染和交互
+- IM 两层绑定：ImInstance 默认 + ImConversationBinding 覆盖路由正确
+- CronJobService：`scheduled_task_meta` 表持久化任务元数据
+- `pnpm typecheck` + `pnpm test` 全部通过
