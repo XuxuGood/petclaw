@@ -1,4 +1,4 @@
-// 技能多选子组件，带搜索过滤
+// 目录技能多选子组件，带搜索过滤
 // 通过 IPC skills:list 获取所有技能，支持名称/描述关键词过滤和多选
 import { useState, useEffect } from 'react'
 
@@ -11,12 +11,12 @@ interface Skill {
   enabled: boolean
 }
 
-interface AgentSkillSelectorProps {
+interface DirectorySkillSelectorProps {
   selectedIds: string[]
   onChange: (ids: string[]) => void
 }
 
-export function AgentSkillSelector({ selectedIds, onChange }: AgentSkillSelectorProps) {
+export function DirectorySkillSelector({ selectedIds, onChange }: DirectorySkillSelectorProps) {
   const [skills, setSkills] = useState<Skill[]>([])
   const [search, setSearch] = useState('')
 

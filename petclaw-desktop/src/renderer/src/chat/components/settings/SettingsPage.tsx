@@ -5,7 +5,7 @@ import { ProfileSettings } from './ProfileSettings'
 import { AboutSettings } from './AboutSettings'
 import { EngineSettings } from './EngineSettings'
 import { ModelSettings } from './ModelSettings'
-import { AgentSettings } from './AgentSettings'
+import { DirectorySettings } from './DirectorySettings'
 import { MemorySettings } from './MemorySettings'
 import { ConnectorSettings } from './ConnectorSettings'
 import { McpSettings } from './McpSettings'
@@ -25,7 +25,7 @@ const MENU_SECTIONS = [
     items: [
       { id: 'engine', label: 'Agent 引擎', icon: '⚙️' },
       { id: 'models', label: '模型', icon: '🧠' },
-      { id: 'agents', label: 'Agent', icon: '🤖' },
+      { id: 'directories', label: '工作目录', icon: '📂' },
       { id: 'memory', label: '记忆', icon: '📝' }
     ]
   },
@@ -97,7 +97,7 @@ export function SettingsPage({ activeTab, onTabChange, onBack }: SettingsPagePro
           {activeTab === 'about' && <AboutSettings />}
           {activeTab === 'engine' && <EngineSettings />}
           {activeTab === 'models' && <ModelSettings />}
-          {activeTab === 'agents' && <AgentSettings />}
+          {activeTab === 'directories' && <DirectorySettings />}
           {activeTab === 'memory' && <MemorySettings />}
           {activeTab === 'connectors' && <ConnectorSettings />}
           {activeTab === 'mcp' && <McpSettings />}
