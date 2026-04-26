@@ -2,8 +2,7 @@
 import { ipcMain } from 'electron'
 
 import type { ImGatewayManager } from '../im/im-gateway-manager'
-import type { IMPlatformConfig, IMSettings } from '../im/types'
-import { ImIpcChannel } from '../im/types'
+import type { Platform } from '../im/types'
 
 export interface ImIpcDeps {
   imGatewayManager: ImGatewayManager
@@ -12,37 +11,61 @@ export interface ImIpcDeps {
 export function registerImIpcHandlers(deps: ImIpcDeps): void {
   const { imGatewayManager } = deps
 
-  // 加载所有 IM 平台配置和全局设置
-  ipcMain.handle(ImIpcChannel.LoadConfig, async () => {
-    return {
-      platforms: imGatewayManager.listPlatformConfigs(),
-      settings: imGatewayManager.loadSettings()
+  // 列出所有 IM 实例
+  ipcMain.handle('im:load-config', async () => {
+    return { instances: imGatewayManager.listInstances() }
+  })
+
+  // 创建实例
+  ipcMain.handle(
+    'im:create-instance',
+    async (_event, platform: Platform, credentials: Record<string, unknown>, name?: string) => {
+      return imGatewayManager.createInstance(platform, credentials, name)
     }
+  )
+
+  // 更新实例
+  ipcMain.handle('im:save-config', async (_event, id: string, patch: Record<string, unknown>) => {
+    imGatewayManager.updateInstance(id, patch)
   })
 
-  // 保存单个 IM 平台配置
-  ipcMain.handle(ImIpcChannel.SaveConfig, async (_event, key: string, config: IMPlatformConfig) => {
-    imGatewayManager.savePlatformConfig(key, config)
+  // 删除实例
+  ipcMain.handle('im:delete-instance', async (_event, id: string) => {
+    imGatewayManager.deleteInstance(id)
   })
 
-  // 获取各 IM 平台的启用状态
-  // 注意：实际连接状态由 OpenClaw 插件管理，此处仅返回 PetClaw 侧配置中的 enabled 字段
-  ipcMain.handle(ImIpcChannel.GetStatus, async () => {
-    const platforms = imGatewayManager.listPlatformConfigs()
-    const result: Record<string, { enabled: boolean }> = {}
-    for (const { key, config } of platforms) {
-      result[key] = { enabled: config.enabled }
+  // 获取状态（enabled 列表）
+  ipcMain.handle('im:get-status', async () => {
+    const instances = imGatewayManager.listInstances()
+    const result: Record<string, { enabled: boolean; platform: string }> = {}
+    for (const inst of instances) {
+      result[inst.id] = { enabled: inst.enabled, platform: inst.platform }
     }
     return result
   })
 
-  // IM 全局设置读取
-  ipcMain.handle('im:load-settings', async () => {
-    return imGatewayManager.loadSettings()
-  })
+  // 对话绑定
+  ipcMain.handle(
+    'im:set-binding',
+    async (
+      _event,
+      conversationId: string,
+      instanceId: string,
+      peerKind: 'dm' | 'group',
+      directoryPath: string,
+      agentId: string
+    ) => {
+      imGatewayManager.setConversationBinding(
+        conversationId,
+        instanceId,
+        peerKind,
+        directoryPath,
+        agentId
+      )
+    }
+  )
 
-  // IM 全局设置保存
-  ipcMain.handle('im:save-settings', async (_event, settings: IMSettings) => {
-    imGatewayManager.saveSettings(settings)
-  })
+  // 旧 settings handlers 降级兼容（IMSettings 已删除，返回空对象避免 preload 引用报错）
+  ipcMain.handle('im:load-settings', async () => ({}))
+  ipcMain.handle('im:save-settings', async () => {})
 }

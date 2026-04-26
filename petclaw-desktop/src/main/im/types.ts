@@ -1,5 +1,5 @@
 // src/main/im/types.ts
-// IM 平台类型定义（参考 LobsterAI im/types.ts，PetClaw 简化版）
+// IM 平台类型定义（v3 两层绑定模型）
 
 // Phase 3 只实现 4 个平台：飞书、钉钉、企微、微信
 export type Platform = 'wechat' | 'wecom' | 'dingtalk' | 'feishu'
@@ -17,12 +17,6 @@ export const PLATFORM_INFO: Record<Platform, { name: string; icon: string; maxIn
     wecom: { name: '企业微信', icon: '🏢', maxInstances: 3 },
     wechat: { name: '微信', icon: '💬', maxInstances: 1 }
   }
-
-// IM 绑定规则：
-// - 一个平台实例同一时间只能被一个 Agent 持有（互斥锁）
-// - 已被其他 Agent 绑定的平台在 UI 上显示灰色 + "→ AgentName"，不可点击
-// - main Agent 是兜底：未绑定任何 Agent 的平台消息默认交给 main 处理
-// - main Agent 不在 Agent 列表中显示，不需要显式绑定 IM
 
 // IM 统一消息类型
 export interface IMMessage {
@@ -46,33 +40,47 @@ export interface IMPlatformStatus {
   lastOutboundAt: number | null
 }
 
-// IM 全局设置
-export interface IMSettings {
-  systemPrompt: string
-  skillsEnabled: boolean
-  platformAgentBindings: Record<string, string> // key 格式: 'telegram' 或 'dingtalk:instance-id'
+// IM 实例（替代旧 IMPlatformConfig 的 KV 模式，一行一个实例）
+export interface ImInstance {
+  id: string
+  platform: Platform
+  name: string | null
+  directoryPath: string | null // 实例级默认目录（null=使用 main）
+  agentId: string | null // deriveAgentId(directoryPath) 或 null
+  credentials: Record<string, unknown>
+  config: ImInstanceConfig
+  enabled: boolean
+  createdAt: number
+  updatedAt: number
 }
 
-// IM 平台通用配置
-export interface IMPlatformConfig {
-  enabled: boolean
+// 实例配置（嵌入 ImInstance.config 字段）
+export interface ImInstanceConfig {
   dmPolicy: 'open' | 'pairing' | 'allowlist' | 'disabled'
   groupPolicy: 'open' | 'allowlist' | 'disabled'
   allowFrom: string[]
   debug: boolean
 }
 
-// 多实例平台的实例配置
-export interface IMInstanceConfig extends IMPlatformConfig {
+// 对话级绑定（Tier 1 优先级，精确匹配）
+export interface ImConversationBinding {
+  conversationId: string
   instanceId: string
-  instanceName: string
+  peerKind: 'dm' | 'group'
+  directoryPath: string
+  agentId: string
+  createdAt: number
+  updatedAt: number
 }
 
 // IPC Channel 常量
 export const ImIpcChannel = {
   LoadConfig: 'im:load-config',
   SaveConfig: 'im:save-config',
+  CreateInstance: 'im:create-instance',
+  DeleteInstance: 'im:delete-instance',
   GetStatus: 'im:get-status',
+  SetBinding: 'im:set-binding',
   Connect: 'im:connect',
   Disconnect: 'im:disconnect',
   TestConnection: 'im:test-connection',
