@@ -356,7 +356,7 @@ export class OpenclawEngineManager extends EventEmitter {
     }
 
     const runtime = this.resolveRuntimeMetadata()
-    console.debug(
+    console.info(
       `[OpenClaw] resolveRuntimeMetadata done (${elapsed()}), root=${runtime.root ? 'found' : 'missing'}`
     )
     if (!runtime.root) {
@@ -370,7 +370,7 @@ export class OpenclawEngineManager extends EventEmitter {
     }
 
     const openclawEntry = this.resolveOpenClawEntry(runtime.root)
-    console.debug(`[OpenClaw] resolveOpenClawEntry done (${elapsed()}), entry=${openclawEntry}`)
+    console.info(`[OpenClaw] resolveOpenClawEntry done (${elapsed()}), entry=${openclawEntry}`)
     if (!openclawEntry) {
       this.setStatus({
         phase: 'error',
@@ -382,9 +382,9 @@ export class OpenclawEngineManager extends EventEmitter {
     }
 
     const token = this.ensureGatewayToken()
-    console.debug(`[OpenClaw] ensureGatewayToken done (${elapsed()})`)
+    console.info(`[OpenClaw] ensureGatewayToken done (${elapsed()})`)
     const port = await this.resolveGatewayPort()
-    console.debug(`[OpenClaw] resolveGatewayPort done (${elapsed()}), port=${port}`)
+    console.info(`[OpenClaw] resolveGatewayPort done (${elapsed()}), port=${port}`)
     this.gatewayPort = port
     this.writeGatewayPort(port)
     this.ensureConfigFile()
@@ -428,7 +428,7 @@ export class OpenclawEngineManager extends EventEmitter {
       token,
       '--verbose'
     ]
-    console.debug(
+    console.info(
       `[OpenClaw] spawning gateway: entry=${openclawEntry}, cwd=${runtime.root}, port=${port}`
     )
 
