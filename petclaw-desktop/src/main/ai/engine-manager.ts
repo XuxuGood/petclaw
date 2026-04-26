@@ -717,7 +717,7 @@ export class OpenclawEngineManager extends EventEmitter {
     return new Promise((resolve) => {
       const tick = async () => {
         if (this.shutdownRequested) {
-          console.info('[OpenClaw] waitForGatewayReady: shutdown requested, aborting')
+          console.warn('[OpenClaw] waitForGatewayReady: shutdown requested, aborting')
           resolve(false)
           return
         }
@@ -834,13 +834,13 @@ export class OpenclawEngineManager extends EventEmitter {
       appendLog(chunk, 'stdout')
       const text = typeof chunk === 'string' ? chunk : chunk.toString()
       logMilestone(text)
-      console.warn(`[OpenClaw stdout] ${text}`)
+      console.log(`[OpenClaw stdout] ${text}`)
     })
     child.stderr?.on('data', (chunk) => {
       appendLog(chunk, 'stderr')
       const text = typeof chunk === 'string' ? chunk : chunk.toString()
       logMilestone(text)
-      console.error(`[OpenClaw stderr] ${text}`)
+      console.warn(`[OpenClaw stderr] ${text}`)
     })
   }
 
@@ -861,7 +861,7 @@ export class OpenclawEngineManager extends EventEmitter {
     })
 
     child.once('exit', (code) => {
-      console.warn(`[OpenClaw] gateway process exited, code=${code}`)
+      console.info(`[OpenClaw] gateway process exited, code=${code}`)
       if (this.gatewayProcess === child) {
         this.gatewayProcess = null
       }
