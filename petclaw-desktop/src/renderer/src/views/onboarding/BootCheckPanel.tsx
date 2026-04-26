@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react'
+
 import { Check, AlertCircle, RefreshCw, PawPrint } from 'lucide-react'
+
+import { useI18n } from '../../i18n'
 
 /* Inject keyframes — only for continuously running animations */
 const RING_STYLE = document.createElement('style')
@@ -248,6 +251,7 @@ export function BootCheckPanel({ onRetry }: { onRetry?: () => void }) {
   const [steps, setSteps] = useState<BootStep[]>([])
   const [hasError, setHasError] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
+  const { t } = useI18n()
 
   const handleRetry = (): void => {
     setSteps([])
@@ -288,7 +292,7 @@ export function BootCheckPanel({ onRetry }: { onRetry?: () => void }) {
   }, [allDone])
 
   const runningStep = steps.find((s) => s.status === 'running')
-  const title = showSuccess ? '设置完成！' : '正在启动 PetClaw...'
+  const title = showSuccess ? t('boot.setupComplete') : t('boot.starting')
   const subtitle = !showSuccess ? runningStep?.hint : undefined
 
   return (
@@ -324,7 +328,7 @@ export function BootCheckPanel({ onRetry }: { onRetry?: () => void }) {
               transform: showSuccess ? 'translateY(0)' : 'translateY(8px)'
             }}
           >
-            设置完成！
+            {t('boot.setupComplete')}
           </h1>
         </div>
 
@@ -382,7 +386,7 @@ export function BootCheckPanel({ onRetry }: { onRetry?: () => void }) {
                   style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
                 >
                   <RefreshCw size={15} strokeWidth={2.5} />
-                  重试
+                  {t('common.retry')}
                 </button>
               )}
             </div>

@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+
 import { Check, ChevronDown, X, Keyboard, Mic, CircleCheck, Circle } from 'lucide-react'
+
+import { useI18n } from '../../i18n'
 import {
   useOnboardingStore,
   STEPS,
@@ -104,13 +107,15 @@ function NavFooter({
   showPrev: boolean
   nextLabel: string
 }) {
+  const { t } = useI18n()
+
   return (
     <div className="flex items-center justify-between px-8 pb-6 pt-3">
       <button
         onClick={onSkip}
         className="text-[14px] text-text-tertiary hover:text-text-secondary transition-colors"
       >
-        跳过
+        {t('common.skip')}
       </button>
       <div className="flex items-center gap-3">
         {showPrev && (
@@ -118,7 +123,7 @@ function NavFooter({
             onClick={onPrev}
             className="px-5 py-2 text-[14px] text-text-primary bg-bg-card border border-border rounded-[10px] hover:bg-bg-hover active:scale-[0.96] transition-all duration-[120ms]"
           >
-            上一步
+            {t('common.prevStep')}
           </button>
         )}
         <button
@@ -137,6 +142,7 @@ function NavFooter({
    ────────────────────────────────────────── */
 function PermissionsStep() {
   const { permissions, setPermission } = useOnboardingStore()
+  const { t } = useI18n()
 
   const handlePermission = async (type: 'accessibility' | 'microphone') => {
     // In production: call system API to request permission
@@ -147,10 +153,10 @@ function PermissionsStep() {
   return (
     <div className="flex-1 flex flex-col px-8 pt-2">
       <h1 className="text-[24px] font-bold text-text-primary leading-tight">
-        在您的电脑上设置 PetClaw
+        {t('onboarding.setupTitle')}
       </h1>
       <p className="mt-3 text-[14px] text-text-secondary leading-relaxed">
-        PetClaw 需要以下权限才能正常工作。您的数据仅在本地处理，我们不会存储任何内容。
+        {t('onboarding.setupSubtitle')}
       </p>
 
       <div className="mt-8 space-y-4">
@@ -160,7 +166,7 @@ function PermissionsStep() {
           className="w-full flex items-center justify-between p-4 border border-border-input rounded-[10px] hover:bg-bg-hover transition-colors text-left"
         >
           <span className="text-[15px] text-text-primary font-medium">
-            允许 PetClaw 使用辅助功能
+            {t('onboarding.accessibility')}
           </span>
           <div
             className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
@@ -179,7 +185,7 @@ function PermissionsStep() {
           className="w-full flex items-center justify-between p-4 border border-border-input rounded-[10px] hover:bg-bg-hover transition-colors text-left"
         >
           <span className="text-[15px] text-text-primary font-medium">
-            允许 PetClaw 使用您的麦克风
+            {t('onboarding.microphone')}
           </span>
           <div
             className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
@@ -208,6 +214,7 @@ function ProfileStep() {
     setProfileSubmitted,
     setCatBubbleText
   } = useOnboardingStore()
+  const { t } = useI18n()
 
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -225,7 +232,8 @@ function ProfileStep() {
   const handleSubmit = () => {
     if (nickname.trim() && roles.length > 0) {
       setProfileSubmitted(true)
-      setCatBubbleText('记录完成！已为您推荐了合适的技能，点击下一步查看吧~')
+      // 录音完成后显示猫咪对话气泡，提示用户查看推荐技能
+      setCatBubbleText(t('onboarding.recordingDone'))
     }
   }
 
@@ -236,14 +244,16 @@ function ProfileStep() {
 
   return (
     <div className="flex-1 flex flex-col px-8 pt-2">
-      <h1 className="text-[24px] font-bold text-text-primary leading-tight">告诉我们关于您</h1>
-      <p className="mt-2 text-[14px] text-text-tertiary">帮助 PetClaw 为您打造个性化体验</p>
+      <h1 className="text-[24px] font-bold text-text-primary leading-tight">
+        {t('onboarding.aboutYou')}
+      </h1>
+      <p className="mt-2 text-[14px] text-text-tertiary">{t('onboarding.aboutYouSubtitle')}</p>
 
       <div className="mt-6 space-y-5">
         {/* Nickname */}
         <div>
           <label className="block text-[16px] font-semibold text-text-primary mb-2">
-            怎么称呼您?
+            {t('onboarding.nameQuestion')}
           </label>
           <input
             type="text"
@@ -258,7 +268,7 @@ function ProfileStep() {
         {/* Role selector */}
         <div ref={dropdownRef}>
           <label className="block text-[16px] font-semibold text-text-primary mb-2">
-            选择您的身份角色
+            {t('onboarding.roleQuestion')}
           </label>
           <div
             onClick={() => !profileSubmitted && setDropdownOpen(!dropdownOpen)}
@@ -328,7 +338,7 @@ function ProfileStep() {
             onClick={handleSubmit}
             className="w-full py-3 bg-accent text-white text-[15px] font-semibold rounded-[10px] hover:bg-accent-hover active:scale-[0.96] transition-all duration-[120ms]"
           >
-            提交
+            {t('common.submit')}
           </button>
         )}
         {profileSubmitted && (
@@ -336,7 +346,7 @@ function ProfileStep() {
             onClick={handleResubmit}
             className="w-full py-3 bg-accent text-white text-[15px] font-semibold rounded-[10px] hover:bg-accent-hover active:scale-[0.96] transition-all duration-[120ms]"
           >
-            重新提交
+            {t('common.resubmit')}
           </button>
         )}
       </div>
@@ -349,13 +359,14 @@ function ProfileStep() {
    ────────────────────────────────────────── */
 function SkillsStep() {
   const { skills, toggleSkill } = useOnboardingStore()
+  const { t } = useI18n()
 
   return (
     <div className="flex-1 flex flex-col px-8 pt-2 min-h-0">
-      <h1 className="text-[24px] font-bold text-text-primary leading-tight">PetClaw 拥有的技能</h1>
-      <p className="mt-2 text-[14px] text-text-tertiary italic">
-        我们为您默认安装好用且安全的 Skill
-      </p>
+      <h1 className="text-[24px] font-bold text-text-primary leading-tight">
+        {t('onboarding.skillsTitle')}
+      </h1>
+      <p className="mt-2 text-[14px] text-text-tertiary italic">{t('onboarding.skillsSubtitle')}</p>
 
       <div className="mt-5 flex-1 overflow-y-auto border border-border-input rounded-[14px] divide-y divide-border">
         {skills.map((skill) => (
@@ -379,7 +390,7 @@ function SkillsStep() {
                 )}
                 {skill.tag === 'needs-config' && (
                   <span className="px-1.5 py-0.5 text-[11px] font-medium bg-[#fee2e2] text-error rounded">
-                    需配置
+                    {t('onboarding.needsConfig')}
                   </span>
                 )}
               </div>
@@ -409,20 +420,23 @@ function SkillsStep() {
    ────────────────────────────────────────── */
 function ShortcutStep() {
   const { shortcut } = useOnboardingStore()
+  const { t } = useI18n()
   const [isRecording, setIsRecording] = useState(false)
 
   return (
     <div className="flex-1 flex flex-col px-8 pt-2">
-      <h1 className="text-[24px] font-bold text-text-primary leading-tight">语音快捷键</h1>
+      <h1 className="text-[24px] font-bold text-text-primary leading-tight">
+        {t('onboarding.voiceShortcut')}
+      </h1>
       <p className="mt-3 text-[14px] text-text-secondary leading-relaxed">
-        按下快捷键开始说话，再按一次确认发送。
+        {t('onboarding.voiceHint')}
       </p>
 
       {/* Shortcut display */}
       <div className="mt-8 flex items-center justify-between p-4 border border-border-input rounded-[10px]">
         <div className="flex items-center gap-3">
           <Keyboard size={20} className="text-text-secondary" />
-          <span className="text-[15px] text-text-primary">键盘快捷键</span>
+          <span className="text-[15px] text-text-primary">{t('onboarding.keyboardShortcut')}</span>
         </div>
         <span className="px-3 py-1 bg-bg-input rounded-[10px] text-[14px] font-mono text-text-secondary">
           {shortcut}
@@ -431,9 +445,11 @@ function ShortcutStep() {
 
       {/* Mic test */}
       <div className="mt-8">
-        <h3 className="text-[16px] font-semibold text-text-primary">口述以测试您的麦克风</h3>
+        <h3 className="text-[16px] font-semibold text-text-primary">
+          {t('onboarding.voiceTestHint')}
+        </h3>
         <p className="mt-2 text-[14px] text-text-secondary leading-relaxed">
-          点击下方按钮或按快捷键开始说话，介绍一下自己，顺便给我取个名字吧。
+          {t('onboarding.voiceTestDesc')}
         </p>
 
         <button
@@ -447,7 +463,7 @@ function ShortcutStep() {
             className={isRecording ? 'text-error animate-pulse' : 'text-text-tertiary'}
           />
           <span className={`text-[15px] ${isRecording ? 'text-error' : 'text-text-tertiary'}`}>
-            {isRecording ? '正在录音...' : '点击开始说话'}
+            {isRecording ? t('onboarding.recording') : t('onboarding.clickToSpeak')}
           </span>
         </button>
       </div>
@@ -460,42 +476,44 @@ function ShortcutStep() {
    用户点击卡片后直接完成 onboarding 并发送首条消息
    ────────────────────────────────────────── */
 
-// 快捷任务卡片数据，集中定义避免魔法值散落
-const STARTER_CARDS = [
-  {
-    icon: '📰',
-    title: '帮我整理今日资讯',
-    description: '搜集 AI、科技领域的最新动态，整理成简报',
-    message: '请帮我整理今日 AI 和科技领域的最新资讯，按重要性排序'
-  },
-  {
-    icon: '✉️',
-    title: '帮我写一封邮件',
-    description: '根据你的描述，生成一封专业的邮件',
-    message: '我需要写一封邮件'
-  },
-  {
-    icon: '📋',
-    title: '整理代码仓库',
-    description: '分析项目结构，生成文档和改进建议',
-    message: '帮我分析当前项目结构，列出改进建议'
-  },
-  {
-    icon: '📅',
-    title: '创建每日工作计划',
-    description: '根据待办事项，制定今日工作安排',
-    message: '帮我制定今天的工作计划'
-  }
-]
-
 function StarterCardsStep({ onSelectCard }: { onSelectCard: (message: string) => void }) {
+  const { t } = useI18n()
+
+  // 快捷任务卡片数据，依赖 t() 国际化，需在组件内部定义（避免模块级硬编码）
+  const STARTER_CARDS = [
+    {
+      icon: '📰',
+      title: t('onboarding.quickTask.news.title'),
+      description: t('onboarding.quickTask.news.desc'),
+      message: t('onboarding.quickTask.news.message')
+    },
+    {
+      icon: '✉️',
+      title: t('onboarding.quickTask.email.title'),
+      description: t('onboarding.quickTask.email.desc'),
+      message: t('onboarding.quickTask.email.message')
+    },
+    {
+      icon: '📋',
+      title: t('onboarding.quickTask.code.title'),
+      description: t('onboarding.quickTask.code.desc'),
+      message: t('onboarding.quickTask.code.message')
+    },
+    {
+      icon: '📅',
+      title: t('onboarding.quickTask.plan.title'),
+      description: t('onboarding.quickTask.plan.desc'),
+      message: t('onboarding.quickTask.plan.message')
+    }
+  ]
+
   return (
     <div className="flex-1 flex flex-col px-8 pt-2">
       <h1 className="text-[24px] font-bold text-text-primary leading-tight">
-        试试让 PetClaw 帮你做点什么
+        {t('onboarding.tryTitle')}
       </h1>
       <p className="mt-3 text-[14px] text-text-secondary leading-relaxed">
-        选择一个快捷任务开始，或者跳过直接开始使用
+        {t('onboarding.trySubtitle')}
       </p>
 
       {/* 2x2 卡片网格，点击后触发 onSelectCard 完成 onboarding */}
@@ -521,6 +539,7 @@ function StarterCardsStep({ onSelectCard }: { onSelectCard: (message: string) =>
    ────────────────────────────────────────── */
 export function OnboardingPanel({ onComplete }: { onComplete: () => void }) {
   const { step, catBubbleText, goNext, goPrev, setCatBubbleText } = useOnboardingStore()
+  const { t } = useI18n()
   const isLastStep = step === 'first-chat'
   const isFirstStep = step === 'permissions'
 
@@ -608,7 +627,7 @@ export function OnboardingPanel({ onComplete }: { onComplete: () => void }) {
         onPrev={handlePrev}
         onNext={handleNext}
         showPrev={!isFirstStep}
-        nextLabel={isLastStep ? '开始使用' : '下一步'}
+        nextLabel={isLastStep ? t('common.startUsing') : t('common.nextStep')}
       />
     </div>
   )
