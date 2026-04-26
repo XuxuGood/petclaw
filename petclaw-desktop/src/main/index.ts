@@ -278,7 +278,7 @@ function toggleMainWindow(): void {
  * 启动后初始化运行时：创建 Gateway 连接 + CoworkController + CoworkSessionManager
  * 只有 boot 成功后（拿到 port/token）才会调用
  */
-async function setupV3Runtime(_port: number, _token: string): Promise<void> {
+async function setupV3Runtime(): Promise<void> {
   gateway = new OpenclawGateway()
 
   // 从 EngineManager 获取连接信息，用于 GatewayClient 动态加载和连接
@@ -420,7 +420,7 @@ app.whenReady().then(async () => {
     diagBootResult(retryResult.success)
 
     if (retryResult.success) {
-      await setupV3Runtime(retryResult.port!, retryResult.token!)
+      await setupV3Runtime()
       await new Promise((r) => setTimeout(r, 1500))
       mainWindow.webContents.send('boot:complete', true)
     } else {
@@ -430,7 +430,7 @@ app.whenReady().then(async () => {
 
   // 13. Boot 成功 → 初始化运行时（Gateway + CoworkController + CoworkSessionManager）
   if (bootResult.success) {
-    await setupV3Runtime(bootResult.port!, bootResult.token!)
+    await setupV3Runtime()
   }
 
   // 初始化自动更新（boot 成功后，生产环境延迟检查）
