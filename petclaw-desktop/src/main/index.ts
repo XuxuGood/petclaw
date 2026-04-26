@@ -278,14 +278,14 @@ function toggleMainWindow(): void {
  * 启动后初始化运行时：创建 Gateway 连接 + CoworkController + CoworkSessionManager
  * 只有 boot 成功后（拿到 port/token）才会调用
  */
-async function setupV3Runtime(port: number, token: string): Promise<void> {
-  gateway = new OpenclawGateway(port, token)
+async function setupV3Runtime(_port: number, _token: string): Promise<void> {
+  gateway = new OpenclawGateway()
 
-  // 从 EngineManager 获取运行时根目录，用于 GatewayClient 动态加载
-  const runtimeRoot = engineManager.getRuntimeRoot()
-  if (runtimeRoot) {
+  // 从 EngineManager 获取连接信息，用于 GatewayClient 动态加载和连接
+  const connectionInfo = engineManager.getGatewayConnectionInfo()
+  if (connectionInfo.clientEntryPath) {
     try {
-      await gateway.connect(runtimeRoot)
+      await gateway.connect(connectionInfo)
     } catch (err) {
       console.warn('[Gateway] connection failed:', err instanceof Error ? err.message : err)
     }

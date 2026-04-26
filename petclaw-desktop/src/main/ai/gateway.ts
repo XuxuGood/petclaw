@@ -1,10 +1,12 @@
-import crypto from 'crypto'
 import { createRequire } from 'module'
 import { EventEmitter } from 'events'
 
-import type { CoworkMessage, CoworkMessageType, PermissionRequest } from './types'
+import { app } from 'electron'
 
-// GatewayClient 的 duck-type 接口（从 runtime 动态加载）
+import type { GatewayConnectionInfo } from './types'
+
+// ── GatewayClient duck-type 接口（从 runtime 动态加载）──
+
 interface GatewayClientLike {
   start: () => void
   stop: () => void
@@ -23,87 +25,140 @@ interface GatewayEventFrame {
   payload?: unknown
 }
 
-// Gateway 发射的事件签名
+// ── Gateway 发射的事件载荷类型 ──
+
+export interface ChatEventPayload {
+  sessionKey: string
+  state: string
+  message?: unknown
+  runId?: string
+  stopReason?: string
+  errorMessage?: string
+}
+
+export interface AgentEventPayload {
+  sessionKey: string
+  stream: string
+  runId?: string
+  seq?: number
+  data?: Record<string, unknown>
+}
+
+export interface ApprovalRequestedPayload {
+  id: string
+  request: {
+    sessionKey: string
+    command?: string
+    cwd?: string
+    toolUseId?: string
+    [key: string]: unknown
+  }
+}
+
+export interface ApprovalResolvedPayload {
+  id: string
+}
+
+// ── Gateway 发射的事件签名 ──
+
 export interface OpenclawGatewayEvents {
-  message: (sessionId: string, message: CoworkMessage) => void
-  messageUpdate: (sessionId: string, messageId: string, content: string) => void
-  permissionRequest: (sessionId: string, request: PermissionRequest) => void
-  complete: (sessionId: string, engineSessionId: string | null) => void
-  error: (sessionId: string, error: string) => void
+  chatEvent: (payload: ChatEventPayload) => void
+  agentEvent: (payload: AgentEventPayload) => void
+  approvalRequested: (payload: ApprovalRequestedPayload) => void
+  approvalResolved: (payload: ApprovalResolvedPayload) => void
+  tick: () => void
   connected: () => void
   disconnected: (reason: string) => void
 }
 
 export class OpenclawGateway extends EventEmitter {
   private client: GatewayClientLike | null = null
-  private clientEntryPath: string | null = null
+  private pendingGatewayClient: GatewayClientLike | null = null
   private connected = false
 
-  constructor(
-    private port: number,
-    private token: string
-  ) {
+  // 版本/路径变更检测
+  private gatewayClientVersion: string | null = null
+  private gatewayClientEntryPath: string | null = null
+
+  // WS 自动重连
+  private gatewayReconnectTimer: ReturnType<typeof setTimeout> | null = null
+  private gatewayReconnectAttempt = 0
+  private gatewayStoppingIntentionally = false
+  private lastConnectionInfo: GatewayConnectionInfo | null = null
+  private static readonly GATEWAY_RECONNECT_MAX_ATTEMPTS = 10
+  private static readonly GATEWAY_RECONNECT_DELAYS = [2_000, 5_000, 10_000, 15_000, 30_000]
+
+  // Tick 心跳看门狗
+  private lastTickTimestamp = 0
+  private tickWatchdogTimer: ReturnType<typeof setInterval> | null = null
+  private static readonly TICK_WATCHDOG_INTERVAL_MS = 60_000
+  private static readonly TICK_TIMEOUT_MS = 90_000
+
+  // 并发锁
+  private gatewayClientInitLock: Promise<void> | null = null
+
+  constructor() {
     super()
   }
 
-  async connect(runtimeRoot: string): Promise<void> {
-    const Ctor = await this.loadGatewayClientCtor(runtimeRoot)
+  // ── 公开连接接口 ──
 
-    return new Promise<void>((resolve, reject) => {
-      let settled = false
-
-      const client = new Ctor({
-        url: `ws://127.0.0.1:${this.port}`,
-        token: this.token,
-        clientDisplayName: 'PetClaw',
-        clientVersion: '1.0.0',
-        mode: 'backend',
-        caps: ['tool-events'],
-        role: 'operator',
-        scopes: ['operator.admin'],
-        onHelloOk: () => {
-          this.client = client
-          this.connected = true
-          if (!settled) {
-            settled = true
-            resolve()
-          }
-          this.emit('connected')
-        },
-        onConnectError: (error: Error) => {
-          // 只有认证失败才立即拒绝，其他等自动重连
-          const msg = error.message.toLowerCase()
-          if (msg.includes('auth') || msg.includes('denied') || msg.includes('forbidden')) {
-            if (!settled) {
-              settled = true
-              reject(error)
-            }
-          }
-        },
-        onClose: (_code: number, reason: string) => {
-          this.connected = false
-          if (!settled) {
-            // 握手前断开，等重连
-            return
-          }
-          this.emit('disconnected', reason || 'Connection closed')
-        },
-        onEvent: (event: GatewayEventFrame) => {
-          this.handleEvent(event)
-        }
-      })
-
-      client.start()
-
-      // 60s 超时
-      setTimeout(() => {
-        if (!settled) {
-          settled = true
-          reject(new Error('Gateway connection timeout (60s)'))
-        }
-      }, 60_000)
-    })
+  async connect(connectionInfo: GatewayConnectionInfo): Promise<void> {
+    // 并发锁：同一时刻只有一个连接流程
+    if (this.gatewayClientInitLock) {
+      await this.gatewayClientInitLock
+      return
+    }
+    this.gatewayClientInitLock = this._connectImpl(connectionInfo)
+    try {
+      await this.gatewayClientInitLock
+    } finally {
+      this.gatewayClientInitLock = null
+    }
   }
+
+  /** 仅在未连接时才执行 connect，已连接则跳过 */
+  async connectIfNeeded(connectionInfo: GatewayConnectionInfo): Promise<void> {
+    if (this.client && this.connected) return
+    await this.connect(connectionInfo)
+  }
+
+  /** 强制断开后重连 */
+  async reconnect(connectionInfo: GatewayConnectionInfo): Promise<void> {
+    this.disconnect()
+    await this.connect(connectionInfo)
+  }
+
+  disconnect(): void {
+    this.gatewayStoppingIntentionally = true
+    this.cancelGatewayReconnect()
+    this.stopTickWatchdog()
+    // 同时清理已晋升的 client 和等待中的 pendingClient
+    const clientToStop = this.client ?? this.pendingGatewayClient
+    try {
+      clientToStop?.stop()
+    } catch {
+      /* ignore */
+    }
+    this.client = null
+    this.pendingGatewayClient = null
+    this.connected = false
+    this.gatewayClientVersion = null
+    this.gatewayClientEntryPath = null
+    this.lastTickTimestamp = 0
+    this.gatewayStoppingIntentionally = false
+  }
+
+  isConnected(): boolean {
+    return this.connected
+  }
+
+  // 暴露底层 client 供 CronJobService 等模块代理 Gateway RPC
+  getClient(): GatewayClientLike | null {
+    return this.client
+  }
+
+  // ── RPC 方法 ──
 
   async chatSend(
     sessionKey: string,
@@ -118,9 +173,9 @@ export class OpenclawGateway extends EventEmitter {
     })
   }
 
-  async chatStop(sessionKey: string): Promise<void> {
+  async chatAbort(sessionKey: string, runId: string): Promise<void> {
     this.ensureConnected()
-    await this.client!.request('chat.stop', { sessionKey })
+    await this.client!.request('chat.abort', { sessionKey, runId })
   }
 
   async approvalResolve(requestId: string, result: unknown): Promise<void> {
@@ -131,26 +186,185 @@ export class OpenclawGateway extends EventEmitter {
     })
   }
 
-  disconnect(): void {
-    if (this.client) {
-      try {
-        this.client.stop()
-      } catch {
-        /* ignore */
+  // ── 内部连接实现 ──
+
+  private async _connectImpl(connectionInfo: GatewayConnectionInfo): Promise<void> {
+    this.lastConnectionInfo = connectionInfo
+
+    // 版本或路径变更 → 先断开旧连接
+    const versionChanged =
+      this.gatewayClientVersion !== null && this.gatewayClientVersion !== connectionInfo.version
+    const pathChanged =
+      this.gatewayClientEntryPath !== null &&
+      this.gatewayClientEntryPath !== connectionInfo.clientEntryPath
+    if (versionChanged || pathChanged) {
+      console.warn('[Gateway] version/path changed, disconnecting old client')
+      this.disconnect()
+    }
+
+    // 已连接且无变更 → 跳过
+    if (this.client && this.connected) return
+
+    if (!connectionInfo.clientEntryPath) {
+      throw new Error('GatewayConnectionInfo.clientEntryPath is required')
+    }
+    if (!connectionInfo.url && (!connectionInfo.port || !connectionInfo.token)) {
+      throw new Error('GatewayConnectionInfo requires url or port+token')
+    }
+
+    const Ctor = await this.loadGatewayClientCtor(connectionInfo.clientEntryPath)
+    const url = connectionInfo.url ?? `ws://127.0.0.1:${connectionInfo.port}`
+
+    return new Promise<void>((resolve, reject) => {
+      let settled = false
+
+      const settleResolve = (): void => {
+        if (settled) return
+        settled = true
+        resolve()
       }
-      this.client = null
-      this.connected = false
+      const settleReject = (error: Error): void => {
+        if (settled) return
+        settled = true
+        reject(error)
+      }
+
+      const client = new Ctor({
+        url,
+        token: connectionInfo.token,
+        clientDisplayName: 'PetClaw',
+        clientVersion: app.getVersion(),
+        mode: 'backend',
+        caps: ['tool-events'],
+        role: 'operator',
+        scopes: ['operator.admin'],
+        onHelloOk: () => {
+          // 握手成功后才暴露 client，避免并发代码在 connect 帧前发送 request
+          this.client = client
+          this.pendingGatewayClient = null
+          this.connected = true
+          this.gatewayClientVersion = connectionInfo.version ?? null
+          this.gatewayClientEntryPath = connectionInfo.clientEntryPath
+          this.lastTickTimestamp = Date.now()
+          this.startTickWatchdog()
+          this.gatewayReconnectAttempt = 0
+          settleResolve()
+          this.emit('connected')
+        },
+        onConnectError: (error: Error) => {
+          // 只有认证失败才立即拒绝，其他等自动重连
+          const msg = error.message.toLowerCase()
+          const isAuthFailure =
+            msg.includes('auth') || msg.includes('denied') || msg.includes('forbidden')
+          if (isAuthFailure) {
+            settleReject(error)
+          }
+        },
+        onClose: (_code: number, reason: string) => {
+          if (!settled) {
+            // 握手前断开，等 GatewayClient 内部重连
+            return
+          }
+          // 如果是主动断开（stopGatewayClient），不做任何处理
+          if (this.gatewayStoppingIntentionally) return
+
+          this.connected = false
+          this.emit('disconnected', reason || 'Connection closed')
+          // 意外断开 → 调度自动重连
+          this.scheduleGatewayReconnect()
+        },
+        onEvent: (event: GatewayEventFrame) => {
+          this.handleEvent(event)
+        }
+      })
+
+      // 先存为 pending，握手成功后在 onHelloOk 中晋升为 this.client
+      this.pendingGatewayClient = client
+      client.start()
+
+      // 60s 超时
+      setTimeout(() => {
+        if (!settled) {
+          settled = true
+          reject(new Error('Gateway connection timeout (60s)'))
+        }
+      }, 60_000)
+    })
+  }
+
+  // ── WS 自动重连 ──
+
+  private scheduleGatewayReconnect(): void {
+    if (this.gatewayReconnectAttempt >= OpenclawGateway.GATEWAY_RECONNECT_MAX_ATTEMPTS) {
+      console.error(
+        `[GatewayReconnect] max attempts reached (${OpenclawGateway.GATEWAY_RECONNECT_MAX_ATTEMPTS}), giving up`
+      )
+      return
+    }
+
+    const delays = OpenclawGateway.GATEWAY_RECONNECT_DELAYS
+    const delay = delays[Math.min(this.gatewayReconnectAttempt, delays.length - 1)]
+    this.gatewayReconnectAttempt++
+
+    console.warn(
+      `[GatewayReconnect] scheduling attempt ${this.gatewayReconnectAttempt}/${OpenclawGateway.GATEWAY_RECONNECT_MAX_ATTEMPTS} in ${delay}ms`
+    )
+
+    this.gatewayReconnectTimer = setTimeout(() => {
+      this.gatewayReconnectTimer = null
+      void this.attemptGatewayReconnect()
+    }, delay)
+  }
+
+  private async attemptGatewayReconnect(): Promise<void> {
+    if (!this.lastConnectionInfo) return
+    try {
+      await this.connectIfNeeded(this.lastConnectionInfo)
+      this.gatewayReconnectAttempt = 0
+    } catch (error) {
+      console.warn('[GatewayReconnect] reconnect failed:', error)
+      this.scheduleGatewayReconnect()
     }
   }
 
-  isConnected(): boolean {
-    return this.connected
+  private cancelGatewayReconnect(): void {
+    if (this.gatewayReconnectTimer) {
+      clearTimeout(this.gatewayReconnectTimer)
+      this.gatewayReconnectTimer = null
+    }
   }
 
-  // 暴露底层 client 供 CronJobService 等模块代理 Gateway RPC
-  getClient(): GatewayClientLike | null {
-    return this.client
+  // ── Tick 心跳看门狗 ──
+
+  private startTickWatchdog(): void {
+    this.stopTickWatchdog()
+    this.tickWatchdogTimer = setInterval(() => {
+      this.checkTickHealth()
+    }, OpenclawGateway.TICK_WATCHDOG_INTERVAL_MS)
   }
+
+  private stopTickWatchdog(): void {
+    if (this.tickWatchdogTimer) {
+      clearInterval(this.tickWatchdogTimer)
+      this.tickWatchdogTimer = null
+    }
+  }
+
+  private checkTickHealth(): void {
+    if (this.lastTickTimestamp <= 0) return
+    const elapsed = Date.now() - this.lastTickTimestamp
+    if (elapsed <= OpenclawGateway.TICK_TIMEOUT_MS) return
+
+    console.warn(
+      `[TickWatchdog] no tick for ${Math.round(elapsed / 1000)}s (threshold: ${OpenclawGateway.TICK_TIMEOUT_MS / 1000}s) — triggering reconnect`
+    )
+    this.cancelGatewayReconnect()
+    this.disconnect()
+    this.gatewayReconnectAttempt = 0
+    this.scheduleGatewayReconnect()
+  }
+
+  // ── 事件分发 ──
 
   private ensureConnected(): void {
     if (!this.client || !this.connected) {
@@ -160,145 +374,96 @@ export class OpenclawGateway extends EventEmitter {
 
   private handleEvent(frame: GatewayEventFrame): void {
     const { event, payload } = frame
+
+    if (event === 'tick') {
+      this.lastTickTimestamp = Date.now()
+      this.emit('tick')
+      return
+    }
+
     const p = payload as Record<string, unknown> | undefined
+    if (!p) return
 
     switch (event) {
-      case 'chat.delta':
-      case 'chat.final': {
-        this.handleChatEvent(event, p)
+      case 'chat':
+        this.handleChatEvent(p)
         break
-      }
-      case 'chat.error': {
-        const sessionKey = (p?.sessionKey ?? '') as string
-        const errorMsg = (p?.errorMessage ?? 'Unknown error') as string
-        if (sessionKey) {
-          this.emit('error', sessionKey, errorMsg)
-        }
+      case 'agent':
+        this.handleAgentEvent(p, frame.seq as number | undefined)
         break
-      }
-      case 'exec.approval.requested': {
-        this.handleApprovalEvent(p)
+      case 'exec.approval.requested':
+        this.handleApprovalRequested(p)
         break
-      }
-      case 'agent.event': {
-        this.handleAgentEvent(p)
+      case 'exec.approval.resolved':
+        this.handleApprovalResolved(p)
         break
-      }
       // 其他事件静默忽略
     }
   }
 
-  private handleChatEvent(event: string, payload: Record<string, unknown> | undefined): void {
-    if (!payload) return
-    const sessionKey = (payload.sessionKey ?? '') as string
-    if (!sessionKey) return
+  private handleChatEvent(p: Record<string, unknown>): void {
+    const sessionKey = ((p.sessionKey ?? '') as string).trim()
+    const state = ((p.state ?? '') as string).trim()
+    if (!sessionKey || !state) return
 
-    if (event === 'chat.final') {
-      const engineSessionId = (payload.runId ?? null) as string | null
-      this.emit('complete', sessionKey, engineSessionId)
-      return
+    const rawRunId = ((p.runId ?? '') as string).trim()
+    const payload: ChatEventPayload = {
+      sessionKey,
+      state,
+      message: p.message,
+      runId: rawRunId || undefined,
+      stopReason: p.stopReason ? String(p.stopReason) : undefined,
+      errorMessage: p.errorMessage ? String(p.errorMessage) : undefined
     }
-
-    // chat.delta — 流式文本更新
-    const message = payload.message as Record<string, unknown> | undefined
-    if (message) {
-      const content = this.extractMessageContent(message)
-      const msgId = (message.id ?? crypto.randomUUID()) as string
-      const type = this.inferMessageType(message)
-      this.emit('message', sessionKey, {
-        id: msgId,
-        type,
-        content,
-        timestamp: Date.now(),
-        metadata: { isStreaming: true }
-      } satisfies CoworkMessage)
-    }
+    this.emit('chatEvent', payload)
   }
 
-  private handleApprovalEvent(payload: Record<string, unknown> | undefined): void {
-    if (!payload) return
-    const request = payload.request as Record<string, unknown> | undefined
-    const id = (payload.id ?? '') as string
-    const sessionKey = (request?.sessionKey ?? '') as string
-    if (!id || !sessionKey) return
+  private handleAgentEvent(p: Record<string, unknown>, framSeq?: number): void {
+    const sessionKey = ((p.sessionKey ?? '') as string).trim()
+    const stream = ((p.stream ?? '') as string).trim()
+    if (!sessionKey || !stream) return
 
-    const permReq: PermissionRequest = {
-      requestId: id,
-      toolName: (request?.command ?? 'unknown') as string,
-      toolInput: {
-        command: request?.command,
-        cwd: request?.cwd,
-        ask: request?.ask
-      },
-      toolUseId: (request?.toolUseId ?? null) as string | null
+    const rawRunId = ((p.runId ?? '') as string).trim()
+    // seq 可能来自 frame 级别或 payload 级别，优先取 frame
+    const rawSeq = framSeq ?? p.seq
+    const payload: AgentEventPayload = {
+      sessionKey,
+      stream,
+      runId: rawRunId || undefined,
+      seq: typeof rawSeq === 'number' ? rawSeq : undefined,
+      data: p.data as Record<string, unknown> | undefined
     }
-    this.emit('permissionRequest', sessionKey, permReq)
+    this.emit('agentEvent', payload)
   }
 
-  private handleAgentEvent(payload: Record<string, unknown> | undefined): void {
-    if (!payload) return
-    const sessionKey = (payload.sessionKey ?? '') as string
-    const stream = (payload.stream ?? '') as string
-    const data = payload.data as Record<string, unknown> | undefined
-    if (!sessionKey || !data) return
+  private handleApprovalRequested(p: Record<string, unknown>): void {
+    const id = ((p.id ?? '') as string).trim()
+    const request = p.request as Record<string, unknown> | undefined
+    if (!id || !request) return
 
-    // agent.event 中的文本更新
-    if (stream === 'text' || stream === 'assistant') {
-      const content = (data.text ?? data.content ?? '') as string
-      const msgId = (data.id ?? '') as string
-      if (msgId && content) {
-        this.emit('messageUpdate', sessionKey, msgId, content)
+    const payload: ApprovalRequestedPayload = {
+      id,
+      request: {
+        sessionKey: (request.sessionKey ?? '') as string,
+        command: request.command as string | undefined,
+        cwd: request.cwd as string | undefined,
+        toolUseId: request.toolUseId as string | undefined
       }
     }
+    this.emit('approvalRequested', payload)
   }
 
-  private extractMessageContent(message: Record<string, unknown>): string {
-    if (typeof message.content === 'string') return message.content
-    if (Array.isArray(message.content)) {
-      return (message.content as Array<Record<string, unknown>>)
-        .filter((block) => block.type === 'text')
-        .map((block) => block.text as string)
-        .join('')
-    }
-    return ''
+  private handleApprovalResolved(p: Record<string, unknown>): void {
+    const id = ((p.id ?? '') as string).trim()
+    if (!id) return
+    this.emit('approvalResolved', { id } satisfies ApprovalResolvedPayload)
   }
 
-  private inferMessageType(message: Record<string, unknown>): CoworkMessageType {
-    const role = (message.role ?? '') as string
-    if (role === 'user') return 'user'
-    if (role === 'assistant') return 'assistant'
-    return 'assistant'
-  }
+  // ── 动态加载 GatewayClient 构造函数 ──
 
-  private async loadGatewayClientCtor(runtimeRoot: string): Promise<GatewayClientCtor> {
-    const fs = await import('fs')
-    const path = await import('path')
-
-    const candidates = [
-      path.join(runtimeRoot, 'dist', 'plugin-sdk', 'gateway-runtime.js'),
-      path.join(runtimeRoot, 'dist', 'plugin-sdk', 'gateway-runtime.mjs'),
-      path.join(runtimeRoot, 'dist', 'gateway', 'client.js'),
-      path.join(runtimeRoot, 'dist', 'client.js'),
-      path.join(runtimeRoot, 'gateway.asar', 'dist', 'plugin-sdk', 'gateway-runtime.js')
-    ]
-
-    let entryPath: string | null = null
-    for (const candidate of candidates) {
-      if (fs.existsSync(candidate)) {
-        entryPath = candidate
-        break
-      }
-    }
-
-    if (!entryPath) {
-      throw new Error(`GatewayClient entry not found in ${runtimeRoot}`)
-    }
-
-    this.clientEntryPath = entryPath
-
-    // 使用 createRequire 加载 CJS 模块
+  private async loadGatewayClientCtor(clientEntryPath: string): Promise<GatewayClientCtor> {
     const req = createRequire(import.meta.url)
-    const loaded = req(entryPath) as Record<string, unknown>
+    const loaded = req(clientEntryPath) as Record<string, unknown>
 
     // 优先查找命名导出 GatewayClient
     if (typeof loaded.GatewayClient === 'function') {
@@ -320,6 +485,9 @@ export class OpenclawGateway extends EventEmitter {
       }
     }
 
-    throw new Error(`GatewayClient class not found in ${entryPath}`)
+    const exportKeysPreview = Object.keys(loaded).slice(0, 20).join(', ')
+    throw new Error(
+      `GatewayClient class not found in ${clientEntryPath} (exports: ${exportKeysPreview || 'none'})`
+    )
   }
 }
