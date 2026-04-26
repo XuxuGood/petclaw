@@ -12,7 +12,7 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
       include: ['src/**/*.ts', 'src/**/*.tsx'],
-      exclude: ['src/renderer/index.html', '**/*.d.ts']
+      exclude: ['src/renderer/index.html', 'src/renderer/pet.html', '**/*.d.ts']
     },
     alias: {
       electron: resolve('./tests/__mocks__/electron.ts')

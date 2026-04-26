@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
 
-import { CoworkStore } from '../../../src/main/ai/cowork-store'
+import { CoworkStore } from '../../../src/main/data/cowork-store'
 import { initDatabase } from '../../../src/main/data/db'
 
 function createTestDb(): Database.Database {
@@ -28,7 +28,7 @@ describe('CoworkStore', () => {
       expect(session.agentId).toBe('agent-1')
       expect(session.status).toBe('idle')
       expect(session.pinned).toBe(false)
-      expect(session.claudeSessionId).toBeNull()
+      expect(session.engineSessionId).toBeNull()
       expect(session.modelOverride).toBe('')
       expect(session.messages).toEqual([])
       expect(typeof session.createdAt).toBe('number')
@@ -85,12 +85,12 @@ describe('CoworkStore', () => {
       expect(updated!.directoryPath).toBe('/workspace')
     })
 
-    it('更新 claudeSessionId', () => {
+    it('更新 engineSessionId', () => {
       const session = store.createSession('会话', '/workspace', 'a1')
-      store.updateSession(session.id, { claudeSessionId: 'claude-123' })
+      store.updateSession(session.id, { engineSessionId: 'engine-123' })
 
       const updated = store.getSession(session.id)
-      expect(updated!.claudeSessionId).toBe('claude-123')
+      expect(updated!.engineSessionId).toBe('engine-123')
     })
 
     it('空 updates 不报错', () => {

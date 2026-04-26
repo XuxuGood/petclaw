@@ -31,13 +31,11 @@ export function registerAllIpcHandlers(deps: AllIpcDeps): void {
   registerWindowIpcHandlers(deps)
   registerBootIpcHandlers(deps)
   registerPetIpcHandlers(deps)
-  // Phase 2: Manager IPC 模块
   registerDirectoryIpcHandlers(deps)
   registerModelsIpcHandlers(deps)
   registerSkillsIpcHandlers(deps)
   registerMcpIpcHandlers(deps)
   registerMemoryIpcHandlers(deps)
-  // Phase 3: 集成功能 IPC 模块
   registerSchedulerIpcHandlers(deps)
   registerImIpcHandlers(deps)
 }

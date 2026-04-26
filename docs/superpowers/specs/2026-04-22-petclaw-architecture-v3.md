@@ -15,7 +15,7 @@
 5. [基础层 — OpenclawGateway](#5-基础层--openclawgateway)
 6. [基础层 — ConfigSync](#6-基础层--configsync)
 7. [核心层 — DirectoryManager](#7-核心层--directorymanager)
-8. [核心层 — SessionManager](#8-核心层--sessionmanager)
+8. [核心层 — CoworkSessionManager](#8-核心层--coworksessionmanager)
 9. [核心层 — CoworkController](#9-核心层--coworkcontroller)
 10. [功能层 — SkillManager](#10-功能层--skillmanager)
 11. [功能层 — ModelRegistry](#11-功能层--modelregistry)
@@ -78,7 +78,7 @@
 │  └────────────────────────────────────────────────────────┘ │
 │                                                             │
 │  ┌─────────────── 核心层 ──────────────────────────────────┐ │
-│  │ DirectoryManager │ SessionManager │ CoworkController    │ │
+│  │ DirectoryManager │ CoworkSessionManager │ CoworkController │ │
 │  └────────────────────────────────────────────────────────┘ │
 │                                                             │
 │  ┌─────────────── 功能层 ──────────────────────────────────┐ │
@@ -114,7 +114,7 @@
 | 基础 | **OpenclawGateway** | 动态加载 GatewayClient，RPC + 事件分发 |
 | 基础 | **ConfigSync** | 唯一写入 openclaw.json 的模块 |
 | 核心 | **DirectoryManager** | 目录注册、别名、model_override、skill_ids → agents.list 聚合 |
-| 核心 | **SessionManager** | 会话生命周期，绑定 directory_path + 自动派生 agent_id |
+| 核心 | **CoworkSessionManager** | 会话生命周期，绑定 directory_path + 自动派生 agent_id |
 | 核心 | **CoworkController** | 执行模式、Exec Approval、流式事件协议 |
 | 功能 | **SkillManager** | Skill 扫描/安装/卸载/启用/禁用 |
 | 功能 | **ModelRegistry** | Provider/Model CRUD，预设 + 自定义提供商 |
@@ -1009,26 +1009,12 @@ export class DirectoryManager extends EventEmitter {
 
 ---
 
-## 8. 核心层 — SessionManager
+## 8. 核心层 — CoworkSessionManager
 
 ```typescript
-// src/main/ai/session-manager.ts
+// src/main/ai/cowork-session-manager.ts
 
-export interface Session {
-  id: string
-  directoryPath: string          // 用户选择的工作目录
-  agentId: string                // deriveAgentId(directoryPath)
-  sessionKey: string             // 'agent:{agentId}:petclaw:{sessionId}'
-  modelOverride: string          // 会话级模型覆盖（空=跟目录→跟全局）
-  activeSkillIds?: string[]      // 本次会话激活的技能
-  status: 'idle' | 'running' | 'completed' | 'error'
-  title: string
-  pinned: boolean
-  createdAt: number
-  updatedAt: number
-}
-
-export class SessionManager extends EventEmitter {
+export class CoworkSessionManager extends EventEmitter {
   // 会话 CRUD
   create(opts: { directoryPath: string; modelOverride?: string }): Session
   send(sessionId: string, message: string, opts?: SendOptions): Promise<void>
@@ -1117,7 +1103,7 @@ CoworkController 作为 EventEmitter，emit 以下事件（对应 LobsterAI `Cow
 | `message` | 新消息加入会话 | `(sessionId, message: CoworkMessage)` |
 | `messageUpdate` | 流式内容增量更新 | `(sessionId, messageId, content)` |
 | `permissionRequest` | 工具执行需要审批 | `(sessionId, request: PermissionRequest)` |
-| `complete` | 会话执行完毕 | `(sessionId, claudeSessionId)` |
+| `complete` | 会话执行完毕 | `(sessionId, engineSessionId)` |
 | `error` | 执行出错 | `(sessionId, error: string)` |
 | `sessionStopped` | 会话被停止 | `(sessionId)` |
 
@@ -1480,7 +1466,7 @@ CREATE TABLE IF NOT EXISTS im_conversation_bindings (
 CREATE TABLE IF NOT EXISTS im_session_mappings (
   conversation_id TEXT NOT NULL,
   instance_id TEXT NOT NULL REFERENCES im_instances(id) ON DELETE CASCADE,
-  session_id TEXT NOT NULL REFERENCES sessions(id),
+  session_id TEXT NOT NULL REFERENCES cowork_sessions(id),
   agent_id TEXT NOT NULL DEFAULT 'main',
   created_at INTEGER NOT NULL,
   last_active_at INTEGER NOT NULL,
@@ -1650,13 +1636,13 @@ function runBootCheck() {
 
 ### 17.1 表设计总览
 
-9 张表，无 `cowork_` 前缀。
+9 张表，会话和消息表带 `cowork_` 前缀（与 Cowork 领域对齐）。
 
 ```sql
 -- 全局配置 KV
 CREATE TABLE app_config (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL);
 
--- 目录配置（替代旧 agents 表）
+-- 目录配置
 CREATE TABLE directories (
   agent_id TEXT PRIMARY KEY,       -- deriveAgentId(path)
   path TEXT NOT NULL UNIQUE,       -- 目录绝对路径
@@ -1668,11 +1654,12 @@ CREATE TABLE directories (
 );
 
 -- 会话
-CREATE TABLE sessions (
+CREATE TABLE cowork_sessions (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
   directory_path TEXT NOT NULL,        -- 用户选择的工作目录
   agent_id TEXT NOT NULL,              -- deriveAgentId(directory_path)
+  engine_session_id TEXT,              -- OpenClaw Runtime 会话 ID
   status TEXT NOT NULL DEFAULT 'idle', -- idle | running | completed | error
   model_override TEXT NOT NULL DEFAULT '', -- 会话级模型覆盖
   pinned INTEGER NOT NULL DEFAULT 0,
@@ -1681,14 +1668,14 @@ CREATE TABLE sessions (
 );
 
 -- 消息
-CREATE TABLE messages (
+CREATE TABLE cowork_messages (
   id TEXT PRIMARY KEY,
   session_id TEXT NOT NULL,
   type TEXT NOT NULL,             -- user | assistant | tool_use | tool_result | system
   content TEXT NOT NULL,
   metadata TEXT NOT NULL DEFAULT '{}',
   created_at INTEGER NOT NULL,
-  FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+  FOREIGN KEY (session_id) REFERENCES cowork_sessions(id) ON DELETE CASCADE
 );
 
 -- IM 实例
@@ -1721,7 +1708,7 @@ CREATE TABLE im_conversation_bindings (
 CREATE TABLE im_session_mappings (
   conversation_id TEXT NOT NULL,
   instance_id TEXT NOT NULL REFERENCES im_instances(id) ON DELETE CASCADE,
-  session_id TEXT NOT NULL REFERENCES sessions(id),
+  session_id TEXT NOT NULL REFERENCES cowork_sessions(id),
   agent_id TEXT NOT NULL DEFAULT 'main',
   created_at INTEGER NOT NULL,
   last_active_at INTEGER NOT NULL,
@@ -1734,7 +1721,9 @@ CREATE TABLE scheduled_task_meta (
   directory_path TEXT,
   agent_id TEXT,
   origin TEXT,                    -- gui | chat | api
-  binding TEXT                    -- IM 推送绑定 JSON
+  binding TEXT,                   -- IM 推送绑定 JSON
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
 );
 
 -- MCP 服务器（全局 enabled）
@@ -1753,8 +1742,8 @@ CREATE TABLE mcp_servers (
 ### 17.2 索引
 
 ```sql
-CREATE INDEX idx_messages_session ON messages(session_id);
-CREATE INDEX idx_sessions_directory ON sessions(directory_path);
+CREATE INDEX idx_cowork_messages_session ON cowork_messages(session_id);
+CREATE INDEX idx_cowork_sessions_directory ON cowork_sessions(directory_path);
 CREATE INDEX idx_im_session_mappings_session ON im_session_mappings(session_id);
 ```
 
@@ -1764,7 +1753,7 @@ CREATE INDEX idx_im_session_mappings_session ON im_session_mappings(session_id);
 
 ### 18.1 命名规范
 
-`模块:动作` 格式，禁止驼峰。
+`模块:动作` 格式，禁止驼峰。Cowork 领域的流式事件 Channel 统一使用 `cowork:stream:*` 前缀，审批响应使用 `cowork:permission:respond`。Preload API 命名空间：`window.api.cowork`。
 
 ### 18.2 完整 Channel 列表
 
@@ -1772,22 +1761,24 @@ CREATE INDEX idx_im_session_mappings_session ON im_session_mappings(session_id);
 
 | Channel | 方向 | 说明 |
 |---------|------|------|
-| `chat:send` | invoke | 发送消息（含 cwd/files/skills/agentId） |
-| `chat:abort` | invoke | 中止当前会话 |
+| `chat:send` | invoke | 发送消息（含 cwd） |
+| `chat:continue` | invoke | 续发消息到已有会话 |
+| `chat:stop` | invoke | 中止当前会话 |
+| `chat:sessions` | invoke | 列表所有会话 |
+| `chat:session` | invoke | 获取会话详情 |
+| `chat:delete-session` | invoke | 删除会话 |
 | `chat:history` | invoke | 查询历史消息 |
-| `chat:chunk` | main→renderer | 流式文本增量 |
-| `chat:done` | main→renderer | 会话完成 |
-| `chat:error` | main→renderer | 执行出错 |
 
-**Session**:
+**Cowork Stream**（协作流式事件，主→渲染）:
 
 | Channel | 方向 | 说明 |
 |---------|------|------|
-| `session:create` | invoke | 创建会话 |
-| `session:list` | invoke | 列表 |
-| `session:get` | invoke | 获取详情 |
-| `session:list-recent-cwds` | invoke | 最近工作目录 |
-| `session:patch` | invoke | 更新会话属性 |
+| `cowork:stream:message` | main→renderer | 新消息（user/assistant） |
+| `cowork:stream:message-update` | main→renderer | 流式内容增量更新 |
+| `cowork:stream:permission` | main→renderer | 工具执行需审批 |
+| `cowork:stream:complete` | main→renderer | 会话执行完毕 |
+| `cowork:stream:error` | main→renderer | 执行出错 |
+| `cowork:permission:respond` | invoke | 审批响应 |
 
 **Agent**:
 
@@ -2234,7 +2225,7 @@ Renderer ChatInputBox → IPC chat:send { text, cwd, files, activeSkillIds }
   → CoworkController.handleSend()
     → DirectoryManager.ensureRegistered(cwd)        // 自动注册目录，deriveAgentId(cwd)
     → agentId = deriveAgentId(cwd)                   // 'ws-' + sha256(resolve(cwd)).slice(0,12)
-    → SessionManager.create/get(session, { directoryPath: cwd, agentId })
+    → CoworkSessionManager.create/get(session, { directoryPath: cwd, agentId })
     → resolveModel(session.modelOverride, directory.modelOverride, app_config['model.defaultModel'])
     → buildOutboundPrompt(session, text, skillPrompt)
     → gateway.chatSend({ sessionKey: `${agentId}/${sessionId}`, message, attachments })
@@ -2266,7 +2257,7 @@ OpenClaw cron 引擎触发 → Gateway 回调 PetClaw
   → SchedulerManager.handleFired(taskId)
     → scheduled_task_meta 查 directory_path + agent_id + origin + binding
     → DirectoryManager.ensureRegistered(directory_path)
-    → SessionManager.create(session, { directoryPath, agentId })
+    → CoworkSessionManager.create(session, { directoryPath, agentId })
     → CoworkController.send(sessionId, task.prompt)
   → Agent 执行 → 结果
   → 如果 binding 指定 IM → ImGateway 推送到指定会话
@@ -2673,8 +2664,9 @@ petclaw-desktop/
 │   │   ├── ai/                        # 基础层：运行时 + 通信 + 配置
 │   │   │   ├── engine-manager.ts      #   OpenclawEngineManager（进程生命周期）
 │   │   │   ├── gateway.ts             #   OpenclawGateway（GatewayClient 动态加载）
-│   │   │   ├── session-manager.ts     #   SessionManager（会话 CRUD）
+│   │   │   ├── cowork-session-manager.ts #   CoworkSessionManager（会话 CRUD）
 │   │   │   ├── cowork-controller.ts   #   CoworkController（执行 + 审批 + 流式事件）
+│   │   │   ├── cowork-store.ts        #   CoworkStore（会话/消息持久化）
 │   │   │   ├── directory-manager.ts   #   DirectoryManager（目录注册 + deriveAgentId）
 │   │   │   └── config-sync.ts         #   ConfigSync（openclaw.json 生成）
 │   │   │
@@ -2724,8 +2716,13 @@ petclaw-desktop/
 │   │   │   ├── scheduler-ipc.ts
 │   │   │   └── settings-ipc.ts
 │   │   │
-│   │   └── data/                      # 工程层：数据库
-│   │       └── database.ts            #   SQLite 初始化 + 表创建 + 迁移
+│   │   └── data/                      # 工程层：数据库（Repository 模式，集中管理所有 SQL）
+│   │       ├── db.ts                  #   SQLite 初始化 + 表创建 + 迁移
+│   │       ├── cowork-store.ts        #   会话/消息持久化（CoworkStore）
+│   │       ├── directory-store.ts     #   目录注册持久化（DirectoryStore）
+│   │       ├── im-store.ts            #   IM 实例/绑定/映射（ImStore）
+│   │       ├── mcp-store.ts           #   MCP 服务器 CRUD（McpStore）
+│   │       └── scheduled-task-meta-store.ts  # 定时任务元数据（ScheduledTaskMetaStore）
 │   │
 │   ├── preload/                       # ═══ Preload 安全桥接 ═══
 │   │   ├── index.ts                   # contextBridge 暴露 API
@@ -3547,9 +3544,9 @@ git push origin v1.0.0               # 推送 tag → 触发 GitHub Actions
 - `ai/engine-manager.ts` — OpenclawEngineManager
 - `ai/gateway.ts` — OpenclawGateway（GatewayClient 动态加载）
 - `ai/config-sync.ts` — ConfigSync
-- `ai/session-manager.ts` — SessionManager
+- `ai/cowork-session-manager.ts` — CoworkSessionManager
 - `ai/cowork-controller.ts` — CoworkController
-- `ai/cowork-store.ts` — CoworkStore（会话/消息持久化，对应 LobsterAI coworkStore.ts）
+- `ai/cowork-store.ts` — CoworkStore（会话/消息持久化）
 - （WorkspaceManager 已合并到 ConfigSync，不再单独创建）
 
 **重构文件**：
@@ -3639,16 +3636,16 @@ git push origin v1.0.0               # 推送 tag → 触发 GitHub Actions
 
 **DB Schema 重构**：
 - `agents` 表 → `directories` 表（字段映射：agent_id/path/name/model_override/skill_ids）
-- `cowork_sessions` → `sessions`（cwd → directory_path，新增 status/model_override/pinned）
-- `cowork_messages` → `messages`（timestamp → created_at，新增 metadata）
+- 会话表命名为 `cowork_sessions`（字段：directory_path、agent_id、engine_session_id、status/model_override/pinned）
+- 消息表命名为 `cowork_messages`（字段：created_at、metadata）
 - `kv` → `app_config`
 - 新增 `im_instances` + `im_conversation_bindings`（两层 IM 绑定）
 - 新增 `scheduled_task_meta`（定时任务元数据持久化）
-- 自动数据迁移脚本（`data/migration.ts`），启动时检测旧表并迁移
+- 产品未上线，无需数据迁移
 
 **主进程重构**：
 - `AgentManager` → `DirectoryManager`（`src/main/ai/directory-manager.ts`）
-- ConfigSync / SessionManager / CoworkStore 切换到新表名和新字段
+- ConfigSync / CoworkSessionManager / CoworkStore 切换到新表名和新字段
 - IM Gateway 两层绑定：`ImInstance`（实例级默认目录）+ `ImConversationBinding`（对话级覆盖）
 - CronJobService 新增 `scheduled_task_meta` DB 持久化
 

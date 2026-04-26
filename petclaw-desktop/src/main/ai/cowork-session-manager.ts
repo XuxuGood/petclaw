@@ -1,14 +1,13 @@
-import type { CoworkStore } from './cowork-store'
+import type { CoworkStore } from '../data/cowork-store'
 import type { CoworkController } from './cowork-controller'
 import type { CoworkSession, CoworkStartOptions } from './types'
 import { deriveAgentId } from './types'
 import type { DirectoryManager } from './directory-manager'
 
-export class SessionManager {
+export class CoworkSessionManager {
   constructor(
     private store: CoworkStore,
     private controller: CoworkController,
-    // v3: 替代 AgentManager，用户选目录即自动注册 + 派生 agentId
     private directoryManager: DirectoryManager
   ) {}
 

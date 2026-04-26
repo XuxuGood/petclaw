@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events'
 
 import type { OpenclawGateway } from './gateway'
-import type { CoworkStore } from './cowork-store'
+import type { CoworkStore } from '../data/cowork-store'
 import type { CoworkStartOptions, PermissionResult, CoworkMessage } from './types'
 
 export class CoworkController extends EventEmitter {
@@ -70,10 +70,10 @@ export class CoworkController extends EventEmitter {
       this.emit('permissionRequest', sessionId, req)
     })
 
-    this.gateway.on('complete', (sessionId: string, claudeSessionId: string | null) => {
+    this.gateway.on('complete', (sessionId: string, engineSessionId: string | null) => {
       this.activeSessionIds.delete(sessionId)
-      this.store.updateSession(sessionId, { status: 'completed', claudeSessionId })
-      this.emit('complete', sessionId, claudeSessionId)
+      this.store.updateSession(sessionId, { status: 'completed', engineSessionId })
+      this.emit('complete', sessionId, engineSessionId)
     })
 
     this.gateway.on('error', (sessionId: string, error: string) => {

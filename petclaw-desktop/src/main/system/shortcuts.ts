@@ -2,8 +2,8 @@ import { globalShortcut, BrowserWindow } from 'electron'
 
 export function registerShortcuts(
   petWindow: BrowserWindow,
-  _chatWindow: BrowserWindow,
-  toggleChatWindow: () => void
+  _mainWindow: BrowserWindow,
+  toggleMainWindow: () => void
 ): void {
   const registered1 = globalShortcut.register('CommandOrControl+Shift+P', () => {
     if (petWindow.isVisible()) {
@@ -16,7 +16,7 @@ export function registerShortcuts(
   if (!registered1) console.warn('Failed to register shortcut: CommandOrControl+Shift+P')
 
   const registered2 = globalShortcut.register('CommandOrControl+Shift+C', () => {
-    toggleChatWindow()
+    toggleMainWindow()
   })
   if (!registered2) console.warn('Failed to register shortcut: CommandOrControl+Shift+C')
 }

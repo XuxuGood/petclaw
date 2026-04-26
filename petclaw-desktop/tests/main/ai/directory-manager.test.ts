@@ -3,16 +3,17 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
 
 import { initDatabase } from '../../../src/main/data/db'
+import { DirectoryStore } from '../../../src/main/data/directory-store'
 import { DirectoryManager } from '../../../src/main/ai/directory-manager'
 
 describe('DirectoryManager', () => {
-  let db: Database.Database
   let dm: DirectoryManager
 
   beforeEach(() => {
-    db = new Database(':memory:')
+    const db = new Database(':memory:')
     initDatabase(db)
-    dm = new DirectoryManager(db, '/default/workspace')
+    const store = new DirectoryStore(db)
+    dm = new DirectoryManager(store, '/default/workspace')
   })
 
   describe('ensureRegistered', () => {

@@ -1,5 +1,4 @@
 // directory-ipc.ts: 目录配置 IPC 处理层
-// 替代旧 agents-ipc.ts，channel 从 agents:* 改为 directory:*
 import { ipcMain } from 'electron'
 
 import type { DirectoryManager } from '../ai/directory-manager'

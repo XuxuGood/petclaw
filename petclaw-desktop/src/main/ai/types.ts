@@ -1,4 +1,4 @@
-// v3 Cowork 共享类型
+// Cowork 共享类型
 
 import crypto from 'crypto'
 import path from 'path'
@@ -28,9 +28,9 @@ export interface CoworkMessageMetadata {
 export interface CoworkSession {
   id: string
   title: string
-  directoryPath: string // 替代 cwd
+  directoryPath: string
   agentId: string // deriveAgentId(directoryPath)
-  claudeSessionId: string | null
+  engineSessionId: string | null
   status: CoworkSessionStatus
   modelOverride: string // 会话级模型覆盖
   pinned: boolean
@@ -54,7 +54,7 @@ export interface CoworkRuntimeEvents {
   message: (sessionId: string, message: CoworkMessage) => void
   messageUpdate: (sessionId: string, messageId: string, content: string) => void
   permissionRequest: (sessionId: string, request: PermissionRequest) => void
-  complete: (sessionId: string, claudeSessionId: string | null) => void
+  complete: (sessionId: string, engineSessionId: string | null) => void
   error: (sessionId: string, error: string) => void
   sessionStopped: (sessionId: string) => void
 }
@@ -79,7 +79,7 @@ export interface RuntimeMetadata {
   expectedPathHint: string
 }
 
-// ── Directory（替代 Agent） ──
+// ── Directory ──
 
 export interface Directory {
   agentId: string // deriveAgentId(path)
@@ -98,7 +98,7 @@ export function deriveAgentId(dir: string): string {
   return `ws-${hash}`
 }
 
-// ── Phase 2: Model ──
+// ── Model ──
 
 export interface ModelProvider {
   id: string
@@ -122,7 +122,7 @@ export interface ModelDefinition {
   maxTokens: number
 }
 
-// ── Phase 2: Skill ──
+// ── Skill ──
 
 export interface Skill {
   id: string
@@ -134,7 +134,7 @@ export interface Skill {
   version?: string
 }
 
-// ── Phase 2: MCP ──
+// ── MCP ──
 
 export interface McpServer {
   id: string
@@ -158,7 +158,7 @@ export interface HttpConfig {
   headers?: Record<string, string>
 }
 
-// ── Phase 2: Memory ──
+// ── Memory ──
 
 export interface MemoryEntry {
   text: string

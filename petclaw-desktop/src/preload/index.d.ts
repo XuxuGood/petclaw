@@ -5,7 +5,7 @@ interface ChatMessage {
 
 interface ElectronAPI {
   moveWindow: (dx: number, dy: number) => void
-  toggleChatWindow: () => void
+  toggleMainWindow: () => void
   sendChat: (message: string) => Promise<void>
   loadHistory: (limit: number) => Promise<ChatMessage[]>
   onChatChunk: (callback: (chunk: string) => void) => () => void
@@ -54,7 +54,7 @@ interface ElectronAPI {
   quitApp: () => void
   showPetContextMenu: (paused: boolean) => void
   onPetTogglePause: (callback: () => void) => () => void
-  // v3 Cowork
+  // Cowork
   cowork: {
     send: (message: string, cwd: string) => Promise<unknown>
     continue: (sessionId: string, message: string) => Promise<void>
@@ -69,16 +69,16 @@ interface ElectronAPI {
     onComplete: (cb: (data: unknown) => void) => () => void
     onError: (cb: (data: unknown) => void) => () => void
   }
-  // v3 Pet
+  // Pet
   pet: {
     onStateEvent: (cb: (data: unknown) => void) => () => void
     onBubble: (cb: (data: unknown) => void) => () => void
   }
-  // v3 Engine
+  // Engine
   engine: {
     onStatus: (cb: (status: unknown) => void) => () => void
   }
-  // v3 Phase 4: Auto-updater
+  // Auto-updater
   updater: {
     check: () => Promise<void>
     download: () => Promise<void>
@@ -92,7 +92,7 @@ interface ElectronAPI {
       }) => void
     ) => () => void
   }
-  // v3 Phase 2: Manager APIs
+  // Manager APIs
   directories: {
     list: () => Promise<unknown>
     get: (agentId: string) => Promise<unknown>
@@ -133,7 +133,7 @@ interface ElectronAPI {
     listEntries: (workspace: string) => Promise<unknown>
     updateEntry: (workspace: string, oldText: string, newText: string) => Promise<unknown>
   }
-  // v3 Phase 3: Scheduler
+  // Scheduler
   scheduler: {
     list: () => Promise<unknown>
     create: (input: unknown) => Promise<unknown>
@@ -146,7 +146,7 @@ interface ElectronAPI {
     onStatusUpdate: (cb: (data: unknown) => void) => () => void
     onRefresh: (cb: () => void) => () => void
   }
-  // v3 Phase 3: IM
+  // IM
   im: {
     loadConfig: () => Promise<unknown>
     saveConfig: (key: string, config: unknown) => Promise<void>

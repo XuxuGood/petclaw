@@ -36,7 +36,7 @@ export class PetEventBridge {
     // 需要在 index.ts 中将回调注入。这里提供 public 方法供外部调用。
   }
 
-  // ── CoworkController 事件（v1 已有，保持不变） ──
+  // ── CoworkController 事件 ──
 
   private bindCoworkEvents(): void {
     // 用户发消息 -> 活跃计数+1，首次激活时触发 CHAT_SENT

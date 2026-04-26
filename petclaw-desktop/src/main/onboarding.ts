@@ -17,7 +17,7 @@ export async function checkEnvironment(): Promise<{
 }
 
 /**
- * v3: 通过 HTTP /health 端点检测 Gateway 连通性（替代 v1 WebSocket）
+ * 通过 HTTP /health 端点检测 Gateway 连通性
  */
 export async function checkGatewayConnectivity(
   url: string

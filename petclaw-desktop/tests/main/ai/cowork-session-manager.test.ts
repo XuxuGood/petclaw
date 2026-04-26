@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-import { SessionManager } from '../../../src/main/ai/session-manager'
-import type { CoworkStore } from '../../../src/main/ai/cowork-store'
+import { CoworkSessionManager } from '../../../src/main/ai/cowork-session-manager'
+import type { CoworkStore } from '../../../src/main/data/cowork-store'
 import type { CoworkController } from '../../../src/main/ai/cowork-controller'
 import type { DirectoryManager } from '../../../src/main/ai/directory-manager'
 import type { CoworkSession } from '../../../src/main/ai/types'
@@ -12,7 +12,7 @@ function makeMockSession(overrides?: Partial<CoworkSession>): CoworkSession {
   return {
     id: 'sess-001',
     title: '测试会话',
-    claudeSessionId: null,
+    engineSessionId: null,
     status: 'idle',
     pinned: false,
     directoryPath: '/workspace',
@@ -49,11 +49,11 @@ function createMocks() {
   return { mockStore, mockController, mockDirectoryManager }
 }
 
-describe('SessionManager', () => {
+describe('CoworkSessionManager', () => {
   let mockStore: CoworkStore
   let mockController: CoworkController
   let mockDirectoryManager: DirectoryManager
-  let manager: SessionManager
+  let manager: CoworkSessionManager
 
   beforeEach(() => {
     const mocks = createMocks()
@@ -61,7 +61,7 @@ describe('SessionManager', () => {
     mockController = mocks.mockController
     mockDirectoryManager = mocks.mockDirectoryManager
 
-    manager = new SessionManager(mockStore, mockController, mockDirectoryManager)
+    manager = new CoworkSessionManager(mockStore, mockController, mockDirectoryManager)
   })
 
   // ── createAndStart ──

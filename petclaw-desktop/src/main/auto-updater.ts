@@ -17,9 +17,9 @@ export interface UpdateInfo {
   releaseNotes: string | null
 }
 
-export function initAutoUpdater(chatWindow: BrowserWindow): void {
+export function initAutoUpdater(mainWindow: BrowserWindow): void {
   autoUpdater.on('checking-for-update', () => {
-    chatWindow.webContents.send('updater:status', { status: 'checking' })
+    mainWindow.webContents.send('updater:status', { status: 'checking' })
   })
 
   autoUpdater.on('update-available', (info) => {
@@ -28,15 +28,15 @@ export function initAutoUpdater(chatWindow: BrowserWindow): void {
       releaseDate: info.releaseDate,
       releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : null
     }
-    chatWindow.webContents.send('updater:status', { status: 'available', info: updateInfo })
+    mainWindow.webContents.send('updater:status', { status: 'available', info: updateInfo })
   })
 
   autoUpdater.on('update-not-available', () => {
-    chatWindow.webContents.send('updater:status', { status: 'up-to-date' })
+    mainWindow.webContents.send('updater:status', { status: 'up-to-date' })
   })
 
   autoUpdater.on('download-progress', (progress) => {
-    chatWindow.webContents.send('updater:status', {
+    mainWindow.webContents.send('updater:status', {
       status: 'downloading',
       progress: {
         percent: progress.percent,
@@ -48,11 +48,11 @@ export function initAutoUpdater(chatWindow: BrowserWindow): void {
   })
 
   autoUpdater.on('update-downloaded', () => {
-    chatWindow.webContents.send('updater:status', { status: 'downloaded' })
+    mainWindow.webContents.send('updater:status', { status: 'downloaded' })
   })
 
   autoUpdater.on('error', (err) => {
-    chatWindow.webContents.send('updater:status', { status: 'error', error: err.message })
+    mainWindow.webContents.send('updater:status', { status: 'error', error: err.message })
   })
 
   // 注册 IPC handlers

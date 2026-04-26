@@ -3,7 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 const api = {
   // Window
   moveWindow: (dx: number, dy: number) => ipcRenderer.send('window:move', dx, dy),
-  toggleChatWindow: () => ipcRenderer.send('chat:toggle'),
+  toggleMainWindow: () => ipcRenderer.send('chat:toggle'),
 
   // Chat
   sendChat: (message: string): Promise<void> => ipcRenderer.invoke('chat:send', message),
@@ -127,7 +127,7 @@ const api = {
     return () => ipcRenderer.removeListener('pet:toggle-pause', handler)
   },
 
-  // ── v3 Cowork ──
+  // ── Cowork ──
   cowork: {
     send: (message: string, cwd: string) => ipcRenderer.invoke('chat:send', message, cwd),
     continue: (sessionId: string, message: string) =>
@@ -165,7 +165,7 @@ const api = {
     }
   },
 
-  // ── v3 Pet 统一入口 ──
+  // ── Pet 统一入口 ──
   pet: {
     onStateEvent: (cb: (data: unknown) => void) => {
       const handler = (_e: Electron.IpcRendererEvent, data: unknown) => cb(data)
@@ -179,7 +179,7 @@ const api = {
     }
   },
 
-  // ── v3 Engine 状态 ──
+  // ── Engine 状态 ──
   engine: {
     onStatus: (cb: (status: unknown) => void) => {
       const handler = (_e: Electron.IpcRendererEvent, status: unknown) => cb(status)
@@ -188,7 +188,7 @@ const api = {
     }
   },
 
-  // ── v3 Phase 4: Auto-updater ──
+  // ── Auto-updater ──
   updater: {
     check: () => ipcRenderer.invoke('updater:check'),
     download: () => ipcRenderer.invoke('updater:download'),
@@ -200,7 +200,7 @@ const api = {
     }
   },
 
-  // ── v3 Phase 2: Manager APIs ──
+  // ── Manager APIs ──
   directories: {
     list: () => ipcRenderer.invoke('directory:list'),
     get: (agentId: string) => ipcRenderer.invoke('directory:get', agentId),
@@ -254,7 +254,7 @@ const api = {
       ipcRenderer.invoke('memory:update-entry', workspace, oldText, newText)
   },
 
-  // ── v3 Phase 3: Scheduler ──
+  // ── Scheduler ──
   scheduler: {
     list: () => ipcRenderer.invoke('scheduler:list'),
     create: (input: unknown) => ipcRenderer.invoke('scheduler:create', input),
@@ -280,7 +280,7 @@ const api = {
     }
   },
 
-  // ── v3 Phase 3: IM ──
+  // ── IM ──
   im: {
     loadConfig: () => ipcRenderer.invoke('im:load-config'),
     saveConfig: (key: string, config: unknown) => ipcRenderer.invoke('im:save-config', key, config),

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 
 import { Settings2, FolderOpen } from 'lucide-react'
 
-import { DirectoryConfigDialog } from '../DirectoryConfigDialog'
+import { DirectoryConfigDialog } from '../../components/DirectoryConfigDialog'
 
 interface DirectoryInfo {
   agentId: string

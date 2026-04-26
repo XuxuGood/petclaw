@@ -191,7 +191,7 @@ Conventional Commits：`type(scope): subject`
 
 - **不造轮子**：优先使用已有工具链（Zustand、lucide-react、Tailwind token），不引入同类库
 - **最小改动**：只改需求相关代码，不做"顺手优化"、不加多余的 JSDoc / 注释 / 类型注解 / 错误处理
-- **Token 驱动**：所有颜色、圆角、阴影必须使用 `chat.css` 中定义的 CSS token，禁止硬编码 hex 值
+- **Token 驱动**：所有颜色、圆角、阴影必须使用 `index.css` 中定义的 CSS token，禁止硬编码 hex 值
 - **中文注释，英文代码**：注释和 UI 文案用中文，变量名、函数名、commit message 用英文
 - **文档同步**：每次开发完功能后，必须将实现内容同步到 `.ai/README.md` 和 `docs/superpowers/specs/2026-04-22-petclaw-architecture-v3.md` 对应章节
 
@@ -203,7 +203,8 @@ Conventional Commits：`type(scope): subject`
 | `src/renderer/**/组件` | `PascalCase.tsx` | `ChatView.tsx`, `BootCheckPanel.tsx` |
 | `src/renderer/**/非组件` | `kebab-case.ts` | `state-machine.ts`, `chat-store.ts` |
 | `stores/` | `kebab-case-store.ts` | `chat-store.ts`, `hook-store.ts` |
-| `panels/` | `PascalCase + Panel.tsx` | `BootCheckPanel.tsx` |
+| `views/` | `PascalCase.tsx`，按功能域分组 | `views/chat/ChatView.tsx` |
+| `components/` | `PascalCase.tsx`，跨视图共享 | `components/Sidebar.tsx` |
 | `tests/` | 镜像 `src/` 结构，后缀 `.test.ts` | `chat-store.test.ts` |
 
 ### 9.3 组件规范（React）
@@ -266,7 +267,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 - **圆角只用两档**：`rounded-[10px]`（按钮/输入框/卡片）和 `rounded-[14px]`（气泡/模态框）
 - **交互统一**：`active:scale-[0.96]` + `transition-all duration-[120ms]`
 - **不抽 CSS 类**：样式写在 className 内，不单独创建 `.btn-primary` 等自定义类
-- **Token 定义**：`chat.css` 的 `@theme` 块是唯一 token 来源，新增 token 在此添加
+- **Token 定义**：`index.css` 的 `@theme` 块是唯一 token 来源，新增 token 在此添加
 
 ### 9.6 TypeScript
 
@@ -386,7 +387,38 @@ pnpm --filter petclaw-desktop test -- tests/main/hooks/server.test.ts
 - **Husky + lint-staged**：commit 时自动格式化和 lint
 - **commitlint**：`type(scope): subject`（type: feat/fix/refactor/chore/docs/test，scope: desktop/web/api/shared/ci）
 
-### 9.11 禁止魔法值散落
+### 9.11 Cowork 统一命名规范
+
+> Cowork 是 PetClaw 的核心产品概念，代表"协作"领域。所有 Cowork 领域的代码统一使用 `Cowork` 前缀。
+
+**领域类型（`src/main/ai/types.ts`）**：
+- `CoworkSession`、`CoworkMessage`、`CoworkMessageMetadata`
+- `CoworkSessionStatus`、`CoworkMessageType`
+- `CoworkRuntimeEvents`、`CoworkStartOptions`
+
+**基础设施类**：
+
+| 文件 | 类名 |
+|------|------|
+| `cowork-store.ts` | `CoworkStore` |
+| `cowork-controller.ts` | `CoworkController` |
+| `cowork-session-manager.ts` | `CoworkSessionManager` |
+| `CoworkPermissionModal.tsx` | `CoworkPermissionModal` |
+
+**变量命名**：`coworkStore`、`coworkController`、`coworkSessionManager`
+
+**IPC Channel**：
+- CRUD 操作：`chat:send`、`chat:sessions`、`chat:session`、`chat:continue`、`chat:stop`、`chat:delete-session`
+- 流式事件：`cowork:stream:message`、`cowork:stream:message-update`、`cowork:stream:permission`、`cowork:stream:complete`、`cowork:stream:error`
+- 审批响应：`cowork:permission:respond`
+
+**Preload API**：`window.api.cowork`
+
+**DB 表名**：`cowork_sessions`、`cowork_messages`（带 `cowork_` 前缀，与领域对齐）
+
+**DB 字段**：`engine_session_id`（OpenClaw Runtime 会话 ID，非 `claude_session_id`）
+
+### 9.12 禁止魔法值散落
 
 - **配置默认值集中定义**：端口、URL、模型名等配置默认值必须集中定义在对应的配置模块中（如 `app-settings.ts` 的 `DEFAULT_GATEWAY_PORT`、`DEFAULT_GATEWAY_URL`、`createDefaultSettings()`），禁止在各文件中硬编码
 - **Settings 单一维护点**：`PetclawSettings` 接口的类型定义、默认值工厂（`createDefaultSettings`）、合并逻辑（`mergeDefaults`）统一在 `app-settings.ts` 维护
@@ -403,20 +435,23 @@ pnpm --filter petclaw-desktop test -- tests/main/hooks/server.test.ts
 ### 10.1 双窗口架构
 
 ```
-Pet Window (180×145, 透明, alwaysOnTop)     Chat Window (动态尺寸, hiddenInset titleBar)
-├── index.html → main.tsx → App.tsx          ├── chat.html → chat/main.tsx → ChatApp.tsx
-├── PetCanvas.tsx  视频播放+拖拽              ├── Sidebar.tsx       深色侧边栏+会话列表
-└── state-machine.ts 宠物状态机               ├── ChatView.tsx      聊天界面
-                                              ├── MonitorView.tsx   Hook 事件监控
-                                              ├── SettingsView.tsx  设置面板
-                                              └── StatusBar.tsx     底部状态栏
+Pet Window (180×145, 透明, alwaysOnTop)     Main Window (动态尺寸, hiddenInset titleBar)
+├── pet.html → pet/main.tsx → PetApp.tsx    ├── index.html → main.tsx → App.tsx
+├── PetCanvas.tsx  视频播放+拖拽              ├── views/chat/       对话视图
+└── state-machine.ts 宠物状态机               ├── views/skills/     技能管理
+                                              ├── views/cron/       定时任务
+                                              ├── views/im/         IM 频道
+                                              ├── views/settings/   设置
+                                              ├── views/onboarding/ 引导流程
+                                              ├── components/       共享组件
+                                              └── stores/           Zustand stores
 ```
 
 #### 窗口尺寸规范
 
 **规则**：所有窗口尺寸相关数值必须使用 `index.ts` 顶部定义的命名常量，禁止散落魔法数字。
 
-**Chat Window（动态计算）**：
+**Main Window（动态计算）**：
 
 | 参数 | 公式 | 下限 | 上限 |
 |------|------|------|------|
@@ -439,22 +474,28 @@ Main Process
 ├── bootcheck.ts          启动检查（调用各 Manager）
 ├── app-settings.ts       全局设置集中定义
 ├── ai/                   基础层
-│   ├── engine-manager.ts   Runtime 生命周期（utilityProcess）
-│   ├── gateway.ts          GatewayClient 动态加载
-│   ├── session-manager.ts  会话 CRUD
-│   ├── cowork-controller.ts  执行+审批+流式事件
-│   └── config-sync.ts     openclaw.json 唯一写入者
+│   ├── engine-manager.ts       Runtime 生命周期（utilityProcess）
+│   ├── gateway.ts              GatewayClient 动态加载
+│   ├── cowork-session-manager.ts  会话 CRUD（CoworkSessionManager）
+│   ├── cowork-controller.ts    执行+审批+流式事件（CoworkController）
+│   └── config-sync.ts          openclaw.json 唯一写入者
 ├── directories/          核心层（目录驱动 Agent）
 ├── skills/               功能层
 ├── models/               功能层
 ├── memory/               功能层
-├── mcp/                  功能层
-├── im/                   集成层
-├── scheduler/            集成层
+├── mcp/                  功能层（McpManager → McpStore）
+├── im/                   集成层（ImGatewayManager → ImStore）
+├── scheduler/            集成层（CronJobService → ScheduledTaskMetaStore）
 ├── pet/                  宠物联动层
 │   └── pet-event-bridge.ts  多源事件聚合 → Pet 窗口
 ├── ipc/                  模块化 IPC（chat-ipc、directory-ipc 等）
-└── data/                 SQLite
+└── data/                 SQLite（Repository 层，集中管理所有数据操作）
+    ├── db.ts                    建表 DDL + KV
+    ├── cowork-store.ts          会话/消息持久化（CoworkStore）
+    ├── directory-store.ts       目录注册持久化（DirectoryStore）
+    ├── im-store.ts              IM 实例/绑定/映射（ImStore）
+    ├── mcp-store.ts             MCP 服务器 CRUD（McpStore）
+    └── scheduled-task-meta-store.ts  定时任务元数据（ScheduledTaskMetaStore）
 ```
 
 详见 v3 spec §2-§18。
@@ -522,8 +563,8 @@ Sleep:     WakeUp→Idle | ChatSent→Thinking | DragStart→Dragging | HookActi
 
 ```typescript
 renderer.build.rollupOptions.input = {
-  index: 'src/renderer/index.html',   // Pet Window
-  chat:  'src/renderer/chat.html'     // Chat Window
+  index: 'src/renderer/index.html',   // Main Window
+  pet:   'src/renderer/pet.html'      // Pet Window
 }
 ```
 
@@ -590,7 +631,7 @@ tests/
 - `scheduler-ipc.ts` — 定时任务 IPC handlers（`scheduler:list`、`scheduler:create`、`scheduler:update`、`scheduler:delete`、`scheduler:run`）
 - `im-ipc.ts` — IM 配置 IPC handlers（`im:get-settings`、`im:update-settings`、`im:test-connection`）
 
-### UI 组件 (`src/renderer/src/chat/components/`)
+### UI 组件 (`src/renderer/src/views/` + `src/renderer/src/components/`)
 
 - `CoworkPermissionModal.tsx` — 三种模式：标准工具审批 / 确认 / 多选
 - `DirectoryConfigDialog.tsx` — 目录配置对话框（模型覆盖 + 技能白名单）
@@ -715,22 +756,24 @@ Openclaw Runtime（utilityProcess）
 └── logs/                    # Electron 应用日志
 ```
 
-### 11.6 当前集成状态（v1 → v3 迁移中）
+### 11.6 当前集成状态
 
-**v1 已实现（待重构）**：
-- ✅ WebSocket 客户端（`ai/openclaw.ts`）→ v3 替换为 GatewayClient
-- ✅ Hook 事件接收（`hooks/server.ts`）→ v3 保留
-- ✅ Workspace MD 同步（`syncWorkspaceMd()`）→ v3 由 ConfigSync 接管
-- ✅ 宠物状态机 + 动画系统 → v3 保留，新增 PetEventBridge
+**已实现**：
+- ✅ OpenclawGateway（GatewayClient 动态加载）
+- ✅ CoworkStore（会话/消息 CRUD → SQLite `cowork_sessions`/`cowork_messages`）
+- ✅ CoworkController（流式事件：message → messageUpdate → complete/error + Exec Approval）
+- ✅ CoworkSessionManager（会话生命周期管理）
+- ✅ DirectoryManager（目录驱动，Agent ID 自动派生）
+- ✅ PetEventBridge（多源事件聚合 → Pet 窗口状态驱动）
+- ✅ ImGatewayManager（IM 两层绑定 + 会话路由）
+- ✅ CronJobService（定时任务 Gateway RPC 代理）
+- ✅ Hook 事件接收（`hooks/server.ts`）
+- ✅ 宠物状态机 + 动画系统
+- ✅ ConfigSync（openclaw.json 唯一写入）
 
-**v3 待实现**：
+**待实现**：
 - OpenclawEngineManager（utilityProcess 启动 Runtime）
-- OpenclawGateway（GatewayClient 动态加载）
-- ConfigSync（openclaw.json 唯一写入）
-- DirectoryManager（目录驱动，已实现） / SessionManager / CoworkController
 - SkillManager / ModelRegistry / MemoryManager / McpManager
-- ImGateway / SchedulerManager
-- PetEventBridge（宠物多源联动）
 - 透明区域点击穿透（alpha 检测）
 
 ---
@@ -752,8 +795,8 @@ ls /tmp/petclaw-extracted/dist/
 
 | HTML | JS Bundle | 用途 |
 | ---- | --------- | ---- |
-| `index.html` | `pet-*.js` + `voice-*.js` | Pet Window（动画+语音） |
-| `chat.html` | `chat-*.js` + `voice-*.js` + `toolAction-*.js` | Chat Window |
+| `index.html` | `main-*.js` | Main Window（全功能工作台） |
+| `pet.html` | `pet-*.js` | Pet Window（动画） |
 | `pet-bubble.html` | `petBubble-*.js` + `toolAction-*.js` | 工具动作气泡 |
 
 ### 12.3 官方资源文件
@@ -770,7 +813,7 @@ ls /tmp/petclaw-extracted/dist/
 
 ## 13. UI/UX 设计规范
 
-> 所有 Chat Window UI 开发必须遵守本节规范。设计基调：**冷灰极简**（zinc 色系），克制、专业、不花哨。
+> 所有 Main Window UI 开发必须遵守本节规范。设计基调：**冷灰极简**（zinc 色系），克制、专业、不花哨。
 
 ### 13.1 配色系统（亮色 / 暗色）
 

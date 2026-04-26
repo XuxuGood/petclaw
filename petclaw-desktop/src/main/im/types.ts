@@ -1,7 +1,7 @@
 // src/main/im/types.ts
-// IM 平台类型定义（v3 两层绑定模型）
+// IM 平台类型定义（两层绑定模型）
 
-// Phase 3 只实现 4 个平台：飞书、钉钉、企微、微信
+// 支持 4 个平台：飞书、钉钉、企微、微信
 export type Platform = 'wechat' | 'wecom' | 'dingtalk' | 'feishu'
 
 // 支持多实例的平台
@@ -40,7 +40,7 @@ export interface IMPlatformStatus {
   lastOutboundAt: number | null
 }
 
-// IM 实例（替代旧 IMPlatformConfig 的 KV 模式，一行一个实例）
+// IM 实例（一行一个实例）
 export interface ImInstance {
   id: string
   platform: Platform

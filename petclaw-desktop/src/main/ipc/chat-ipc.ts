@@ -1,42 +1,42 @@
 import { ipcMain, type BrowserWindow } from 'electron'
 
-import type { SessionManager } from '../ai/session-manager'
+import type { CoworkSessionManager } from '../ai/cowork-session-manager'
 import type { CoworkController } from '../ai/cowork-controller'
 import type { PermissionResult } from '../ai/types'
 
 export interface ChatIpcDeps {
-  sessionManager: SessionManager
+  coworkSessionManager: CoworkSessionManager
   coworkController: CoworkController
-  getChatWindow: () => BrowserWindow | null
+  getMainWindow: () => BrowserWindow | null
   getPetWindow: () => BrowserWindow | null
 }
 
 export function registerChatIpcHandlers(deps: ChatIpcDeps): void {
-  const { sessionManager, coworkController, getChatWindow } = deps
+  const { coworkSessionManager, coworkController, getMainWindow } = deps
 
   ipcMain.handle('chat:send', async (_event, message: string, cwd: string) => {
-    // agentId 不再由前端传入，SessionManager 内部通过 cwd 自动派生
-    return sessionManager.createAndStart('Chat', cwd, message)
+    // agentId 不再由前端传入，CoworkSessionManager 内部通过 cwd 自动派生
+    return coworkSessionManager.createAndStart('Chat', cwd, message)
   })
 
   ipcMain.handle('chat:continue', async (_event, sessionId: string, message: string) => {
-    sessionManager.continueSession(sessionId, message)
+    coworkSessionManager.continueSession(sessionId, message)
   })
 
   ipcMain.handle('chat:stop', async (_event, sessionId: string) => {
-    sessionManager.stopSession(sessionId)
+    coworkSessionManager.stopSession(sessionId)
   })
 
   ipcMain.handle('chat:sessions', async () => {
-    return sessionManager.getSessions()
+    return coworkSessionManager.getSessions()
   })
 
   ipcMain.handle('chat:session', async (_event, id: string) => {
-    return sessionManager.getSession(id)
+    return coworkSessionManager.getSession(id)
   })
 
   ipcMain.handle('chat:delete-session', async (_event, id: string) => {
-    sessionManager.deleteSession(id)
+    coworkSessionManager.deleteSession(id)
   })
 
   ipcMain.handle(
@@ -47,11 +47,11 @@ export function registerChatIpcHandlers(deps: ChatIpcDeps): void {
   )
 
   coworkController.on('message', (sessionId: string, msg: unknown) => {
-    getChatWindow()?.webContents.send('cowork:stream:message', { sessionId, message: msg })
+    getMainWindow()?.webContents.send('cowork:stream:message', { sessionId, message: msg })
   })
 
   coworkController.on('messageUpdate', (sessionId: string, msgId: string, content: string) => {
-    getChatWindow()?.webContents.send('cowork:stream:message-update', {
+    getMainWindow()?.webContents.send('cowork:stream:message-update', {
       sessionId,
       messageId: msgId,
       content
@@ -59,14 +59,14 @@ export function registerChatIpcHandlers(deps: ChatIpcDeps): void {
   })
 
   coworkController.on('permissionRequest', (sessionId: string, req: unknown) => {
-    getChatWindow()?.webContents.send('cowork:stream:permission', { sessionId, request: req })
+    getMainWindow()?.webContents.send('cowork:stream:permission', { sessionId, request: req })
   })
 
   coworkController.on('complete', (sessionId: string) => {
-    getChatWindow()?.webContents.send('cowork:stream:complete', { sessionId })
+    getMainWindow()?.webContents.send('cowork:stream:complete', { sessionId })
   })
 
   coworkController.on('error', (sessionId: string, error: string) => {
-    getChatWindow()?.webContents.send('cowork:stream:error', { sessionId, error })
+    getMainWindow()?.webContents.send('cowork:stream:error', { sessionId, error })
   })
 }

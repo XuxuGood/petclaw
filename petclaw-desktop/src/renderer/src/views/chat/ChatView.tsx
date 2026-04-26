@@ -5,8 +5,8 @@ import { useChatStore } from '../../stores/chat-store'
 import { ChatHeader } from './ChatHeader'
 import { ChatInputBox } from './ChatInputBox'
 import { CoworkPermissionModal } from './CoworkPermissionModal'
-import { WelcomePage } from './WelcomePage'
-import { TaskMonitorPanel } from './TaskMonitorPanel'
+import { WelcomePage } from '../../components/WelcomePage'
+import { TaskMonitorPanel } from '../../components/TaskMonitorPanel'
 
 interface ChatViewProps {
   activeSessionId?: string | null
@@ -37,7 +37,7 @@ export function ChatView({
     toolUseId?: string | null
   } | null>(null)
 
-  // 订阅 v3 cowork 消息事件
+  // 订阅协作消息事件
   useEffect(() => {
     // 收到助手新消息块时追加到最后一条 assistant 消息
     const unsubMessage = window.api.cowork.onMessage((data) => {

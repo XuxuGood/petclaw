@@ -19,8 +19,8 @@ describe('initDatabase', () => {
     const names = tables.map((t) => t.name)
     expect(names).toContain('app_config')
     expect(names).toContain('directories')
-    expect(names).toContain('sessions')
-    expect(names).toContain('messages')
+    expect(names).toContain('cowork_sessions')
+    expect(names).toContain('cowork_messages')
     expect(names).toContain('im_instances')
     expect(names).toContain('im_conversation_bindings')
     expect(names).toContain('im_session_mappings')
@@ -33,9 +33,9 @@ describe('initDatabase', () => {
       .prepare("SELECT name FROM sqlite_master WHERE type='index' AND name NOT LIKE 'sqlite_%'")
       .all() as Array<{ name: string }>
     const names = indexes.map((i) => i.name)
-    expect(names).toContain('idx_messages_session')
-    expect(names).toContain('idx_sessions_agent')
-    expect(names).toContain('idx_sessions_directory')
+    expect(names).toContain('idx_cowork_messages_session')
+    expect(names).toContain('idx_cowork_sessions_agent')
+    expect(names).toContain('idx_cowork_sessions_directory')
   })
 })
 
@@ -105,7 +105,7 @@ describe('directories table', () => {
   })
 })
 
-describe('sessions table', () => {
+describe('cowork_sessions table', () => {
   let db: Database.Database
 
   beforeEach(() => {
@@ -116,10 +116,10 @@ describe('sessions table', () => {
   it('should insert with directory_path and agent_id', () => {
     const now = Date.now()
     db.prepare(
-      `INSERT INTO sessions (id, title, directory_path, agent_id, created_at, updated_at)
+      `INSERT INTO cowork_sessions (id, title, directory_path, agent_id, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?)`
     ).run('s1', 'Test', '/tmp/proj', 'ws-abc123', now, now)
-    const row = db.prepare('SELECT * FROM sessions WHERE id = ?').get('s1') as Record<
+    const row = db.prepare('SELECT * FROM cowork_sessions WHERE id = ?').get('s1') as Record<
       string,
       unknown
     >
@@ -129,7 +129,7 @@ describe('sessions table', () => {
   })
 })
 
-describe('messages table', () => {
+describe('cowork_messages table', () => {
   let db: Database.Database
 
   beforeEach(() => {
@@ -141,15 +141,14 @@ describe('messages table', () => {
     const now = Date.now()
     // Create session first (FK dependency)
     db.prepare(
-      `INSERT INTO sessions (id, title, directory_path, agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO cowork_sessions (id, title, directory_path, agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`
     ).run('s1', 'Test', '/tmp', 'ws-abc', now, now)
     db.prepare(
-      'INSERT INTO messages (id, session_id, type, content, created_at) VALUES (?, ?, ?, ?, ?)'
+      'INSERT INTO cowork_messages (id, session_id, type, content, created_at) VALUES (?, ?, ?, ?, ?)'
     ).run('m1', 's1', 'user', 'hello', now)
-    const msgs = db.prepare('SELECT * FROM messages WHERE session_id = ?').all('s1') as Record<
-      string,
-      unknown
-    >[]
+    const msgs = db
+      .prepare('SELECT * FROM cowork_messages WHERE session_id = ?')
+      .all('s1') as Record<string, unknown>[]
     expect(msgs).toHaveLength(1)
     expect(msgs[0].content).toBe('hello')
   })
@@ -157,13 +156,13 @@ describe('messages table', () => {
   it('should cascade delete messages when session deleted', () => {
     const now = Date.now()
     db.prepare(
-      `INSERT INTO sessions (id, title, directory_path, agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO cowork_sessions (id, title, directory_path, agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`
     ).run('s1', 'Test', '/tmp', 'ws-abc', now, now)
     db.prepare(
-      'INSERT INTO messages (id, session_id, type, content, created_at) VALUES (?, ?, ?, ?, ?)'
+      'INSERT INTO cowork_messages (id, session_id, type, content, created_at) VALUES (?, ?, ?, ?, ?)'
     ).run('m1', 's1', 'user', 'hello', now)
-    db.prepare('DELETE FROM sessions WHERE id = ?').run('s1')
-    const msgs = db.prepare('SELECT * FROM messages WHERE session_id = ?').all('s1')
+    db.prepare('DELETE FROM cowork_sessions WHERE id = ?').run('s1')
+    const msgs = db.prepare('SELECT * FROM cowork_messages WHERE session_id = ?').all('s1')
     expect(msgs).toHaveLength(0)
   })
 })
@@ -229,7 +228,7 @@ describe('im_session_mappings table', () => {
       `INSERT INTO im_instances (id, platform, credentials, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`
     ).run('inst-1', 'dingtalk', '{}', now, now)
     db.prepare(
-      `INSERT INTO sessions (id, title, directory_path, agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO cowork_sessions (id, title, directory_path, agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`
     ).run('sess-1', 'Test', '/tmp', 'main', now, now)
     db.prepare(
       `INSERT INTO im_session_mappings (conversation_id, instance_id, session_id, agent_id, created_at, last_active_at) VALUES (?, ?, ?, ?, ?, ?)`
@@ -276,134 +275,6 @@ describe('mcp_servers table', () => {
   })
 })
 
-describe('migrateIfNeeded', () => {
-  it('should skip migration on fresh install', () => {
-    const db = new Database(':memory:')
-    initDatabase(db)
-    // 验证新表存在即可
-    const tables = db
-      .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
-      .all() as Array<{ name: string }>
-    expect(tables.map((t) => t.name)).toContain('app_config')
-    expect(tables.map((t) => t.name)).toContain('directories')
-    db.close()
-  })
-
-  it('should migrate kv to app_config', () => {
-    const db = new Database(':memory:')
-    // 先手动创建旧 kv 表
-    db.exec(
-      'CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL)'
-    )
-    db.exec("INSERT INTO kv VALUES ('theme', '\"dark\"', 1000)")
-    // initDatabase 内部会触发迁移
-    initDatabase(db)
-    // kv 应该被删除
-    const hasKv = db
-      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='kv'")
-      .get()
-    expect(hasKv).toBeUndefined()
-    // 数据应迁移到 app_config
-    const row = db.prepare("SELECT value FROM app_config WHERE key = 'theme'").get() as
-      | { value: string }
-      | undefined
-    expect(row).toBeDefined()
-    expect(row!.value).toBe('"dark"')
-    db.close()
-  })
-
-  it('should drop old agents table', () => {
-    const db = new Database(':memory:')
-    db.exec('CREATE TABLE agents (id TEXT PRIMARY KEY, name TEXT)')
-    db.exec("INSERT INTO agents VALUES ('a1', 'Test Agent')")
-    initDatabase(db)
-    const hasAgents = db
-      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='agents'")
-      .get()
-    expect(hasAgents).toBeUndefined()
-    db.close()
-  })
-
-  it('should migrate cowork_sessions to sessions', () => {
-    const db = new Database(':memory:')
-    // 创建旧 cowork_sessions 表
-    db.exec(`CREATE TABLE cowork_sessions (
-      id TEXT PRIMARY KEY, title TEXT NOT NULL, claude_session_id TEXT,
-      agent_id TEXT NOT NULL DEFAULT 'main', status TEXT NOT NULL DEFAULT 'idle',
-      cwd TEXT NOT NULL, model_override TEXT NOT NULL DEFAULT '',
-      pinned INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
-    )`)
-    db.exec(
-      "INSERT INTO cowork_sessions (id, title, cwd, created_at, updated_at) VALUES ('s1', 'Test', '/tmp', 1000, 1000)"
-    )
-    initDatabase(db)
-    const hasOld = db
-      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='cowork_sessions'")
-      .get()
-    expect(hasOld).toBeUndefined()
-    const row = db.prepare("SELECT * FROM sessions WHERE id = 's1'").get() as Record<
-      string,
-      unknown
-    >
-    expect(row).toBeDefined()
-    expect(row.directory_path).toBe('/tmp')
-    db.close()
-  })
-
-  it('should migrate cowork_messages to messages', () => {
-    const db = new Database(':memory:')
-    // 创建旧的 cowork_sessions 和 cowork_messages 表
-    db.exec(`CREATE TABLE cowork_sessions (
-      id TEXT PRIMARY KEY, title TEXT NOT NULL, claude_session_id TEXT,
-      agent_id TEXT NOT NULL DEFAULT 'main', status TEXT NOT NULL DEFAULT 'idle',
-      cwd TEXT NOT NULL, model_override TEXT NOT NULL DEFAULT '',
-      pinned INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
-    )`)
-    db.exec(
-      "INSERT INTO cowork_sessions (id, title, cwd, created_at, updated_at) VALUES ('s1', 'Test', '/tmp', 1000, 1000)"
-    )
-    db.exec(`CREATE TABLE cowork_messages (
-      id TEXT PRIMARY KEY, session_id TEXT NOT NULL, type TEXT NOT NULL,
-      content TEXT NOT NULL, metadata TEXT NOT NULL DEFAULT '{}', timestamp INTEGER NOT NULL
-    )`)
-    db.exec("INSERT INTO cowork_messages VALUES ('m1', 's1', 'user', 'hello', '{}', 2000)")
-    initDatabase(db)
-    const hasOld = db
-      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='cowork_messages'")
-      .get()
-    expect(hasOld).toBeUndefined()
-    const row = db.prepare("SELECT * FROM messages WHERE id = 'm1'").get() as Record<
-      string,
-      unknown
-    >
-    expect(row).toBeDefined()
-    expect(row.content).toBe('hello')
-    expect(row.created_at).toBe(2000)
-    db.close()
-  })
-
-  it('should drop v1 messages table with role column and recreate', () => {
-    const db = new Database(':memory:')
-    // 需要一个旧表来触发迁移流程
-    db.exec('CREATE TABLE agents (id TEXT PRIMARY KEY, name TEXT)')
-    // 创建 v1 版本的 messages 表（有 role 列）
-    db.exec(`CREATE TABLE messages (
-      id TEXT PRIMARY KEY, session_id TEXT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL
-    )`)
-    db.exec("INSERT INTO messages VALUES ('m1', 's1', 'user', 'old msg')")
-    initDatabase(db)
-    // 旧数据应被清除，表结构应更新为含 type 列
-    const cols = db.prepare("PRAGMA table_info('messages')").all() as Array<{ name: string }>
-    const colNames = cols.map((c) => c.name)
-    expect(colNames).toContain('type')
-    expect(colNames).not.toContain('role')
-    // 旧数据不保留
-    const rows = db.prepare('SELECT * FROM messages').all()
-    expect(rows).toHaveLength(0)
-    db.close()
-  })
-})
-
 describe('scheduled_task_meta table', () => {
   let db: Database.Database
 
@@ -413,12 +284,15 @@ describe('scheduled_task_meta table', () => {
   })
 
   it('should insert task metadata', () => {
+    const now = Date.now()
     db.prepare(
-      `INSERT INTO scheduled_task_meta (task_id, directory_path, agent_id, origin, binding) VALUES (?, ?, ?, ?, ?)`
-    ).run('task-1', '/tmp/proj', 'ws-abc', 'cron', null)
+      `INSERT INTO scheduled_task_meta (task_id, directory_path, agent_id, origin, binding, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run('task-1', '/tmp/proj', 'ws-abc', 'cron', null, now, now)
     const row = db
       .prepare('SELECT * FROM scheduled_task_meta WHERE task_id = ?')
       .get('task-1') as Record<string, unknown>
     expect(row.directory_path).toBe('/tmp/proj')
+    expect(row.created_at).toBe(now)
+    expect(row.updated_at).toBe(now)
   })
 })

@@ -2,11 +2,11 @@ import { ipcMain, BrowserWindow, Menu, app } from 'electron'
 
 export interface WindowIpcDeps {
   getPetWindow: () => BrowserWindow | null
-  toggleChatWindow: () => void
+  toggleMainWindow: () => void
 }
 
 export function registerWindowIpcHandlers(deps: WindowIpcDeps): void {
-  const { getPetWindow, toggleChatWindow } = deps
+  const { getPetWindow, toggleMainWindow } = deps
 
   ipcMain.on('window:move', (event, dx: number, dy: number) => {
     const win = BrowserWindow.fromWebContents(event.sender)
@@ -16,7 +16,7 @@ export function registerWindowIpcHandlers(deps: WindowIpcDeps): void {
   })
 
   ipcMain.on('chat:toggle', () => {
-    toggleChatWindow()
+    toggleMainWindow()
   })
 
   ipcMain.on('pet:context-menu', (_event, paused: boolean) => {

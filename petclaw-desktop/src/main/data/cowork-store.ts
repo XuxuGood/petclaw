@@ -19,7 +19,7 @@ export class CoworkStore {
     this.db
       .prepare(
         `
-      INSERT INTO sessions (id, title, directory_path, agent_id, created_at, updated_at)
+      INSERT INTO cowork_sessions (id, title, directory_path, agent_id, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?)
     `
       )
@@ -28,7 +28,7 @@ export class CoworkStore {
   }
 
   getSession(id: string): CoworkSession | null {
-    const row = this.db.prepare('SELECT * FROM sessions WHERE id = ?').get(id) as
+    const row = this.db.prepare('SELECT * FROM cowork_sessions WHERE id = ?').get(id) as
       | Record<string, unknown>
       | undefined
     if (!row) return null
@@ -37,9 +37,9 @@ export class CoworkStore {
   }
 
   getSessions(): CoworkSession[] {
-    const rows = this.db.prepare('SELECT * FROM sessions ORDER BY updated_at DESC').all() as Array<
-      Record<string, unknown>
-    >
+    const rows = this.db
+      .prepare('SELECT * FROM cowork_sessions ORDER BY updated_at DESC')
+      .all() as Array<Record<string, unknown>>
     return rows.map((row) => this.rowToSession(row, []))
   }
 
@@ -48,7 +48,7 @@ export class CoworkStore {
     updates: Partial<
       Pick<
         CoworkSession,
-        'title' | 'claudeSessionId' | 'status' | 'directoryPath' | 'modelOverride'
+        'title' | 'engineSessionId' | 'status' | 'directoryPath' | 'modelOverride'
       >
     >
   ): void {
@@ -59,9 +59,9 @@ export class CoworkStore {
       fields.push('title = ?')
       values.push(updates.title)
     }
-    if (updates.claudeSessionId !== undefined) {
-      fields.push('claude_session_id = ?')
-      values.push(updates.claudeSessionId)
+    if (updates.engineSessionId !== undefined) {
+      fields.push('engine_session_id = ?')
+      values.push(updates.engineSessionId)
     }
     if (updates.status !== undefined) {
       fields.push('status = ?')
@@ -82,11 +82,11 @@ export class CoworkStore {
     values.push(Date.now())
     values.push(id)
 
-    this.db.prepare(`UPDATE sessions SET ${fields.join(', ')} WHERE id = ?`).run(...values)
+    this.db.prepare(`UPDATE cowork_sessions SET ${fields.join(', ')} WHERE id = ?`).run(...values)
   }
 
   deleteSession(id: string): void {
-    this.db.prepare('DELETE FROM sessions WHERE id = ?').run(id)
+    this.db.prepare('DELETE FROM cowork_sessions WHERE id = ?').run(id)
   }
 
   addMessage(
@@ -100,24 +100,26 @@ export class CoworkStore {
     this.db
       .prepare(
         `
-      INSERT INTO messages (id, session_id, type, content, metadata, created_at)
+      INSERT INTO cowork_messages (id, session_id, type, content, metadata, created_at)
       VALUES (?, ?, ?, ?, ?, ?)
     `
       )
       .run(id, sessionId, type, content, JSON.stringify(metadata ?? {}), timestamp)
 
-    this.db.prepare('UPDATE sessions SET updated_at = ? WHERE id = ?').run(timestamp, sessionId)
+    this.db
+      .prepare('UPDATE cowork_sessions SET updated_at = ? WHERE id = ?')
+      .run(timestamp, sessionId)
 
     return { id, type, content, timestamp, metadata }
   }
 
   updateMessageContent(id: string, content: string): void {
-    this.db.prepare('UPDATE messages SET content = ? WHERE id = ?').run(content, id)
+    this.db.prepare('UPDATE cowork_messages SET content = ? WHERE id = ?').run(content, id)
   }
 
   getMessages(sessionId: string): CoworkMessage[] {
     const rows = this.db
-      .prepare('SELECT * FROM messages WHERE session_id = ? ORDER BY created_at ASC')
+      .prepare('SELECT * FROM cowork_messages WHERE session_id = ? ORDER BY created_at ASC')
       .all(sessionId) as Array<Record<string, unknown>>
     return rows.map((row) => ({
       id: row.id as string,
@@ -130,13 +132,17 @@ export class CoworkStore {
 
   resetRunningSessions(): void {
     this.db
-      .prepare("UPDATE sessions SET status = 'idle', updated_at = ? WHERE status = 'running'")
+      .prepare(
+        "UPDATE cowork_sessions SET status = 'idle', updated_at = ? WHERE status = 'running'"
+      )
       .run(Date.now())
   }
 
   getRecentDirectories(limit = 8): string[] {
     const rows = this.db
-      .prepare('SELECT DISTINCT directory_path FROM sessions ORDER BY updated_at DESC LIMIT ?')
+      .prepare(
+        'SELECT DISTINCT directory_path FROM cowork_sessions ORDER BY updated_at DESC LIMIT ?'
+      )
       .all(limit) as Array<{ directory_path: string }>
     return rows.map((r) => r.directory_path)
   }
@@ -145,7 +151,7 @@ export class CoworkStore {
     return {
       id: row.id as string,
       title: row.title as string,
-      claudeSessionId: (row.claude_session_id as string | null) ?? null,
+      engineSessionId: (row.engine_session_id as string | null) ?? null,
       status: row.status as CoworkSessionStatus,
       pinned: (row.pinned as number) === 1,
       directoryPath: row.directory_path as string,

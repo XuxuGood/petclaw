@@ -65,7 +65,7 @@ export function registerImIpcHandlers(deps: ImIpcDeps): void {
     }
   )
 
-  // 旧 settings handlers 降级兼容（IMSettings 已删除，返回空对象避免 preload 引用报错）
+  // 兼容旧 settings handlers（返回空对象避免 preload 引用报错）
   ipcMain.handle('im:load-settings', async () => ({}))
   ipcMain.handle('im:save-settings', async () => {})
 }

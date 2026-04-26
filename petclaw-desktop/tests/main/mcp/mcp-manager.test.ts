@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
 import { initDatabase } from '../../../src/main/data/db'
+import { McpStore } from '../../../src/main/data/mcp-store'
 import { McpManager } from '../../../src/main/mcp/mcp-manager'
 
 describe('McpManager', () => {
@@ -11,7 +12,8 @@ describe('McpManager', () => {
   beforeEach(() => {
     db = new Database(':memory:')
     initDatabase(db)
-    manager = new McpManager(db)
+    const store = new McpStore(db)
+    manager = new McpManager(store)
   })
 
   afterEach(() => {

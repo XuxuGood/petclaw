@@ -28,7 +28,7 @@ export interface OpenclawGatewayEvents {
   message: (sessionId: string, message: CoworkMessage) => void
   messageUpdate: (sessionId: string, messageId: string, content: string) => void
   permissionRequest: (sessionId: string, request: PermissionRequest) => void
-  complete: (sessionId: string, claudeSessionId: string | null) => void
+  complete: (sessionId: string, engineSessionId: string | null) => void
   error: (sessionId: string, error: string) => void
   connected: () => void
   disconnected: (reason: string) => void
@@ -194,8 +194,8 @@ export class OpenclawGateway extends EventEmitter {
     if (!sessionKey) return
 
     if (event === 'chat.final') {
-      const claudeSessionId = (payload.runId ?? null) as string | null
-      this.emit('complete', sessionKey, claudeSessionId)
+      const engineSessionId = (payload.runId ?? null) as string | null
+      this.emit('complete', sessionKey, engineSessionId)
       return
     }
 

@@ -4,7 +4,7 @@ import { EventEmitter } from 'events'
 import { CoworkController } from '../../../src/main/ai/cowork-controller'
 import type { CoworkMessage } from '../../../src/main/ai/types'
 import type { OpenclawGateway } from '../../../src/main/ai/gateway'
-import type { CoworkStore } from '../../../src/main/ai/cowork-store'
+import type { CoworkStore } from '../../../src/main/data/cowork-store'
 
 // Mock Gateway
 function createMockGateway() {
@@ -30,16 +30,14 @@ function createMockStore() {
       timestamp: Date.now()
     } satisfies CoworkMessage),
     updateMessageContent: vi.fn(),
-    getMessages: vi
-      .fn()
-      .mockReturnValue([
-        {
-          id: 'msg-1',
-          type: 'user',
-          content: 'test',
-          timestamp: Date.now()
-        } satisfies CoworkMessage
-      ])
+    getMessages: vi.fn().mockReturnValue([
+      {
+        id: 'msg-1',
+        type: 'user',
+        content: 'test',
+        timestamp: Date.now()
+      } satisfies CoworkMessage
+    ])
   }
 }
 
@@ -132,14 +130,14 @@ describe('CoworkController', () => {
       const listener = vi.fn()
       controller.on('complete', listener)
 
-      gateway.emit('complete', 'session-1', 'claude-session-abc')
+      gateway.emit('complete', 'session-1', 'engine-session-abc')
 
       expect(controller.isSessionActive('session-1')).toBe(false)
       expect(store.updateSession).toHaveBeenCalledWith('session-1', {
         status: 'completed',
-        claudeSessionId: 'claude-session-abc'
+        engineSessionId: 'engine-session-abc'
       })
-      expect(listener).toHaveBeenCalledWith('session-1', 'claude-session-abc')
+      expect(listener).toHaveBeenCalledWith('session-1', 'engine-session-abc')
     })
 
     it('error 事件 → 移除 activeSessionIds，更新 status=error', async () => {

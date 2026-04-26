@@ -6,8 +6,8 @@ import {
   USER_ROLES,
   type OnboardingStep,
   type Language
-} from '../stores/onboarding-store'
-import catStaticSrc from '../assets/cat/static.webm'
+} from '../../stores/onboarding-store'
+import catStaticSrc from '../../assets/cat/static.webm'
 
 /* ──────────────────────────────────────────
    Language bar

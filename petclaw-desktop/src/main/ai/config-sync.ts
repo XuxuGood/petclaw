@@ -1,5 +1,4 @@
 // config-sync.ts：将 Openclaw 运行时配置（openclaw.json）与当前 Manager 状态同步
-// 重构为直接依赖 Manager 对象（ConfigSyncOptions），移除 ConfigSyncDeps 函数注入接口
 import fs from 'fs'
 
 import type { DirectoryManager } from './directory-manager'

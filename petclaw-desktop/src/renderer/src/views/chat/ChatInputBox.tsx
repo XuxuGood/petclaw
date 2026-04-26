@@ -2,9 +2,9 @@ import { useRef, useState } from 'react'
 
 import { Send } from 'lucide-react'
 
-import { CwdSelector } from './CwdSelector'
-import { ModelSelector } from './ModelSelector'
-import { SkillSelector } from './SkillSelector'
+import { CwdSelector } from '../../components/CwdSelector'
+import { ModelSelector } from '../../components/ModelSelector'
+import { SkillSelector } from '../../views/skills/SkillSelector'
 
 interface ChatInputBoxProps {
   onSend: (message: string, cwd: string, skillIds: string[], modelOverride: string) => void

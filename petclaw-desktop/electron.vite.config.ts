@@ -29,7 +29,7 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve('src/renderer/index.html'),
-          chat: resolve('src/renderer/chat.html')
+          pet: resolve('src/renderer/pet.html')
         }
       }
     }

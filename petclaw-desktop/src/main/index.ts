@@ -9,13 +9,16 @@ import type { CronJobService } from './scheduler/cron-job-service'
 import type { ImGatewayManager } from './im/im-gateway-manager'
 
 import { initDatabase } from './data/db'
-import { migrateSettingsToKv } from './data/settings-migration'
 import { OpenclawEngineManager } from './ai/engine-manager'
 import { ConfigSync } from './ai/config-sync'
 import { OpenclawGateway } from './ai/gateway'
 import { CoworkController } from './ai/cowork-controller'
-import { CoworkStore } from './ai/cowork-store'
-import { SessionManager } from './ai/session-manager'
+import { CoworkStore } from './data/cowork-store'
+import { CoworkSessionManager } from './ai/cowork-session-manager'
+import { DirectoryStore } from './data/directory-store'
+import { ImStore } from './data/im-store'
+import { McpStore } from './data/mcp-store'
+import { ScheduledTaskMetaStore } from './data/scheduled-task-meta-store'
 import { DirectoryManager } from './ai/directory-manager'
 import { ModelRegistry } from './models/model-registry'
 import { SkillManager } from './skills/skill-manager'
@@ -33,22 +36,22 @@ import { resolveDatabasePath } from './database-path'
 import { initAutoUpdater } from './auto-updater'
 
 let petWindow: BrowserWindow | null = null
-let chatWindow: BrowserWindow | null = null
+let mainWindow: BrowserWindow | null = null
 let db: Database.Database
 let engineManager: OpenclawEngineManager
 let configSync: ConfigSync
 let coworkStore: CoworkStore
 let gateway: OpenclawGateway | null = null
 let coworkController: CoworkController | null = null
-let sessionManager: SessionManager | null = null
+let coworkSessionManager: CoworkSessionManager | null = null
 
-// Phase 2 Manager 实例声明（在 app.whenReady 中初始化）
+// Manager 实例声明（在 app.whenReady 中初始化）
 let directoryManager: DirectoryManager
 let modelRegistry: ModelRegistry
 let skillManager: SkillManager
 let mcpManager: McpManager
 let memoryManager: MemoryManager
-// Phase 3 集成功能实例
+// 集成功能实例
 let cronJobService: CronJobService | null = null
 let imGatewayManager: ImGatewayManager
 // workspacePath 在 whenReady 中确定，setupV3Runtime 需要引用
@@ -96,8 +99,8 @@ function createPetWindow(): void {
   ) {
     petX = savedPetPos.x
     petY = savedPetPos.y
-  } else if (chatWindow && chatWindow.isVisible()) {
-    const chatBounds = chatWindow.getBounds()
+  } else if (mainWindow && mainWindow.isVisible()) {
+    const chatBounds = mainWindow.getBounds()
     petX = chatBounds.x + chatBounds.width - PET_ANCHOR_OFFSET_X
     petY = chatBounds.y + chatBounds.height - PET_ANCHOR_OFFSET_Y
 
@@ -142,9 +145,9 @@ function createPetWindow(): void {
   })
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    petWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    petWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '/pet.html')
   } else {
-    petWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
+    petWindow.loadFile(path.join(__dirname, '../renderer/pet.html'))
   }
 
   // Persist pet position on move (debounced)
@@ -161,7 +164,7 @@ function createPetWindow(): void {
   })
 }
 
-function createChatWindow(): void {
+function createMainWindow(): void {
   const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize
   const chatW = Math.round(Math.min(Math.max(screenW * CHAT_W_RATIO, CHAT_W_MIN), CHAT_W_MAX))
   const chatH = Math.round(Math.min(Math.max(screenH * CHAT_H_RATIO, CHAT_H_MIN), CHAT_H_MAX))
@@ -193,7 +196,7 @@ function createChatWindow(): void {
     }
   }
 
-  chatWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: initialW,
     height: initialH,
     ...(initialX !== undefined && initialY !== undefined ? { x: initialX, y: initialY } : {}),
@@ -219,58 +222,58 @@ function createChatWindow(): void {
   const saveBounds = (): void => {
     if (boundsTimer) clearTimeout(boundsTimer)
     boundsTimer = setTimeout(() => {
-      if (!chatWindow || chatWindow.isDestroyed()) return
-      const bounds = chatWindow.getBounds()
+      if (!mainWindow || mainWindow.isDestroyed()) return
+      const bounds = mainWindow.getBounds()
       const settings = readAppSettings(settingsPath)
       settings.windowBounds = bounds
       writeAppSettings(settingsPath, settings)
     }, 500)
   }
-  chatWindow.on('resize', saveBounds)
-  chatWindow.on('move', saveBounds)
+  mainWindow.on('resize', saveBounds)
+  mainWindow.on('move', saveBounds)
 
-  chatWindow.on('close', (e) => {
+  mainWindow.on('close', (e) => {
     e.preventDefault()
-    chatWindow?.hide()
+    mainWindow?.hide()
   })
 
   // Prevent accidental resize from top edge (overlaps with drag region)
-  chatWindow.on('will-resize', (e, _newBounds, details) => {
+  mainWindow.on('will-resize', (e, _newBounds, details) => {
     if (details.edge === 'top-left' || details.edge === 'top-right') {
       e.preventDefault()
     }
   })
 
-  chatWindow.webContents.setWindowOpenHandler((details) => {
+  mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
   })
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    chatWindow.loadURL(process.env['ELECTRON_RENDERER_URL'] + '/chat.html')
+    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
-    chatWindow.loadFile(path.join(__dirname, '../renderer/chat.html'))
+    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'))
   }
 }
 
 let chatBoundsBeforeHide: Electron.Rectangle | null = null
 
-function toggleChatWindow(): void {
-  if (!chatWindow) return
-  if (chatWindow.isVisible()) {
-    chatBoundsBeforeHide = chatWindow.getBounds()
-    chatWindow.hide()
+function toggleMainWindow(): void {
+  if (!mainWindow) return
+  if (mainWindow.isVisible()) {
+    chatBoundsBeforeHide = mainWindow.getBounds()
+    mainWindow.hide()
   } else {
     if (chatBoundsBeforeHide) {
-      chatWindow.setBounds(chatBoundsBeforeHide)
+      mainWindow.setBounds(chatBoundsBeforeHide)
     }
-    chatWindow.show()
-    chatWindow.focus()
+    mainWindow.show()
+    mainWindow.focus()
   }
 }
 
 /**
- * v3 启动后初始化运行时：创建 Gateway 连接 + CoworkController + SessionManager
+ * 启动后初始化运行时：创建 Gateway 连接 + CoworkController + CoworkSessionManager
  * 只有 boot 成功后（拿到 port/token）才会调用
  */
 async function setupV3Runtime(port: number, token: string): Promise<void> {
@@ -286,18 +289,20 @@ async function setupV3Runtime(port: number, token: string): Promise<void> {
     }
   }
 
-  // 创建 CoworkController（事件路由）和 SessionManager（会话门面）
+  // 创建 CoworkController（事件路由）和 CoworkSessionManager（会话门面）
   coworkController = new CoworkController(gateway, coworkStore)
-  sessionManager = new SessionManager(coworkStore, coworkController, directoryManager)
+  coworkSessionManager = new CoworkSessionManager(coworkStore, coworkController, directoryManager)
 
-  // Phase 3: CronJobService — 定时任务 Gateway RPC 代理
+  // CronJobService — 定时任务 Gateway RPC 代理
   const { CronJobService: CronJobServiceClass } = await import('./scheduler/cron-job-service')
+  const scheduledTaskMetaStore = new ScheduledTaskMetaStore(db)
   cronJobService = new CronJobServiceClass({
     // gateway 已在 boot 阶段建立连接，此处直接透传底层 client
     getGatewayClient: () => gateway?.getClient() ?? null,
     ensureGatewayReady: async () => {
       /* gateway 已在 boot 阶段就绪 */
-    }
+    },
+    metaStore: scheduledTaskMetaStore
   })
   cronJobService.startPolling()
 }
@@ -313,10 +318,6 @@ app.whenReady().then(async () => {
   db = new Database(dbPath)
   initDatabase(db)
 
-  // 1b. v1 迁移：将 petclaw-settings.json 中的设置一次性写入 kv 表
-  const oldSettingsPath = path.join(app.getPath('home'), '.petclaw', 'petclaw-settings.json')
-  migrateSettingsToKv(db, oldSettingsPath)
-
   // 2. CoworkStore 防御性重置：上次崩溃遗留的 running 状态归零
   coworkStore = new CoworkStore(db)
   coworkStore.resetRunningSessions()
@@ -324,12 +325,13 @@ app.whenReady().then(async () => {
   // 3. EngineManager 初始化
   engineManager = new OpenclawEngineManager()
 
-  // 4. Phase 2: Manager 初始化（在 ConfigSync 之前，ConfigSync 直接依赖 Manager 实例）
+  // 4. Manager 初始化（在 ConfigSync 之前，ConfigSync 直接依赖 Manager 实例）
   const petclawHome = path.join(app.getPath('home'), '.petclaw')
   workspacePath = path.join(petclawHome, 'workspace')
 
   // DirectoryManager：Directory CRUD，目录自动注册
-  directoryManager = new DirectoryManager(db, workspacePath)
+  const directoryStore = new DirectoryStore(db)
+  directoryManager = new DirectoryManager(directoryStore, workspacePath)
 
   // ModelRegistry：加载持久化的 Provider 配置和活跃模型
   modelRegistry = new ModelRegistry(db)
@@ -342,14 +344,16 @@ app.whenReady().then(async () => {
   await skillManager.scan()
 
   // McpManager：MCP 服务器 CRUD，数据持久化在 SQLite
-  mcpManager = new McpManager(db)
+  const mcpStore = new McpStore(db)
+  mcpManager = new McpManager(mcpStore)
 
   // MemoryManager：纯文件驱动，不依赖 db，无构造参数
   memoryManager = new MemoryManager()
 
-  // Phase 3: ImGatewayManager — IM 平台配置管理（不依赖 Gateway 连接，仅操作本地 SQLite）
+  // ImGatewayManager — IM 平台配置管理（不依赖 Gateway 连接，仅操作本地 SQLite）
   const { ImGatewayManager: ImGatewayManagerClass } = await import('./im/im-gateway-manager')
-  imGatewayManager = new ImGatewayManagerClass(db)
+  const imStore = new ImStore(db)
+  imGatewayManager = new ImGatewayManagerClass(imStore)
 
   // 5. ConfigSync 初始化（新接口直接注入 Manager，移除旧函数注入方式）
   configSync = new ConfigSync({
@@ -376,7 +380,7 @@ app.whenReady().then(async () => {
   }
 
   // 8. 创建 chat 窗口（立即显示 BootCheck UI）
-  createChatWindow()
+  createMainWindow()
 
   // 9. 注册启动阶段 IPC（boot 检查和设置查询，不依赖 petWindow）
   ipcMain.handle('app:version', async () => app.getVersion())
@@ -385,44 +389,44 @@ app.whenReady().then(async () => {
   registerBootIpcHandlers({ db })
   registerSettingsIpcHandlers({ db })
 
-  chatWindow?.webContents.on('did-finish-load', () => {
-    diagWindowLoad('chat-window', chatWindow?.webContents.getURL())
+  mainWindow?.webContents.on('did-finish-load', () => {
+    diagWindowLoad('chat-window', mainWindow?.webContents.getURL())
   })
 
   // 10. 等待 chat 窗口就绪（内容已绘制）
   await new Promise<void>((resolve) => {
-    chatWindow?.once('ready-to-show', () => resolve())
+    mainWindow?.once('ready-to-show', () => resolve())
   })
-  chatWindow?.show()
-  chatWindow?.focus()
+  mainWindow?.show()
+  mainWindow?.focus()
 
-  // 11. 运行 BootCheck（v3：环境 → 引擎 → 连接，进度推送到 chat 窗口）
-  const bootResult = await runBootCheck(chatWindow!, engineManager, configSync)
+  // 11. 运行 BootCheck（环境 → 引擎 → 连接，进度推送到 chat 窗口）
+  const bootResult = await runBootCheck(mainWindow!, engineManager, configSync)
   diagBootResult(bootResult.success)
 
   // 12. 处理 boot 重试（renderer 发起）
   ipcMain.on('boot:retry', async () => {
-    if (!chatWindow) return
-    const retryResult = await runBootCheck(chatWindow, engineManager, configSync)
+    if (!mainWindow) return
+    const retryResult = await runBootCheck(mainWindow, engineManager, configSync)
     diagBootResult(retryResult.success)
 
     if (retryResult.success) {
       await setupV3Runtime(retryResult.port!, retryResult.token!)
       await new Promise((r) => setTimeout(r, 1500))
-      chatWindow.webContents.send('boot:complete', true)
+      mainWindow.webContents.send('boot:complete', true)
     } else {
-      chatWindow.webContents.send('boot:complete', false)
+      mainWindow.webContents.send('boot:complete', false)
     }
   })
 
-  // 13. Boot 成功 → 初始化 v3 运行时（Gateway + Controller + SessionManager）
+  // 13. Boot 成功 → 初始化运行时（Gateway + CoworkController + CoworkSessionManager）
   if (bootResult.success) {
     await setupV3Runtime(bootResult.port!, bootResult.token!)
   }
 
-  // Phase 4: 初始化自动更新（boot 成功后，生产环境延迟检查）
+  // 初始化自动更新（boot 成功后，生产环境延迟检查）
   if (!is.dev) {
-    initAutoUpdater(chatWindow!)
+    initAutoUpdater(mainWindow!)
   }
 
   // 14. 启动 Hook Server
@@ -436,7 +440,7 @@ app.whenReady().then(async () => {
     await new Promise((r) => setTimeout(r, 2000))
   }
   bootSuccess = bootResult.success
-  chatWindow?.webContents.send('boot:complete', bootSuccess)
+  mainWindow?.webContents.send('boot:complete', bootSuccess)
 
   // 16. chat 窗口进入主界面后创建 pet 窗口并注册完整 IPC
   let petCreated = false
@@ -450,14 +454,14 @@ app.whenReady().then(async () => {
     })
 
     // 注册需要双窗口的 IPC 处理器
-    if (petWindow && chatWindow) {
+    if (petWindow && mainWindow) {
       // registerAllIpcHandlers 统一注册全部模块 IPC，
-      // Chat/Session/Manager IPC 需要 v3 运行时（sessionManager + coworkController），
-      // boot 失败时 sessionManager / coworkController 为 null，chat:send 等会报 500 错误，
+      // Chat/Session/Manager IPC 需要运行时（coworkSessionManager + coworkController），
+      // boot 失败时 coworkSessionManager / coworkController 为 null，chat:send 等会报 500 错误，
       // 但 UI 层保证 boot 失败后不允许发送，所以这里以 null 断言传入
       registerAllIpcHandlers({
         db,
-        sessionManager: sessionManager!,
+        coworkSessionManager: coworkSessionManager!,
         coworkController: coworkController!,
         directoryManager,
         modelRegistry,
@@ -466,9 +470,9 @@ app.whenReady().then(async () => {
         memoryManager,
         cronJobService: cronJobService!,
         imGatewayManager,
-        getChatWindow: () => chatWindow,
+        getMainWindow: () => mainWindow,
         getPetWindow: () => petWindow,
-        toggleChatWindow,
+        toggleMainWindow,
         hookServer
       })
 
@@ -483,14 +487,14 @@ app.whenReady().then(async () => {
         )
       }
 
-      createTray(petWindow, chatWindow, toggleChatWindow)
-      registerShortcuts(petWindow, chatWindow, toggleChatWindow)
+      createTray(petWindow, mainWindow, toggleMainWindow)
+      registerShortcuts(petWindow, mainWindow, toggleMainWindow)
     }
   })
 
   // 17. 引擎状态变更转发到 renderer
   engineManager.on('status', (status) => {
-    chatWindow?.webContents.send('engine:status', status)
+    mainWindow?.webContents.send('engine:status', status)
   })
 })
 
@@ -501,10 +505,10 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
-  chatWindow?.removeAllListeners('close')
-  chatWindow?.close()
+  mainWindow?.removeAllListeners('close')
+  mainWindow?.close()
 
-  // v3: 停止引擎进程 + 断开 gateway 连接
+  // 停止引擎进程 + 断开 gateway 连接
   engineManager?.stopGateway()
   gateway?.disconnect()
   db?.close()
@@ -513,7 +517,7 @@ app.on('before-quit', () => {
   unregisterShortcuts()
 })
 
-export { petWindow, chatWindow }
+export { petWindow, mainWindow }
 
 // Capture unhandled errors to diagnostics log
 process.on('unhandledRejection', (reason) => {

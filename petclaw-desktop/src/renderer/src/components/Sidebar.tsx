@@ -11,7 +11,7 @@ import {
   User
 } from 'lucide-react'
 
-import type { ViewType } from '../ChatApp'
+import type { ViewType } from '../App'
 
 // 目录数据结构（与后端 DirectoryManager 对应）
 interface DirectoryInfo {
@@ -20,7 +20,7 @@ interface DirectoryInfo {
   name: string | null
 }
 
-// 会话数据结构（与后端 SessionManager 对应）
+// 会话数据结构（与后端 CoworkSessionManager 对应）
 interface Session {
   id: string
   agentId: string

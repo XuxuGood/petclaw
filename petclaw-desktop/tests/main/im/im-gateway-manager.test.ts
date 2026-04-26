@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
 
 import { initDatabase } from '../../../src/main/data/db'
+import { ImStore } from '../../../src/main/data/im-store'
 import { ImGatewayManager } from '../../../src/main/im/im-gateway-manager'
 
 describe('ImGatewayManager', () => {
@@ -12,7 +13,8 @@ describe('ImGatewayManager', () => {
   beforeEach(() => {
     db = new Database(':memory:')
     initDatabase(db)
-    manager = new ImGatewayManager(db)
+    const store = new ImStore(db)
+    manager = new ImGatewayManager(store)
   })
 
   afterEach(() => db.close())
@@ -106,7 +108,7 @@ describe('ImGatewayManager', () => {
       // 需要先创建 session 以满足外键约束
       const now = Date.now()
       db.prepare(
-        'INSERT INTO sessions (id, title, directory_path, agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
+        'INSERT INTO cowork_sessions (id, title, directory_path, agent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
       ).run('sess-1', 'Test', '/tmp', 'main', now, now)
       manager.upsertSessionMapping('conv-1', inst.id, 'sess-1', 'main')
       const mapping = manager.getSessionMapping('conv-1', inst.id)

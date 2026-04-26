@@ -5,6 +5,8 @@ import os from 'os'
 import Database from 'better-sqlite3'
 
 import { initDatabase } from '../../../src/main/data/db'
+import { DirectoryStore } from '../../../src/main/data/directory-store'
+import { McpStore } from '../../../src/main/data/mcp-store'
 import { DirectoryManager } from '../../../src/main/ai/directory-manager'
 import { ModelRegistry } from '../../../src/main/models/model-registry'
 import { SkillManager } from '../../../src/main/skills/skill-manager'
@@ -29,13 +31,13 @@ describe('ConfigSync', () => {
     const skillsDir = path.join(tmpDir, 'skills')
     fs.mkdirSync(skillsDir, { recursive: true })
 
-    directoryManager = new DirectoryManager(db, workspacePath)
+    directoryManager = new DirectoryManager(new DirectoryStore(db), workspacePath)
 
     modelRegistry = new ModelRegistry(db)
     modelRegistry.load()
 
     skillManager = new SkillManager(db, skillsDir)
-    mcpManager = new McpManager(db)
+    mcpManager = new McpManager(new McpStore(db))
   })
 
   afterEach(() => {

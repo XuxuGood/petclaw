@@ -53,22 +53,22 @@ async function ensureMinDuration(start: number, ms: number): Promise<void> {
 // ── 主流程 ──
 
 /**
- * v3 启动检查：3 步（环境 → 引擎 → 连接）
+ * 启动检查：3 步（环境 → 引擎 → 连接）
  * EngineManager 管理 gateway 进程生命周期，ConfigSync 生成 openclaw.json
  */
 export async function runBootCheck(
-  chatWindow: BrowserWindow,
+  mainWindow: BrowserWindow,
   engineManager: OpenclawEngineManager,
   configSync: ConfigSync
 ): Promise<{ success: boolean; port?: number; token?: string }> {
   const steps = createSteps()
-  sendSteps(chatWindow, steps)
+  sendSteps(mainWindow, steps)
 
   const MIN_STEP_MS = 500
 
   // Step 1: env — 确保工作目录存在
   updateStep(steps, 'env', 'running')
-  sendSteps(chatWindow, steps)
+  sendSteps(mainWindow, steps)
   let stepStart = Date.now()
   try {
     const baseDir = engineManager.getBaseDir()
@@ -79,14 +79,14 @@ export async function runBootCheck(
     updateStep(steps, 'env', 'done')
   } catch (err) {
     updateStep(steps, 'env', 'error', (err as Error).message)
-    sendSteps(chatWindow, steps)
+    sendSteps(mainWindow, steps)
     return { success: false }
   }
-  sendSteps(chatWindow, steps)
+  sendSteps(mainWindow, steps)
 
   // Step 2: engine — 同步配置 + 启动 gateway
   updateStep(steps, 'engine', 'running')
-  sendSteps(chatWindow, steps)
+  sendSteps(mainWindow, steps)
   stepStart = Date.now()
   try {
     // ConfigSync 生成/更新 openclaw.json
@@ -105,14 +105,14 @@ export async function runBootCheck(
     updateStep(steps, 'engine', 'done')
   } catch (err) {
     updateStep(steps, 'engine', 'error', (err as Error).message)
-    sendSteps(chatWindow, steps)
+    sendSteps(mainWindow, steps)
     return { success: false }
   }
-  sendSteps(chatWindow, steps)
+  sendSteps(mainWindow, steps)
 
   // Step 3: connect — 验证 gateway 健康并读取连接信息
   updateStep(steps, 'connect', 'running')
-  sendSteps(chatWindow, steps)
+  sendSteps(mainWindow, steps)
   stepStart = Date.now()
   try {
     // startGateway 内部已等待就绪，这里读取最终连接信息
@@ -123,11 +123,11 @@ export async function runBootCheck(
 
     await ensureMinDuration(stepStart, MIN_STEP_MS)
     updateStep(steps, 'connect', 'done')
-    sendSteps(chatWindow, steps)
+    sendSteps(mainWindow, steps)
     return { success: true, port: connInfo.port, token: connInfo.token }
   } catch (err) {
     updateStep(steps, 'connect', 'error', (err as Error).message)
-    sendSteps(chatWindow, steps)
+    sendSteps(mainWindow, steps)
     return { success: false }
   }
 }

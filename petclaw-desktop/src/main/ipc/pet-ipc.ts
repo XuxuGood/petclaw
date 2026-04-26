@@ -4,15 +4,15 @@ import type { HookServer } from '../hooks/server'
 
 export interface PetIpcDeps {
   getPetWindow: () => BrowserWindow | null
-  getChatWindow: () => BrowserWindow | null
+  getMainWindow: () => BrowserWindow | null
   hookServer: HookServer | null
 }
 
 export function registerPetIpcHandlers(deps: PetIpcDeps): void {
-  const { getPetWindow, getChatWindow, hookServer } = deps
+  const { getPetWindow, getMainWindow, hookServer } = deps
 
   hookServer?.onEvent((event: unknown) => {
     getPetWindow()?.webContents.send('hook:event', event)
-    getChatWindow()?.webContents.send('hook:event', event)
+    getMainWindow()?.webContents.send('hook:event', event)
   })
 }
