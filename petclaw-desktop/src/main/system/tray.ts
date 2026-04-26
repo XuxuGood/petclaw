@@ -1,5 +1,7 @@
 import { Tray, Menu, nativeImage, app, BrowserWindow } from 'electron'
 
+import { t } from '../i18n'
+
 export function createTray(
   petWindow: BrowserWindow,
   mainWindow: BrowserWindow,
@@ -13,7 +15,7 @@ export function createTray(
 
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: '显示/隐藏宠物',
+      label: t('tray.togglePet'),
       click: () => {
         if (petWindow.isVisible()) {
           petWindow.hide()
@@ -23,14 +25,14 @@ export function createTray(
       }
     },
     {
-      label: '打开聊天',
+      label: t('tray.openChat'),
       click: () => {
         mainWindow.show()
         mainWindow.focus()
       }
     },
     {
-      label: 'AI 工具监控',
+      label: t('tray.monitor'),
       click: () => {
         mainWindow.show()
         mainWindow.focus()
@@ -39,7 +41,7 @@ export function createTray(
     },
     { type: 'separator' },
     {
-      label: '退出 PetClaw',
+      label: t('tray.quit'),
       click: () => {
         app.quit()
       }

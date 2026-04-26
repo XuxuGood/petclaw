@@ -1,8 +1,11 @@
+import fs from 'fs'
+
 import type { CoworkStore } from '../data/cowork-store'
 import type { CoworkController } from './cowork-controller'
 import type { CoworkSession, CoworkStartOptions } from './types'
 import { deriveAgentId } from './types'
 import type { DirectoryManager } from './directory-manager'
+import { t } from '../i18n'
 
 export class CoworkSessionManager {
   constructor(
@@ -17,18 +20,30 @@ export class CoworkSessionManager {
     prompt: string,
     options?: CoworkStartOptions
   ): CoworkSession {
+    // 校验工作目录是否存在
+    if (!fs.existsSync(cwd)) {
+      throw new Error(t('error.dirNotFound', { path: cwd }))
+    }
     // 幂等注册目录，确保 directories 表有记录
     this.directoryManager.ensureRegistered(cwd)
     // 由目录路径确定性派生 agentId，不再依赖用户传入
     const agentId = deriveAgentId(cwd)
     const session = this.store.createSession(title, cwd, agentId)
-    // workspace = cwd 本身，不再需要 workspaceRoot 路由
-    this.controller.startSession(session.id, prompt, options)
+    // fire-and-forget: session-manager 不阻塞到 turn 完成
+    // 错误通过 controller 的 error 事件传递到 UI 层
+    void this.controller.startSession(session.id, prompt, options).catch(() => {
+      // 错误已在 controller 内处理（status=error + emit error），这里只防止 unhandled rejection
+    })
     return session
   }
 
   continueSession(sessionId: string, prompt: string): void {
-    this.controller.continueSession(sessionId, prompt)
+    // 校验会话工作目录是否仍然存在
+    const session = this.store.getSession(sessionId)
+    if (session && !fs.existsSync(session.directoryPath)) {
+      throw new Error(t('error.dirDeleted', { path: session.directoryPath }))
+    }
+    void this.controller.continueSession(sessionId, prompt).catch(() => {})
   }
 
   stopSession(sessionId: string): void {
@@ -55,15 +70,11 @@ export class CoworkSessionManager {
       this.controller.stopSession(id)
     }
     this.store.deleteSession(id)
+    // 清理 controller 内部关联状态（映射表、缓存等），防止内存泄漏
+    this.controller.onSessionDeleted(id)
   }
 
   getRecentDirectories(limit?: number): string[] {
     return this.store.getRecentDirectories(limit)
-  }
-
-  // 生成 agent 感知的会话 key，格式：agent:{agentId}:petclaw:{sessionId}
-  // 用于 Openclaw 运行时识别会话归属
-  private buildSessionKey(agentId: string, sessionId: string): string {
-    return `agent:${agentId}:petclaw:${sessionId}`
   }
 }

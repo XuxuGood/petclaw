@@ -1,5 +1,7 @@
 import { ipcMain, BrowserWindow, Menu, app } from 'electron'
 
+import { t } from '../i18n'
+
 export interface WindowIpcDeps {
   getPetWindow: () => BrowserWindow | null
   toggleMainWindow: () => void
@@ -24,11 +26,11 @@ export function registerWindowIpcHandlers(deps: WindowIpcDeps): void {
     if (!petWin) return
     const menu = Menu.buildFromTemplate([
       {
-        label: paused ? '继续' : '停一下',
+        label: paused ? t('pet.resume') : t('pet.pause'),
         click: () => petWin.webContents.send('pet:toggle-pause')
       },
       { type: 'separator' },
-      { label: '退出', click: () => app.quit() }
+      { label: t('pet.quit'), click: () => app.quit() }
     ])
     menu.popup({ window: petWin })
   })

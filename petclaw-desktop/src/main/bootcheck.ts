@@ -4,6 +4,7 @@ import { join } from 'path'
 
 import type { ConfigSync } from './ai/config-sync'
 import type { OpenclawEngineManager } from './ai/engine-manager'
+import { t } from './i18n'
 
 // ── 类型 ──
 
@@ -19,9 +20,9 @@ export interface BootStep {
 
 function createSteps(): BootStep[] {
   return [
-    { id: 'env', label: '准备环境', status: 'pending', hint: '~1秒' },
-    { id: 'engine', label: '启动引擎', status: 'pending', hint: '~10秒' },
-    { id: 'connect', label: '连接服务', status: 'pending', hint: '~5秒' }
+    { id: 'env', label: t('boot.stepEnv'), status: 'pending', hint: t('boot.hintEnv') },
+    { id: 'engine', label: t('boot.stepEngine'), status: 'pending', hint: t('boot.hintEngine') },
+    { id: 'connect', label: t('boot.stepConnect'), status: 'pending', hint: t('boot.hintConnect') }
   ]
 }
 
@@ -98,7 +99,7 @@ export async function runBootCheck(
     // EngineManager 启动 gateway 进程并等待就绪
     const status = await engineManager.startGateway()
     if (status.phase !== 'ready') {
-      throw new Error(status.message || 'Gateway 启动失败')
+      throw new Error(status.message || t('boot.gatewayFailed'))
     }
 
     await ensureMinDuration(stepStart, MIN_STEP_MS)
@@ -118,7 +119,7 @@ export async function runBootCheck(
     // startGateway 内部已等待就绪，这里读取最终连接信息
     const connInfo = engineManager.getGatewayConnectionInfo()
     if (!connInfo.port || !connInfo.token) {
-      throw new Error('Gateway 连接信息不完整')
+      throw new Error(t('boot.gatewayIncomplete'))
     }
 
     await ensureMinDuration(stepStart, MIN_STEP_MS)
