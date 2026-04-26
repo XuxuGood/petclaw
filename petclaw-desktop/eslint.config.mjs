@@ -33,5 +33,10 @@ export default tseslint.config(
   {
     files: ['tests/**/*.{ts,tsx}'],
     languageOptions: { globals: { ...globals.node } }
+  },
+  {
+    // logger.ts must access console.* to intercept and forward them to electron-log
+    files: ['src/main/logger.ts'],
+    rules: { 'no-console': 'off' }
   }
 )
