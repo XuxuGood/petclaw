@@ -93,12 +93,13 @@ interface ElectronAPI {
     ) => () => void
   }
   // v3 Phase 2: Manager APIs
-  agents: {
+  directories: {
     list: () => Promise<unknown>
-    get: (id: string) => Promise<unknown>
-    create: (data: unknown) => Promise<unknown>
-    update: (id: string, patch: unknown) => Promise<unknown>
-    delete: (id: string) => Promise<unknown>
+    get: (agentId: string) => Promise<unknown>
+    getByPath: (path: string) => Promise<unknown>
+    updateName: (agentId: string, name: string) => Promise<void>
+    updateModel: (agentId: string, model: string) => Promise<void>
+    updateSkills: (agentId: string, skillIds: string[]) => Promise<void>
   }
   models: {
     providers: () => Promise<unknown>

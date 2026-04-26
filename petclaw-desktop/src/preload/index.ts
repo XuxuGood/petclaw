@@ -201,12 +201,16 @@ const api = {
   },
 
   // ── v3 Phase 2: Manager APIs ──
-  agents: {
-    list: () => ipcRenderer.invoke('agents:list'),
-    get: (id: string) => ipcRenderer.invoke('agents:get', id),
-    create: (data: unknown) => ipcRenderer.invoke('agents:create', data),
-    update: (id: string, patch: unknown) => ipcRenderer.invoke('agents:update', id, patch),
-    delete: (id: string) => ipcRenderer.invoke('agents:delete', id)
+  directories: {
+    list: () => ipcRenderer.invoke('directory:list'),
+    get: (agentId: string) => ipcRenderer.invoke('directory:get', agentId),
+    getByPath: (path: string) => ipcRenderer.invoke('directory:get-by-path', path),
+    updateName: (agentId: string, name: string) =>
+      ipcRenderer.invoke('directory:update-name', agentId, name),
+    updateModel: (agentId: string, model: string) =>
+      ipcRenderer.invoke('directory:update-model', agentId, model),
+    updateSkills: (agentId: string, skillIds: string[]) =>
+      ipcRenderer.invoke('directory:update-skills', agentId, skillIds)
   },
   models: {
     providers: () => ipcRenderer.invoke('models:providers'),
