@@ -13,11 +13,11 @@ import {
 
 import type { ViewType } from '../ChatApp'
 
-// Agent 数据结构（与后端 AgentManager 对应）
-interface Agent {
-  id: string
-  name: string
-  avatar?: string
+// 目录数据结构（与后端 DirectoryManager 对应）
+interface DirectoryInfo {
+  agentId: string
+  path: string
+  name: string | null
 }
 
 // 会话数据结构（与后端 SessionManager 对应）
@@ -31,8 +31,8 @@ interface Session {
 interface SidebarProps {
   activeView: ViewType
   onViewChange: (view: ViewType) => void
-  currentAgentId: string
-  onAgentChange: (agentId: string) => void
+  currentDirectoryId: string
+  onDirectoryChange: (agentId: string) => void
   activeSessionId: string | null
   onSessionSelect: (id: string) => void
   sidebarTab: 'tasks' | 'channels'
@@ -44,8 +44,8 @@ interface SidebarProps {
 export function Sidebar({
   activeView,
   onViewChange,
-  currentAgentId,
-  onAgentChange,
+  currentDirectoryId,
+  onDirectoryChange,
   activeSessionId,
   onSessionSelect,
   sidebarTab,
@@ -53,35 +53,35 @@ export function Sidebar({
   onNewTask,
   onSettingsOpen
 }: SidebarProps) {
-  const [agents, setAgents] = useState<Agent[]>([])
+  const [directories, setDirectories] = useState<DirectoryInfo[]>([])
   const [sessions, setSessions] = useState<Session[]>([])
-  const [agentMenuOpen, setAgentMenuOpen] = useState(false)
+  const [dirMenuOpen, setDirMenuOpen] = useState(false)
 
-  // 加载 Agent 列表
+  // 加载目录列表
   useEffect(() => {
-    window.api.agents.list().then((raw: unknown) => {
+    window.api.directories.list().then((raw: unknown) => {
       if (Array.isArray(raw)) {
-        setAgents(raw as Agent[])
+        setDirectories(raw as DirectoryInfo[])
       }
     })
   }, [])
 
-  // 加载会话列表（每次 currentAgentId 变化时重新过滤）
+  // 加载会话列表（每次 currentDirectoryId 变化时重新过滤）
   useEffect(() => {
     window.api.cowork.sessions().then((raw: unknown) => {
       if (Array.isArray(raw)) {
         setSessions(raw as Session[])
       }
     })
-  }, [currentAgentId])
+  }, [currentDirectoryId])
 
-  // 当前 Agent 显示名称
-  const currentAgent = agents.find((a) => a.id === currentAgentId)
-  const agentDisplayName = currentAgent?.name ?? 'PetClaw'
+  // 当前目录显示名称
+  const currentDir = directories.find((d) => d.agentId === currentDirectoryId)
+  const dirDisplayName = currentDir?.name ?? currentDir?.path.split('/').pop() ?? 'PetClaw'
 
-  // 过滤当前 Agent 的会话列表，按更新时间倒序
+  // 过滤当前目录的会话列表，按更新时间倒序
   const filteredSessions = sessions
-    .filter((s) => s.agentId === currentAgentId)
+    .filter((s) => s.agentId === currentDirectoryId)
     .sort((a, b) => b.updatedAt - a.updatedAt)
 
   return (
@@ -159,41 +159,41 @@ export function Sidebar({
       {/* 分隔线 */}
       <div className="mx-4 mt-1.5 mb-1.5 h-px bg-border" />
 
-      {/* 我的 Agent 区 */}
+      {/* 工作目录区 */}
       <div className="px-3 mb-1">
         <div className="px-2 mb-1.5">
-          <span className="text-[11px] text-text-tertiary font-medium">我的 Agent</span>
+          <span className="text-[11px] text-text-tertiary font-medium">工作目录</span>
         </div>
-        {/* Agent 选择器 */}
+        {/* 目录选择器 */}
         <div className="relative">
           <button
-            onClick={() => setAgentMenuOpen((p) => !p)}
+            onClick={() => setDirMenuOpen((p) => !p)}
             className="no-drag w-full flex items-center gap-2.5 px-3 py-[7px] rounded-[10px] text-[13px] text-text-secondary hover:text-text-primary hover:bg-bg-hover active:scale-[0.96] transition-all duration-[120ms] ease"
           >
-            {/* Agent 头像占位 */}
+            {/* 目录图标 */}
             <div className="w-5 h-5 rounded-full bg-accent flex items-center justify-center shrink-0">
               <PawPrint size={10} className="text-white" strokeWidth={2.5} />
             </div>
-            <span className="flex-1 text-left truncate text-text-primary">{agentDisplayName}</span>
+            <span className="flex-1 text-left truncate text-text-primary">{dirDisplayName}</span>
             <ChevronDown
               size={13}
-              className={`shrink-0 transition-transform duration-[120ms] ${agentMenuOpen ? 'rotate-180' : ''}`}
+              className={`shrink-0 transition-transform duration-[120ms] ${dirMenuOpen ? 'rotate-180' : ''}`}
               strokeWidth={2}
             />
           </button>
 
-          {/* Agent 下拉菜单 */}
-          {agentMenuOpen && agents.length > 0 && (
+          {/* 目录下拉菜单 */}
+          {dirMenuOpen && directories.length > 0 && (
             <div className="absolute top-full left-0 right-0 mt-1 bg-bg-card border border-border rounded-[10px] shadow-[var(--shadow-dropdown)] z-10 overflow-hidden">
-              {agents.map((agent) => (
+              {directories.map((dir) => (
                 <button
-                  key={agent.id}
+                  key={dir.agentId}
                   onClick={() => {
-                    onAgentChange(agent.id)
-                    setAgentMenuOpen(false)
+                    onDirectoryChange(dir.agentId)
+                    setDirMenuOpen(false)
                   }}
                   className={`no-drag w-full flex items-center gap-2.5 px-3 py-[7px] text-[13px] transition-all duration-[120ms] ease active:scale-[0.96] ${
-                    agent.id === currentAgentId
+                    dir.agentId === currentDirectoryId
                       ? 'bg-bg-active text-text-primary font-medium'
                       : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
                   }`}
@@ -201,7 +201,7 @@ export function Sidebar({
                   <div className="w-5 h-5 rounded-full bg-accent flex items-center justify-center shrink-0">
                     <PawPrint size={10} className="text-white" strokeWidth={2.5} />
                   </div>
-                  <span className="truncate">{agent.name}</span>
+                  <span className="truncate">{dir.name ?? dir.path.split('/').pop()}</span>
                 </button>
               ))}
             </div>

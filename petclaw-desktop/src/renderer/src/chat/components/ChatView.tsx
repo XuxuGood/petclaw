@@ -11,7 +11,7 @@ import { TaskMonitorPanel } from './TaskMonitorPanel'
 interface ChatViewProps {
   activeSessionId?: string | null
   onSessionCreated?: (id: string) => void
-  currentAgentId?: string
+  currentDirectoryId?: string
   taskMonitorOpen?: boolean
   onToggleMonitor?: () => void
 }
@@ -19,7 +19,7 @@ interface ChatViewProps {
 export function ChatView({
   activeSessionId,
   onSessionCreated,
-  currentAgentId: _currentAgentId,
+  currentDirectoryId: _currentDirectoryId,
   taskMonitorOpen,
   onToggleMonitor
 }: ChatViewProps) {

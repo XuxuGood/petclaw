@@ -23,7 +23,7 @@ const MENU_SECTIONS = [
   {
     label: 'AI 配置',
     items: [
-      { id: 'engine', label: 'Agent 引擎', icon: '⚙️' },
+      { id: 'engine', label: '引擎', icon: '⚙️' },
       { id: 'models', label: '模型', icon: '🧠' },
       { id: 'directories', label: '工作目录', icon: '📂' },
       { id: 'memory', label: '记忆', icon: '📝' }

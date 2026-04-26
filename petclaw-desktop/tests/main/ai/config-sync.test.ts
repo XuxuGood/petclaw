@@ -5,7 +5,7 @@ import os from 'os'
 import Database from 'better-sqlite3'
 
 import { initDatabase } from '../../../src/main/data/db'
-import { AgentManager } from '../../../src/main/agents/agent-manager'
+import { DirectoryManager } from '../../../src/main/ai/directory-manager'
 import { ModelRegistry } from '../../../src/main/models/model-registry'
 import { SkillManager } from '../../../src/main/skills/skill-manager'
 import { McpManager } from '../../../src/main/mcp/mcp-manager'
@@ -14,7 +14,7 @@ import { ConfigSync } from '../../../src/main/ai/config-sync'
 describe('ConfigSync', () => {
   let db: Database.Database
   let tmpDir: string
-  let agentManager: AgentManager
+  let directoryManager: DirectoryManager
   let modelRegistry: ModelRegistry
   let skillManager: SkillManager
   let mcpManager: McpManager
@@ -29,8 +29,7 @@ describe('ConfigSync', () => {
     const skillsDir = path.join(tmpDir, 'skills')
     fs.mkdirSync(skillsDir, { recursive: true })
 
-    agentManager = new AgentManager(db, workspacePath)
-    agentManager.ensurePresetAgents()
+    directoryManager = new DirectoryManager(db, workspacePath)
 
     modelRegistry = new ModelRegistry(db)
     modelRegistry.load()
@@ -48,11 +47,10 @@ describe('ConfigSync', () => {
     return new ConfigSync({
       configPath: overridePath ?? path.join(tmpDir, 'openclaw.json'),
       stateDir: tmpDir,
-      agentManager,
+      directoryManager,
       modelRegistry,
       skillManager,
-      mcpManager,
-      workspacePath: path.join(tmpDir, 'workspace')
+      mcpManager
     })
   }
 

@@ -1,18 +1,15 @@
-import path from 'path'
-
 import type { CoworkStore } from './cowork-store'
 import type { CoworkController } from './cowork-controller'
 import type { CoworkSession, CoworkStartOptions } from './types'
-import type { AgentManager } from '../agents/agent-manager'
+import { deriveAgentId } from './types'
+import type { DirectoryManager } from './directory-manager'
 
 export class SessionManager {
   constructor(
     private store: CoworkStore,
     private controller: CoworkController,
-    // Phase 2: 注入 AgentManager，用于 workspace 路由和 agent 感知
-    private agentManager: AgentManager,
-    private workspacePath: string,
-    private stateDir: string
+    // v3: 替代 AgentManager，用户选目录即自动注册 + 派生 agentId
+    private directoryManager: DirectoryManager
   ) {}
 
   createAndStart(
@@ -21,30 +18,13 @@ export class SessionManager {
     prompt: string,
     options?: CoworkStartOptions
   ): CoworkSession {
-    // 未指定 agentId 时回落到 main（系统默认 agent）
-    const agentId = options?.agentId || 'main'
-    const session = this.store.createSession(
-      title,
-      cwd,
-      options?.systemPrompt,
-      undefined,
-      options?.skillIds,
-      agentId
-    )
-
-    // 根据 agent 类型决定 workspace 路径：
-    // - isDefault agent（main）使用全局 workspacePath
-    // - 自定义 agent 使用隔离子目录，避免文件系统污染
-    const agent = this.agentManager.get(agentId)
-    const workspace = agent?.isDefault
-      ? this.workspacePath
-      : path.join(this.stateDir, `workspace-${agentId}`)
-
-    this.controller.startSession(session.id, prompt, {
-      ...options,
-      agentId,
-      workspaceRoot: workspace
-    })
+    // 幂等注册目录，确保 directories 表有记录
+    this.directoryManager.ensureRegistered(cwd)
+    // 由目录路径确定性派生 agentId，不再依赖用户传入
+    const agentId = deriveAgentId(cwd)
+    const session = this.store.createSession(title, cwd, agentId)
+    // workspace = cwd 本身，不再需要 workspaceRoot 路由
+    this.controller.startSession(session.id, prompt, options)
     return session
   }
 
@@ -64,8 +44,9 @@ export class SessionManager {
     return this.store.getSessions()
   }
 
-  // 按 agentId 过滤会话，供 Agent 维度的会话列表展示
-  getSessionsByAgent(agentId: string): CoworkSession[] {
+  // 按目录路径过滤会话：先派生 agentId 再匹配
+  getSessionsByDirectory(directoryPath: string): CoworkSession[] {
+    const agentId = deriveAgentId(directoryPath)
     return this.store.getSessions().filter((s) => s.agentId === agentId)
   }
 
@@ -77,8 +58,8 @@ export class SessionManager {
     this.store.deleteSession(id)
   }
 
-  getRecentWorkingDirs(limit?: number): string[] {
-    return this.store.getRecentWorkingDirs(limit)
+  getRecentDirectories(limit?: number): string[] {
+    return this.store.getRecentDirectories(limit)
   }
 
   // 生成 agent 感知的会话 key，格式：agent:{agentId}:petclaw:{sessionId}

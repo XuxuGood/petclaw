@@ -2,7 +2,7 @@
 // 重构为直接依赖 Manager 对象（ConfigSyncOptions），移除 ConfigSyncDeps 函数注入接口
 import fs from 'fs'
 
-import type { AgentManager } from '../agents/agent-manager'
+import type { DirectoryManager } from './directory-manager'
 import type { ModelRegistry } from '../models/model-registry'
 import type { SkillManager } from '../skills/skill-manager'
 import type { McpManager } from '../mcp/mcp-manager'
@@ -17,23 +17,22 @@ export interface ConfigSyncResult {
 export interface ConfigSyncOptions {
   configPath: string
   stateDir: string
-  agentManager: AgentManager
+  directoryManager: DirectoryManager
   modelRegistry: ModelRegistry
   skillManager: SkillManager
   mcpManager: McpManager
-  workspacePath: string
 }
 
 export class ConfigSync {
   private configPath: string
-  private agentManager: AgentManager
+  private directoryManager: DirectoryManager
   private modelRegistry: ModelRegistry
   private skillManager: SkillManager
   private mcpManager: McpManager
 
   constructor(private opts: ConfigSyncOptions) {
     this.configPath = opts.configPath
-    this.agentManager = opts.agentManager
+    this.directoryManager = opts.directoryManager
     this.modelRegistry = opts.modelRegistry
     this.skillManager = opts.skillManager
     this.mcpManager = opts.mcpManager
@@ -79,7 +78,7 @@ export class ConfigSync {
         auth: { mode: 'token', token: '${OPENCLAW_GATEWAY_TOKEN}' }
       },
       models: this.modelRegistry.toOpenclawConfig(),
-      agents: this.agentManager.toOpenclawConfig(),
+      agents: this.directoryManager.toOpenclawConfig(),
       skills: this.skillManager.toOpenclawConfig(),
       // MCP 服务器映射为 plugins 配置块
       plugins: this.mcpManager.toOpenclawConfig(),

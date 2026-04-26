@@ -24,8 +24,8 @@ export function ChatApp() {
   // 返回 settings 时的上一个页面，用于「返回」按钮
   const [previousView, setPreviousView] = useState<ViewType>('chat')
 
-  // Agent 与会话
-  const [currentAgentId, setCurrentAgentId] = useState('main')
+  // 目录与会话
+  const [currentDirectoryId, setCurrentDirectoryId] = useState('main')
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
 
   // 侧栏 Tab
@@ -53,9 +53,9 @@ export function ChatApp() {
     setActiveView(previousView)
   }, [previousView])
 
-  // 切换 Agent：重置会话、切回 chat 视图
-  const handleAgentChange = useCallback((agentId: string) => {
-    setCurrentAgentId(agentId)
+  // 切换目录：重置会话、切回 chat 视图
+  const handleDirectoryChange = useCallback((agentId: string) => {
+    setCurrentDirectoryId(agentId)
     setSidebarTab('tasks')
     setActiveView('chat')
     setActiveSessionId(null)
@@ -150,8 +150,8 @@ export function ChatApp() {
       <Sidebar
         activeView={activeView}
         onViewChange={handleViewChange}
-        currentAgentId={currentAgentId}
-        onAgentChange={handleAgentChange}
+        currentDirectoryId={currentDirectoryId}
+        onDirectoryChange={handleDirectoryChange}
         activeSessionId={activeSessionId}
         onSessionSelect={setActiveSessionId}
         sidebarTab={sidebarTab}
@@ -166,7 +166,7 @@ export function ChatApp() {
               <ChatView
                 activeSessionId={activeSessionId}
                 onSessionCreated={setActiveSessionId}
-                currentAgentId={currentAgentId}
+                currentDirectoryId={currentDirectoryId}
                 taskMonitorOpen={taskMonitorOpen}
                 onToggleMonitor={() => setTaskMonitorOpen((p) => !p)}
               />

@@ -3,8 +3,9 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { SessionManager } from '../../../src/main/ai/session-manager'
 import type { CoworkStore } from '../../../src/main/ai/cowork-store'
 import type { CoworkController } from '../../../src/main/ai/cowork-controller'
-import type { AgentManager } from '../../../src/main/agents/agent-manager'
+import type { DirectoryManager } from '../../../src/main/ai/directory-manager'
 import type { CoworkSession } from '../../../src/main/ai/types'
+import { deriveAgentId } from '../../../src/main/ai/types'
 
 // ── 测试辅助：构造 mock session ──
 function makeMockSession(overrides?: Partial<CoworkSession>): CoworkSession {
@@ -14,12 +15,9 @@ function makeMockSession(overrides?: Partial<CoworkSession>): CoworkSession {
     claudeSessionId: null,
     status: 'idle',
     pinned: false,
-    cwd: '/workspace',
-    systemPrompt: '',
+    directoryPath: '/workspace',
+    agentId: deriveAgentId('/workspace'),
     modelOverride: '',
-    executionMode: 'local',
-    activeSkillIds: [],
-    agentId: 'main',
     messages: [],
     createdAt: Date.now(),
     updatedAt: Date.now(),
@@ -34,7 +32,7 @@ function createMocks() {
     getSession: vi.fn(),
     getSessions: vi.fn(),
     deleteSession: vi.fn(),
-    getRecentWorkingDirs: vi.fn()
+    getRecentDirectories: vi.fn()
   } as unknown as CoworkStore
 
   const mockController = {
@@ -44,139 +42,103 @@ function createMocks() {
     isSessionActive: vi.fn()
   } as unknown as CoworkController
 
-  // agentManager.get 返回 undefined 表示非 default agent，返回带 isDefault:true 的对象表示 main agent
-  const mockAgentManager = {
-    get: vi.fn()
-  } as unknown as AgentManager
+  const mockDirectoryManager = {
+    ensureRegistered: vi.fn()
+  } as unknown as DirectoryManager
 
-  return { mockStore, mockController, mockAgentManager }
+  return { mockStore, mockController, mockDirectoryManager }
 }
 
 describe('SessionManager', () => {
-  const WORKSPACE = '/home/user/workspace'
-  const STATE_DIR = '/home/user/.petclaw/state'
-
   let mockStore: CoworkStore
   let mockController: CoworkController
-  let mockAgentManager: AgentManager
+  let mockDirectoryManager: DirectoryManager
   let manager: SessionManager
 
   beforeEach(() => {
     const mocks = createMocks()
     mockStore = mocks.mockStore
     mockController = mocks.mockController
-    mockAgentManager = mocks.mockAgentManager
+    mockDirectoryManager = mocks.mockDirectoryManager
 
-    manager = new SessionManager(mockStore, mockController, mockAgentManager, WORKSPACE, STATE_DIR)
+    manager = new SessionManager(mockStore, mockController, mockDirectoryManager)
   })
 
   // ── createAndStart ──
 
   describe('createAndStart', () => {
-    it('默认使用 main agentId 创建会话', () => {
-      const session = makeMockSession({ agentId: 'main' })
+    it('自动注册目录并派生 agentId', () => {
+      const cwd = '/home/user/project'
+      const expectedAgentId = deriveAgentId(cwd)
+      const session = makeMockSession({ directoryPath: cwd, agentId: expectedAgentId })
       vi.mocked(mockStore.createSession).mockReturnValue(session)
-      // main agent 是 default
-      vi.mocked(mockAgentManager.get).mockReturnValue({
-        id: 'main',
-        isDefault: true
-      } as ReturnType<AgentManager['get']>)
 
-      manager.createAndStart('测试', '/cwd', 'hello')
+      manager.createAndStart('测试', cwd, 'hello')
 
-      expect(mockStore.createSession).toHaveBeenCalledWith(
-        '测试',
-        '/cwd',
-        undefined,
-        undefined,
-        undefined,
-        'main'
-      )
+      // 验证 ensureRegistered 被调用
+      expect(mockDirectoryManager.ensureRegistered).toHaveBeenCalledWith(cwd)
+      // 验证 store.createSession 用 3 参数调用（title, directoryPath, agentId）
+      expect(mockStore.createSession).toHaveBeenCalledWith('测试', cwd, expectedAgentId)
     })
 
-    it('options.agentId 被传递给 store.createSession', () => {
-      const session = makeMockSession({ agentId: 'agent-42' })
+    it('controller.startSession 不再传递 workspaceRoot 和 agentId', () => {
+      const cwd = '/home/user/project'
+      const session = makeMockSession({ directoryPath: cwd })
       vi.mocked(mockStore.createSession).mockReturnValue(session)
-      vi.mocked(mockAgentManager.get).mockReturnValue(undefined)
 
-      manager.createAndStart('测试', '/cwd', 'hello', { agentId: 'agent-42' })
+      manager.createAndStart('测试', cwd, 'hello', { autoApprove: true })
 
-      expect(mockStore.createSession).toHaveBeenCalledWith(
-        '测试',
-        '/cwd',
-        undefined,
-        undefined,
-        undefined,
-        'agent-42'
-      )
+      expect(mockController.startSession).toHaveBeenCalledWith(session.id, 'hello', {
+        autoApprove: true
+      })
     })
 
-    it('default agent 使用 workspacePath 作为 workspaceRoot', () => {
-      const session = makeMockSession({ agentId: 'main' })
+    it('无 options 时 controller.startSession 第三参数为 undefined', () => {
+      const cwd = '/workspace'
+      const session = makeMockSession({ directoryPath: cwd })
       vi.mocked(mockStore.createSession).mockReturnValue(session)
-      vi.mocked(mockAgentManager.get).mockReturnValue({
-        id: 'main',
-        isDefault: true
-      } as ReturnType<AgentManager['get']>)
 
-      manager.createAndStart('测试', '/cwd', 'hello', { agentId: 'main' })
+      manager.createAndStart('测试', cwd, 'hello')
 
-      expect(mockController.startSession).toHaveBeenCalledWith(
-        session.id,
-        'hello',
-        expect.objectContaining({ workspaceRoot: WORKSPACE })
-      )
-    })
-
-    it('非 default agent 使用 stateDir/workspace-{agentId} 作为 workspaceRoot', () => {
-      const session = makeMockSession({ agentId: 'agent-42' })
-      vi.mocked(mockStore.createSession).mockReturnValue(session)
-      // 返回 undefined 表示非 default agent（或 agent 不存在）
-      vi.mocked(mockAgentManager.get).mockReturnValue(undefined)
-
-      manager.createAndStart('测试', '/cwd', 'hello', { agentId: 'agent-42' })
-
-      expect(mockController.startSession).toHaveBeenCalledWith(
-        session.id,
-        'hello',
-        expect.objectContaining({ workspaceRoot: `${STATE_DIR}/workspace-agent-42` })
-      )
+      expect(mockController.startSession).toHaveBeenCalledWith(session.id, 'hello', undefined)
     })
 
     it('返回由 store 创建的 session 对象', () => {
       const session = makeMockSession()
       vi.mocked(mockStore.createSession).mockReturnValue(session)
-      vi.mocked(mockAgentManager.get).mockReturnValue({ id: 'main', isDefault: true } as ReturnType<
-        AgentManager['get']
-      >)
 
-      const result = manager.createAndStart('测试', '/cwd', 'hello')
+      const result = manager.createAndStart('测试', '/workspace', 'hello')
 
       expect(result).toBe(session)
     })
   })
 
-  // ── getSessionsByAgent ──
+  // ── getSessionsByDirectory ──
 
-  describe('getSessionsByAgent', () => {
-    it('只返回指定 agentId 的会话', () => {
+  describe('getSessionsByDirectory', () => {
+    it('只返回指定目录路径对应 agentId 的会话', () => {
+      const dirPath = '/home/user/project-a'
+      const agentIdA = deriveAgentId(dirPath)
+      const agentIdB = deriveAgentId('/home/user/project-b')
       const sessions = [
-        makeMockSession({ id: 's1', agentId: 'main' }),
-        makeMockSession({ id: 's2', agentId: 'agent-x' }),
-        makeMockSession({ id: 's3', agentId: 'main' })
+        makeMockSession({ id: 's1', agentId: agentIdA }),
+        makeMockSession({ id: 's2', agentId: agentIdB }),
+        makeMockSession({ id: 's3', agentId: agentIdA })
       ]
       vi.mocked(mockStore.getSessions).mockReturnValue(sessions)
 
-      const result = manager.getSessionsByAgent('main')
+      const result = manager.getSessionsByDirectory(dirPath)
 
       expect(result).toHaveLength(2)
-      expect(result.every((s) => s.agentId === 'main')).toBe(true)
+      expect(result.every((s) => s.agentId === agentIdA)).toBe(true)
     })
 
     it('无匹配时返回空数组', () => {
-      vi.mocked(mockStore.getSessions).mockReturnValue([makeMockSession({ agentId: 'main' })])
+      vi.mocked(mockStore.getSessions).mockReturnValue([
+        makeMockSession({ agentId: deriveAgentId('/some/path') })
+      ])
 
-      expect(manager.getSessionsByAgent('nonexistent')).toEqual([])
+      expect(manager.getSessionsByDirectory('/nonexistent')).toEqual([])
     })
   })
 
@@ -184,8 +146,6 @@ describe('SessionManager', () => {
 
   describe('buildSessionKey 格式', () => {
     it('格式为 agent:{agentId}:petclaw:{sessionId}', () => {
-      // buildSessionKey 是私有方法，通过暴露测试辅助或反射验证
-      // 使用 any 转型访问私有方法
       const key = (
         manager as unknown as { buildSessionKey(a: string, b: string): string }
       ).buildSessionKey('main', 'sess-001')
@@ -232,11 +192,11 @@ describe('SessionManager', () => {
     })
   })
 
-  describe('getRecentWorkingDirs', () => {
-    it('转发给 store.getRecentWorkingDirs', () => {
-      vi.mocked(mockStore.getRecentWorkingDirs).mockReturnValue(['/a', '/b'])
-      expect(manager.getRecentWorkingDirs(5)).toEqual(['/a', '/b'])
-      expect(mockStore.getRecentWorkingDirs).toHaveBeenCalledWith(5)
+  describe('getRecentDirectories', () => {
+    it('转发给 store.getRecentDirectories', () => {
+      vi.mocked(mockStore.getRecentDirectories).mockReturnValue(['/a', '/b'])
+      expect(manager.getRecentDirectories(5)).toEqual(['/a', '/b'])
+      expect(mockStore.getRecentDirectories).toHaveBeenCalledWith(5)
     })
   })
 })

@@ -5,7 +5,7 @@ import os from 'os'
 import Database from 'better-sqlite3'
 
 import { migrateSettingsToKv } from '../../../src/main/data/settings-migration'
-import { kvGet } from '../../../src/main/data/db'
+import { kvGet, initDatabase } from '../../../src/main/data/db'
 
 describe('migrateSettingsToKv', () => {
   let tmpDir: string
@@ -16,15 +16,9 @@ describe('migrateSettingsToKv', () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'petclaw-migration-'))
     settingsPath = path.join(tmpDir, 'petclaw-settings.json')
 
-    // 创建内存数据库并建 kv 表
+    // 创建内存数据库并初始化完整 schema（app_config 表）
     db = new Database(':memory:')
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS kv (
-        key TEXT PRIMARY KEY,
-        value TEXT NOT NULL,
-        updated_at INTEGER NOT NULL
-      )
-    `)
+    initDatabase(db)
   })
 
   afterEach(() => {
@@ -68,7 +62,7 @@ describe('migrateSettingsToKv', () => {
   })
 
   it('should skip if already migrated', () => {
-    db.prepare('INSERT INTO kv (key, value, updated_at) VALUES (?, ?, ?)').run(
+    db.prepare('INSERT INTO app_config (key, value, updated_at) VALUES (?, ?, ?)').run(
       'settings.migrated',
       '"true"',
       Date.now()
