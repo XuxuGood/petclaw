@@ -36,6 +36,7 @@
     "electron:dev:openclaw": "npm run openclaw:ensure && npm run openclaw:runtime:host && electron-vite dev"
   },
   "dependencies": {
+    "@petclaw/shared": "workspace:*",
     "@electron-toolkit/utils": "^3.0.0",
     "better-sqlite3": "^11.0.0",
     "electron-log": "^5.4.3",

@@ -5,7 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
+    plugins: [externalizeDepsPlugin({ exclude: ['@petclaw/shared'] })],
     build: {
       rollupOptions: {
         external: ['better-sqlite3', 'ws']
@@ -13,7 +13,7 @@ export default defineConfig({
     }
   },
   preload: {
-    plugins: [externalizeDepsPlugin()]
+    plugins: [externalizeDepsPlugin({ exclude: ['@petclaw/shared'] })]
   },
   renderer: {
     resolve: {
