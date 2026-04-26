@@ -34,6 +34,7 @@ import { diagAppReady, diagBootResult, diagWindowLoad, diagError } from './diagn
 import { readAppSettings, writeAppSettings } from './app-settings'
 import { resolveDatabasePath } from './database-path'
 import { initAutoUpdater } from './auto-updater'
+import { initI18n } from './i18n'
 
 let petWindow: BrowserWindow | null = null
 let mainWindow: BrowserWindow | null = null
@@ -317,6 +318,8 @@ app.whenReady().then(async () => {
   })
   db = new Database(dbPath)
   initDatabase(db)
+  // 初始化 i18n，读取系统语言偏好
+  initI18n(db, app.getLocale())
 
   // 2. CoworkStore 防御性重置：上次崩溃遗留的 running 状态归零
   coworkStore = new CoworkStore(db)
@@ -359,6 +362,8 @@ app.whenReady().then(async () => {
   configSync = new ConfigSync({
     configPath: engineManager.getConfigPath(),
     stateDir: engineManager.getStateDir(),
+    workspacePath,
+    skillsDir,
     directoryManager,
     modelRegistry,
     skillManager,

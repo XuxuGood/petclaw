@@ -7,6 +7,8 @@ import type Database from 'better-sqlite3'
 import { ConfigInstaller } from '../hooks/installer'
 import { checkEnvironment, checkGatewayConnectivity, installHooks } from '../onboarding'
 import { kvGet, kvSet } from '../data/db'
+import { getLanguage, setLanguage } from '../i18n'
+import type { Locale } from '@petclaw/shared/i18n'
 
 export interface BootIpcDeps {
   db: Database.Database
@@ -70,4 +72,13 @@ export function registerBootIpcHandlers(deps: BootIpcDeps): void {
       return { success: true }
     }
   )
+
+  // i18n 语言查询与切换
+  ipcMain.handle('i18n:get-language', () => getLanguage())
+
+  ipcMain.handle('i18n:set-language', (_event, locale: string) => {
+    if (locale === 'zh' || locale === 'en') {
+      setLanguage(locale as Locale)
+    }
+  })
 }

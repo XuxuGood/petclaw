@@ -65,6 +65,9 @@ const api = {
   setSetting: (key: string, value: string): Promise<void> =>
     ipcRenderer.invoke('settings:set', key, value),
   getAppVersion: (): Promise<string> => ipcRenderer.invoke('app:version'),
+  // i18n 语言查询与切换
+  getLanguage: (): Promise<string> => ipcRenderer.invoke('i18n:get-language'),
+  setLanguage: (locale: string): Promise<void> => ipcRenderer.invoke('i18n:set-language', locale),
 
   // Onboarding
   checkEnv: (): Promise<{ nodeOk: boolean; nodeVersion: string | null }> =>

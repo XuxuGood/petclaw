@@ -26,6 +26,8 @@ interface ElectronAPI {
   getSetting: (key: string) => Promise<string | null>
   setSetting: (key: string, value: string) => Promise<void>
   getAppVersion: () => Promise<string>
+  getLanguage: () => Promise<string>
+  setLanguage: (locale: string) => Promise<void>
   checkEnv: () => Promise<{ nodeOk: boolean; nodeVersion: string | null }>
   checkGateway: (url: string) => Promise<{ connected: boolean; latencyMs: number | null }>
   installHooks: () => Promise<{ success: boolean; alreadyInstalled: boolean; error?: string }>
