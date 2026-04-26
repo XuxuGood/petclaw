@@ -16,7 +16,12 @@ export default tseslint.config(
   },
   {
     files: ['src/main/**/*.ts', 'src/preload/**/*.ts'],
-    languageOptions: { globals: { ...globals.node } }
+    languageOptions: { globals: { ...globals.node } },
+    rules: {
+      // Main process uses logger.ts to intercept console.* and write to log files.
+      // All console methods are valid log levels: log=info, debug, info, warn, error.
+      'no-console': 'off'
+    }
   },
   {
     files: ['src/renderer/**/*.{ts,tsx}'],
@@ -34,9 +39,4 @@ export default tseslint.config(
     files: ['tests/**/*.{ts,tsx}'],
     languageOptions: { globals: { ...globals.node } }
   },
-  {
-    // logger.ts must access console.* to intercept and forward them to electron-log
-    files: ['src/main/logger.ts'],
-    rules: { 'no-console': 'off' }
-  }
 )

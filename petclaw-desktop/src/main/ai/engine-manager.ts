@@ -275,7 +275,7 @@ export class OpenclawEngineManager extends EventEmitter {
   /** 启动 Gateway 进程（去重：重复调用复用同一个 Promise） */
   async startGateway(): Promise<EngineStatus> {
     if (this.startGatewayPromise) {
-      console.warn('[OpenClaw] startGateway: 已在启动中，复用现有 Promise')
+      console.debug('[OpenClaw] startGateway: already starting, reusing existing promise')
       return this.startGatewayPromise
     }
     this.startGatewayPromise = this.doStartGateway().finally(() => {
@@ -294,9 +294,9 @@ export class OpenclawEngineManager extends EventEmitter {
     }
 
     if (this.gatewayProcess) {
-      console.warn('[OpenClaw] 正在停止 gateway 进程...')
+      console.info('[OpenClaw] stopping gateway process...')
       await this.stopGatewayProcess(this.gatewayProcess)
-      console.warn('[OpenClaw] gateway 进程已停止')
+      console.info('[OpenClaw] gateway process stopped')
       this.gatewayProcess = null
     }
 
@@ -313,10 +313,10 @@ export class OpenclawEngineManager extends EventEmitter {
 
   /** 重启 Gateway（先停后启，重置重启计数） */
   async restartGateway(): Promise<EngineStatus> {
-    console.warn('[OpenClaw] restartGateway: 停止现有 gateway...')
+    console.info('[OpenClaw] restartGateway: stopping existing gateway...')
     await this.stopGateway()
     this.gatewayRestartAttempt = 0
-    console.warn('[OpenClaw] restartGateway: 启动新 gateway...')
+    console.info('[OpenClaw] restartGateway: starting new gateway...')
     return this.startGateway()
   }
 
@@ -328,7 +328,9 @@ export class OpenclawEngineManager extends EventEmitter {
     const elapsed = () => `${Date.now() - t0}ms`
 
     const ensured = await this.ensureReady()
-    console.warn(`[OpenClaw] startGateway: ensureReady 完成 (${elapsed()})，phase=${ensured.phase}`)
+    console.debug(
+      `[OpenClaw] startGateway: ensureReady done (${elapsed()}), phase=${ensured.phase}`
+    )
     if (ensured.phase !== 'ready') {
       return ensured
     }
@@ -338,7 +340,7 @@ export class OpenclawEngineManager extends EventEmitter {
       const port = this.gatewayPort ?? this.readGatewayPort()
       if (port) {
         const healthy = await this.isGatewayHealthy(port)
-        console.warn(`[OpenClaw] 现有进程健康检查 (${elapsed()})，healthy=${healthy}`)
+        console.debug(`[OpenClaw] existing process health check (${elapsed()}), healthy=${healthy}`)
         if (healthy) {
           this.setStatus({
             phase: 'ready',
@@ -354,8 +356,8 @@ export class OpenclawEngineManager extends EventEmitter {
     }
 
     const runtime = this.resolveRuntimeMetadata()
-    console.warn(
-      `[OpenClaw] resolveRuntimeMetadata 完成 (${elapsed()})，root=${runtime.root ? '找到' : '缺失'}`
+    console.debug(
+      `[OpenClaw] resolveRuntimeMetadata done (${elapsed()}), root=${runtime.root ? 'found' : 'missing'}`
     )
     if (!runtime.root) {
       this.setStatus({
@@ -368,7 +370,7 @@ export class OpenclawEngineManager extends EventEmitter {
     }
 
     const openclawEntry = this.resolveOpenClawEntry(runtime.root)
-    console.warn(`[OpenClaw] resolveOpenClawEntry 完成 (${elapsed()})，entry=${openclawEntry}`)
+    console.debug(`[OpenClaw] resolveOpenClawEntry done (${elapsed()}), entry=${openclawEntry}`)
     if (!openclawEntry) {
       this.setStatus({
         phase: 'error',
@@ -380,9 +382,9 @@ export class OpenclawEngineManager extends EventEmitter {
     }
 
     const token = this.ensureGatewayToken()
-    console.warn(`[OpenClaw] ensureGatewayToken 完成 (${elapsed()})`)
+    console.debug(`[OpenClaw] ensureGatewayToken done (${elapsed()})`)
     const port = await this.resolveGatewayPort()
-    console.warn(`[OpenClaw] resolveGatewayPort 完成 (${elapsed()})，port=${port}`)
+    console.debug(`[OpenClaw] resolveGatewayPort done (${elapsed()}), port=${port}`)
     this.gatewayPort = port
     this.writeGatewayPort(port)
     this.ensureConfigFile()
@@ -426,8 +428,8 @@ export class OpenclawEngineManager extends EventEmitter {
       token,
       '--verbose'
     ]
-    console.warn(
-      `[OpenClaw] 启动 gateway: entry=${openclawEntry}, cwd=${runtime.root}, port=${port}`
+    console.debug(
+      `[OpenClaw] spawning gateway: entry=${openclawEntry}, cwd=${runtime.root}, port=${port}`
     )
 
     // Windows 使用 child_process.spawn + ELECTRON_RUN_AS_NODE，其他平台使用 utilityProcess.fork
@@ -454,11 +456,11 @@ export class OpenclawEngineManager extends EventEmitter {
     this.attachGatewayExitHandlers(child)
 
     child.once('spawn', () => {
-      console.warn(`[OpenClaw] gateway 进程已 spawn (${elapsed()})，pid=${child.pid}`)
+      console.info(`[OpenClaw] gateway process spawned (${elapsed()}), pid=${child.pid}`)
     })
 
     const ready = await this.waitForGatewayReady(port, GATEWAY_BOOT_TIMEOUT_MS)
-    console.warn(`[OpenClaw] waitForGatewayReady 返回 (${elapsed()})，ready=${ready}`)
+    console.debug(`[OpenClaw] waitForGatewayReady returned (${elapsed()}), ready=${ready}`)
     if (!ready) {
       this.setStatus({
         phase: 'error',
@@ -702,7 +704,7 @@ export class OpenclawEngineManager extends EventEmitter {
 
     if (verbose && !healthy) {
       const tcpResult = results[results.length - 1] ? 'reachable' : 'unreachable'
-      console.warn(`[OpenClaw] 健康探针详情: tcp=${tcpResult}, ${httpResults.join(', ')}`)
+      console.debug(`[OpenClaw] health probe details: tcp=${tcpResult}, ${httpResults.join(', ')}`)
     }
     return healthy
   }
@@ -715,13 +717,13 @@ export class OpenclawEngineManager extends EventEmitter {
     return new Promise((resolve) => {
       const tick = async () => {
         if (this.shutdownRequested) {
-          console.warn('[OpenClaw] waitForGatewayReady: 收到关闭请求，放弃等待')
+          console.info('[OpenClaw] waitForGatewayReady: shutdown requested, aborting')
           resolve(false)
           return
         }
 
         if (!this.gatewayProcess) {
-          console.warn('[OpenClaw] waitForGatewayReady: gateway 进程已退出，放弃等待')
+          console.warn('[OpenClaw] waitForGatewayReady: gateway process exited, aborting')
           resolve(false)
           return
         }
@@ -732,15 +734,17 @@ export class OpenclawEngineManager extends EventEmitter {
         const healthy = await this.isGatewayHealthy(port, verboseProbe)
 
         if (healthy) {
-          console.warn(
-            `[OpenClaw] waitForGatewayReady: gateway 就绪，耗时 ${elapsedMs}ms（${pollCount} 次轮询）`
+          console.info(
+            `[OpenClaw] waitForGatewayReady: gateway ready in ${elapsedMs}ms (${pollCount} polls)`
           )
           resolve(true)
           return
         }
 
         if (elapsedMs >= timeoutMs) {
-          console.warn(`[OpenClaw] waitForGatewayReady: 超时 ${timeoutMs}ms（${pollCount} 次轮询）`)
+          console.warn(
+            `[OpenClaw] waitForGatewayReady: timed out after ${timeoutMs}ms (${pollCount} polls)`
+          )
           resolve(false)
           return
         }
@@ -822,7 +826,7 @@ export class OpenclawEngineManager extends EventEmitter {
       if (/\[gateway\]/.test(text)) {
         const elapsed = Date.now() - this.gatewaySpawnedAt
         const summary = text.replace(/\n+$/g, '').split('\n')[0].trim()
-        console.warn(`[OpenClaw] 启动里程碑 (${elapsed}ms): ${summary}`)
+        console.info(`[OpenClaw] startup milestone (${elapsed}ms): ${summary}`)
       }
     }
 
@@ -845,7 +849,7 @@ export class OpenclawEngineManager extends EventEmitter {
     child.once('error', (...args: unknown[]) => {
       const errorMsg =
         args[0] instanceof Error ? args[0].message : `${args[0]}${args[1] ? ` (${args[1]})` : ''}`
-      console.error(`[OpenClaw] gateway 进程错误: ${errorMsg}`)
+      console.error(`[OpenClaw] gateway process error: ${errorMsg}`)
       if (this.expectedGatewayExits.has(child)) return
       if (this.shutdownRequested) return
       this.setStatus({
@@ -857,7 +861,7 @@ export class OpenclawEngineManager extends EventEmitter {
     })
 
     child.once('exit', (code) => {
-      console.warn(`[OpenClaw] gateway 进程退出，code=${code}`)
+      console.warn(`[OpenClaw] gateway process exited, code=${code}`)
       if (this.gatewayProcess === child) {
         this.gatewayProcess = null
       }
@@ -884,7 +888,7 @@ export class OpenclawEngineManager extends EventEmitter {
 
     if (this.gatewayRestartAttempt >= GATEWAY_MAX_RESTART_ATTEMPTS) {
       console.error(
-        `[OpenClaw] 自动重启次数已达上限（${GATEWAY_MAX_RESTART_ATTEMPTS} 次），放弃重启`
+        `[OpenClaw] max restart attempts reached (${GATEWAY_MAX_RESTART_ATTEMPTS}), giving up`
       )
       this.setStatus({
         phase: 'error',
@@ -901,7 +905,7 @@ export class OpenclawEngineManager extends EventEmitter {
       ]
     this.gatewayRestartAttempt++
     console.warn(
-      `[OpenClaw] 调度重启 #${this.gatewayRestartAttempt}/${GATEWAY_MAX_RESTART_ATTEMPTS}，延迟 ${delay}ms`
+      `[OpenClaw] scheduling restart #${this.gatewayRestartAttempt}/${GATEWAY_MAX_RESTART_ATTEMPTS}, delay ${delay}ms`
     )
 
     this.gatewayRestartTimer = setTimeout(() => {

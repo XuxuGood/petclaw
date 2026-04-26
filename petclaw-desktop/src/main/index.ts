@@ -35,6 +35,7 @@ import { readAppSettings, writeAppSettings } from './app-settings'
 import { resolveDatabasePath } from './database-path'
 import { initAutoUpdater } from './auto-updater'
 import { initI18n } from './i18n'
+import { initLogger } from './logger'
 
 let petWindow: BrowserWindow | null = null
 let mainWindow: BrowserWindow | null = null
@@ -286,7 +287,7 @@ async function setupV3Runtime(port: number, token: string): Promise<void> {
     try {
       await gateway.connect(runtimeRoot)
     } catch (err) {
-      console.warn('Gateway 连接失败:', err instanceof Error ? err.message : err)
+      console.warn('[Gateway] connection failed:', err instanceof Error ? err.message : err)
     }
   }
 
@@ -307,6 +308,9 @@ async function setupV3Runtime(port: number, token: string): Promise<void> {
   })
   cronJobService.startPolling()
 }
+
+// Initialize logging before anything else
+initLogger()
 
 app.whenReady().then(async () => {
   diagAppReady()
@@ -437,7 +441,7 @@ app.whenReady().then(async () => {
   // 14. 启动 Hook Server
   hookServer = new HookServer()
   hookServer.start().then((socketPath) => {
-    console.warn('Hook server listening on:', socketPath)
+    console.info('[HookServer] listening on:', socketPath)
   })
 
   // 15. 通知 chat 窗口 boot 完成（成功时延迟 2s 用于动画编排）
