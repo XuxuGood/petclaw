@@ -328,9 +328,7 @@ export class OpenclawEngineManager extends EventEmitter {
     const elapsed = () => `${Date.now() - t0}ms`
 
     const ensured = await this.ensureReady()
-    console.debug(
-      `[OpenClaw] startGateway: ensureReady done (${elapsed()}), phase=${ensured.phase}`
-    )
+    console.info(`[OpenClaw] startGateway: ensureReady done (${elapsed()}), phase=${ensured.phase}`)
     if (ensured.phase !== 'ready') {
       return ensured
     }
@@ -340,7 +338,7 @@ export class OpenclawEngineManager extends EventEmitter {
       const port = this.gatewayPort ?? this.readGatewayPort()
       if (port) {
         const healthy = await this.isGatewayHealthy(port)
-        console.debug(`[OpenClaw] existing process health check (${elapsed()}), healthy=${healthy}`)
+        console.info(`[OpenClaw] existing process health check (${elapsed()}), healthy=${healthy}`)
         if (healthy) {
           this.setStatus({
             phase: 'ready',
@@ -460,7 +458,7 @@ export class OpenclawEngineManager extends EventEmitter {
     })
 
     const ready = await this.waitForGatewayReady(port, GATEWAY_BOOT_TIMEOUT_MS)
-    console.debug(`[OpenClaw] waitForGatewayReady returned (${elapsed()}), ready=${ready}`)
+    console.info(`[OpenClaw] waitForGatewayReady returned (${elapsed()}), ready=${ready}`)
     if (!ready) {
       this.setStatus({
         phase: 'error',
