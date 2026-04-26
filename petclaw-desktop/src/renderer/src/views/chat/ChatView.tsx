@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { PawPrint } from 'lucide-react'
 
 import { useChatStore } from '../../stores/chat-store'
+import { useI18n } from '../../i18n'
 import { ChatHeader } from './ChatHeader'
 import { ChatInputBox } from './ChatInputBox'
 import { CoworkPermissionModal } from './CoworkPermissionModal'
@@ -24,10 +25,11 @@ export function ChatView({
   onToggleMonitor
 }: ChatViewProps) {
   const { messages, isLoading, addMessage, appendToLastMessage, setLoading } = useChatStore()
+  const { t } = useI18n()
   const scrollRef = useRef<HTMLDivElement>(null)
 
   // 会话标题（后续可从 session 数据中读取，此处先用默认值）
-  const [sessionTitle, setSessionTitle] = useState('新对话')
+  const [sessionTitle, setSessionTitle] = useState(() => t('chat.newConversation'))
 
   // 权限审批弹窗状态
   const [pendingPermission, setPendingPermission] = useState<{
@@ -66,8 +68,8 @@ export function ChatView({
     // 错误
     const unsubError = window.api.cowork.onError((data) => {
       const d = data as Record<string, unknown>
-      const msg = typeof d.message === 'string' ? d.message : '未知错误'
-      appendToLastMessage(`\n[错误：${msg}]`)
+      const msg = typeof d.message === 'string' ? d.message : t('chat.unknownError')
+      appendToLastMessage(t('chat.errorPrefix', { msg }))
       setLoading(false)
     })
 
@@ -86,7 +88,7 @@ export function ChatView({
       unsubError()
       unsubPermission()
     }
-  }, [addMessage, appendToLastMessage, setLoading])
+  }, [addMessage, appendToLastMessage, setLoading, t])
 
   // 消息列表更新时自动滚动到底部
   useEffect(() => {
@@ -109,7 +111,7 @@ export function ChatView({
       // 主进程返回的 sessionId 通知父组件（Sidebar 侧边栏渲染任务列表）
       if (typeof r.sessionId === 'string') {
         onSessionCreated?.(r.sessionId)
-        setSessionTitle(message.slice(0, 30) || '新对话')
+        setSessionTitle(message.slice(0, 30) || t('chat.newConversation'))
       }
     } else {
       // 继续已有会话

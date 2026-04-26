@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Wifi } from 'lucide-react'
 
+import { useI18n } from '../i18n'
+
 export function StatusBar() {
+  const { t } = useI18n()
   const [version, setVersion] = useState('')
 
   useEffect(() => {
@@ -16,7 +19,8 @@ export function StatusBar() {
       </div>
       <div className="flex items-center gap-3">
         <span>
-          免费使用中: <span className="font-medium text-text-secondary">0%</span> 已用
+          {t('statusBar.freeUsage')}: <span className="font-medium text-text-secondary">0%</span>{' '}
+          {t('statusBar.used')}
         </span>
         <span className="opacity-40">|</span>
         <span className="font-mono">v{version}</span>

@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { PanelRight, MoreHorizontal, Check, Pencil } from 'lucide-react'
 
+import { useI18n } from '../../i18n'
+
 interface ChatHeaderProps {
   sessionTitle: string
   onToggleMonitor: () => void
@@ -13,6 +15,7 @@ interface ChatHeaderProps {
  * 该区域同时作为 drag region，拖拽手柄通过 css class `drag-region` 实现。
  */
 export function ChatHeader({ sessionTitle, onToggleMonitor, monitorOpen }: ChatHeaderProps) {
+  const { t } = useI18n()
   const [editing, setEditing] = useState(false)
   const [title, setTitle] = useState(sessionTitle)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -65,7 +68,7 @@ export function ChatHeader({ sessionTitle, onToggleMonitor, monitorOpen }: ChatH
         <button
           onClick={() => (editing ? commitEdit() : setEditing(true))}
           className="no-drag shrink-0 w-6 h-6 flex items-center justify-center rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-input transition-all duration-[120ms] ease active:scale-[0.96]"
-          aria-label={editing ? '确认标题' : '编辑标题'}
+          aria-label={editing ? t('chat.confirmTitle') : t('chat.editTitle')}
         >
           {editing ? <Check size={13} strokeWidth={2.5} /> : <Pencil size={13} strokeWidth={2} />}
         </button>
@@ -81,7 +84,7 @@ export function ChatHeader({ sessionTitle, onToggleMonitor, monitorOpen }: ChatH
               ? 'bg-accent/10 text-accent'
               : 'text-text-tertiary hover:text-text-secondary hover:bg-bg-input'
           }`}
-          aria-label="切换任务监控面板"
+          aria-label={t('chat.toggleMonitor')}
           aria-pressed={monitorOpen}
         >
           <PanelRight size={15} strokeWidth={2} />
@@ -90,7 +93,7 @@ export function ChatHeader({ sessionTitle, onToggleMonitor, monitorOpen }: ChatH
         {/* 更多操作（占位，后续扩展） */}
         <button
           className="w-7 h-7 flex items-center justify-center rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-input transition-all duration-[120ms] ease active:scale-[0.96]"
-          aria-label="更多操作"
+          aria-label={t('chat.moreActions')}
         >
           <MoreHorizontal size={15} strokeWidth={2} />
         </button>

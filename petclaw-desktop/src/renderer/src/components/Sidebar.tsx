@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 
 import type { ViewType } from '../App'
+import { useI18n } from '../i18n'
 
 // 目录数据结构（与后端 DirectoryManager 对应）
 interface DirectoryInfo {
@@ -53,6 +54,7 @@ export function Sidebar({
   onNewTask,
   onSettingsOpen
 }: SidebarProps) {
+  const { t } = useI18n()
   const [directories, setDirectories] = useState<DirectoryInfo[]>([])
   const [sessions, setSessions] = useState<Session[]>([])
   const [dirMenuOpen, setDirMenuOpen] = useState(false)
@@ -108,7 +110,7 @@ export function Sidebar({
           className="no-drag w-full flex items-center gap-2.5 px-3 py-[7px] rounded-[10px] text-[13px] text-text-secondary border border-border hover:text-text-primary hover:bg-bg-hover hover:border-text-tertiary active:scale-[0.96] transition-all duration-[120ms] ease"
         >
           <Plus size={15} strokeWidth={2} />
-          <span>新建任务</span>
+          <span>{t('sidebar.newTask')}</span>
         </button>
       </div>
 
@@ -116,7 +118,7 @@ export function Sidebar({
       <div className="px-3 py-1 flex items-center gap-1">
         <button
           onClick={() => onViewChange('skills')}
-          title="技能"
+          title={t('sidebar.skills')}
           className={`no-drag flex-1 flex items-center justify-center gap-1.5 py-[7px] rounded-[10px] text-[12px] transition-all duration-[120ms] ease active:scale-[0.96] ${
             activeView === 'skills'
               ? 'bg-bg-active text-text-primary font-medium'
@@ -124,11 +126,11 @@ export function Sidebar({
           }`}
         >
           <Zap size={14} strokeWidth={activeView === 'skills' ? 2 : 1.75} />
-          <span>技能</span>
+          <span>{t('sidebar.skills')}</span>
         </button>
         <button
           onClick={() => onViewChange('cron')}
-          title="定时任务"
+          title={t('sidebar.cron')}
           className={`no-drag flex-1 flex items-center justify-center gap-1.5 py-[7px] rounded-[10px] text-[12px] transition-all duration-[120ms] ease active:scale-[0.96] ${
             activeView === 'cron'
               ? 'bg-bg-active text-text-primary font-medium'
@@ -136,7 +138,7 @@ export function Sidebar({
           }`}
         >
           <Clock size={14} strokeWidth={activeView === 'cron' ? 2 : 1.75} />
-          <span>定时</span>
+          <span>{t('sidebar.cron')}</span>
         </button>
       </div>
 
@@ -144,7 +146,7 @@ export function Sidebar({
       <div className="px-3 pb-1">
         <button
           onClick={() => onViewChange('im-channels')}
-          title="IM 频道"
+          title={t('sidebar.imChannels')}
           className={`no-drag w-full flex items-center gap-2.5 px-3 py-[7px] rounded-[10px] text-[13px] transition-all duration-[120ms] ease active:scale-[0.96] ${
             activeView === 'im-channels'
               ? 'bg-bg-active text-text-primary font-medium'
@@ -152,7 +154,7 @@ export function Sidebar({
           }`}
         >
           <MessageSquare size={14} strokeWidth={activeView === 'im-channels' ? 2 : 1.75} />
-          <span>IM 频道</span>
+          <span>{t('sidebar.imChannels')}</span>
         </button>
       </div>
 
@@ -162,7 +164,7 @@ export function Sidebar({
       {/* 工作目录区 */}
       <div className="px-3 mb-1">
         <div className="px-2 mb-1.5">
-          <span className="text-[11px] text-text-tertiary font-medium">工作目录</span>
+          <span className="text-[11px] text-text-tertiary font-medium">{t('sidebar.workDir')}</span>
         </div>
         {/* 目录选择器 */}
         <div className="relative">
@@ -223,7 +225,7 @@ export function Sidebar({
                 : 'text-text-secondary hover:text-text-primary'
             }`}
           >
-            任务
+            {t('sidebar.tasks')}
           </button>
           <button
             onClick={() => onSidebarTabChange('channels')}
@@ -233,7 +235,7 @@ export function Sidebar({
                 : 'text-text-secondary hover:text-text-primary'
             }`}
           >
-            频道
+            {t('sidebar.channels')}
           </button>
         </div>
       </div>
@@ -244,7 +246,7 @@ export function Sidebar({
           <div className="space-y-0.5 py-0.5">
             {filteredSessions.length === 0 ? (
               <div className="px-3 py-6 text-center text-[12px] text-text-tertiary">
-                暂无任务记录
+                {t('sidebar.noTasks')}
               </div>
             ) : (
               filteredSessions.map((session) => (
@@ -265,7 +267,7 @@ export function Sidebar({
                     strokeWidth={1.75}
                     className="shrink-0 text-text-tertiary"
                   />
-                  <span className="truncate">{session.title || '新建任务'}</span>
+                  <span className="truncate">{session.title || t('sidebar.defaultTitle')}</span>
                 </button>
               ))
             )}
@@ -273,7 +275,7 @@ export function Sidebar({
         )}
         {sidebarTab === 'channels' && (
           <div className="px-3 py-6 text-center text-[12px] text-text-tertiary">
-            频道功能即将推出
+            {t('sidebar.channelsComingSoon')}
           </div>
         )}
       </div>

@@ -1,40 +1,42 @@
 import { PawPrint, FolderOpen, PenLine, BarChart3 } from 'lucide-react'
 
-// 根据当前时段返回问候语
-function getGreeting(): string {
-  const hour = new Date().getHours()
-  if (hour >= 5 && hour < 12) return '早上好'
-  if (hour >= 12 && hour < 18) return '下午好'
-  return '晚上好'
-}
-
-const QUICK_CARDS = [
-  {
-    icon: FolderOpen,
-    title: '文件整理',
-    desc: '智能整理和管理本地文件',
-    prompt: '帮我整理桌面文件，按类型分类到对应文件夹'
-  },
-  {
-    icon: PenLine,
-    title: '内容创作',
-    desc: '创作演讲文稿和多种内容',
-    prompt: '帮我写一篇关于的文章'
-  },
-  {
-    icon: BarChart3,
-    title: '文档处理',
-    desc: '处理和分析文档数据内容',
-    prompt: '帮我分析这份文档的关键信息'
-  }
-]
+import { useI18n } from '../i18n'
 
 interface WelcomePageProps {
   onSendPrompt: (text: string) => void
 }
 
 export function WelcomePage({ onSendPrompt }: WelcomePageProps) {
-  const greeting = getGreeting()
+  const { t } = useI18n()
+
+  // 根据当前时段返回问候语（依赖 t，必须在组件内调用）
+  const hour = new Date().getHours()
+  let greeting: string
+  if (hour >= 5 && hour < 12) greeting = t('welcome.morning')
+  else if (hour >= 12 && hour < 18) greeting = t('welcome.afternoon')
+  else greeting = t('welcome.evening')
+
+  // 快捷卡片数据（包含中文文案，必须放在组件内部使用 t()）
+  const quickCards = [
+    {
+      icon: FolderOpen,
+      title: t('welcome.card.fileOrganize.title'),
+      desc: t('welcome.card.fileOrganize.desc'),
+      prompt: t('welcome.card.fileOrganize.prompt')
+    },
+    {
+      icon: PenLine,
+      title: t('welcome.card.contentCreation.title'),
+      desc: t('welcome.card.contentCreation.desc'),
+      prompt: t('welcome.card.contentCreation.prompt')
+    },
+    {
+      icon: BarChart3,
+      title: t('welcome.card.docProcess.title'),
+      desc: t('welcome.card.docProcess.desc'),
+      prompt: t('welcome.card.docProcess.prompt')
+    }
+  ]
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-6">
@@ -45,15 +47,13 @@ export function WelcomePage({ onSendPrompt }: WelcomePageProps) {
 
       {/* 问候语 + 标语 */}
       <h2 className="text-[20px] font-bold text-text-primary mb-2 tracking-tight">
-        {greeting}，不止聊天，搞定一切
+        {greeting}，{t('welcome.tagline')}
       </h2>
-      <p className="text-[14px] text-text-tertiary mb-10">
-        本地运行，自主规划，安全可控的 AI 工作搭子
-      </p>
+      <p className="text-[14px] text-text-tertiary mb-10">{t('welcome.subtitle')}</p>
 
       {/* 快捷提示卡片 */}
       <div className="flex gap-4 max-w-[640px]">
-        {QUICK_CARDS.map((card) => {
+        {quickCards.map((card) => {
           const Icon = card.icon
           return (
             <button

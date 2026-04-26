@@ -4,6 +4,7 @@ import { Send } from 'lucide-react'
 
 import { CwdSelector } from '../../components/CwdSelector'
 import { ModelSelector } from '../../components/ModelSelector'
+import { useI18n } from '../../i18n'
 import { SkillSelector } from '../../views/skills/SkillSelector'
 
 interface ChatInputBoxProps {
@@ -12,6 +13,7 @@ interface ChatInputBoxProps {
 }
 
 export function ChatInputBox({ onSend, disabled = false }: ChatInputBoxProps) {
+  const { t } = useI18n()
   const [input, setInput] = useState('')
   const [cwd, setCwd] = useState('')
   const [selectedSkills, setSelectedSkills] = useState<string[]>([])
@@ -53,7 +55,7 @@ export function ChatInputBox({ onSend, disabled = false }: ChatInputBoxProps) {
             el.style.height = Math.min(el.scrollHeight, 120) + 'px'
           }}
           onKeyDown={handleKeyDown}
-          placeholder="输入消息，Enter 发送，Shift+Enter 换行..."
+          placeholder={t('chat.inputPlaceholder')}
           disabled={disabled}
           className="w-full px-4 pt-3 pb-2 text-[14px] text-text-primary bg-transparent outline-none placeholder:text-text-tertiary resize-none leading-[1.5] min-h-[44px] max-h-[120px]"
         />
@@ -80,7 +82,7 @@ export function ChatInputBox({ onSend, disabled = false }: ChatInputBoxProps) {
             onClick={handleSend}
             disabled={!canSend}
             className="w-8 h-8 rounded-full bg-accent text-white flex items-center justify-center shrink-0 hover:bg-accent-hover disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-[120ms] active:scale-[0.96]"
-            aria-label="发送消息"
+            aria-label={t('chat.sendLabel')}
           >
             <Send size={14} strokeWidth={2} />
           </button>

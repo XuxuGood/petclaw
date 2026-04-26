@@ -1,8 +1,11 @@
 import { useEffect } from 'react'
 import { Activity, AlertCircle, Clock } from 'lucide-react'
+
 import { useHookStore, AgentSession } from '../../stores/hook-store'
+import { useI18n } from '../../i18n'
 
 export function MonitorView() {
+  const { t } = useI18n()
   const { sessions, updateSession, removeSession } = useHookStore()
 
   useEffect(() => {
@@ -32,7 +35,7 @@ export function MonitorView() {
     <div className="flex-1 flex flex-col min-h-0">
       <div className="drag-region h-[52px] shrink-0 flex items-center px-6">
         <div className="w-[70px]" />
-        <h2 className="text-[13px] font-semibold text-text-primary">AI 工具监控</h2>
+        <h2 className="text-[13px] font-semibold text-text-primary">{t('monitor.title')}</h2>
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 pb-4">
@@ -42,10 +45,10 @@ export function MonitorView() {
               <div className="w-12 h-12 rounded-2xl bg-bg-input flex items-center justify-center mb-4">
                 <Activity size={22} className="text-text-tertiary" strokeWidth={1.75} />
               </div>
-              <p className="text-[13px] font-medium text-text-secondary mb-1">暂无活跃的 AI 工具</p>
-              <p className="text-[12px] text-text-tertiary">
-                当 Claude Code 等工具运行时，状态会在这里显示
+              <p className="text-[13px] font-medium text-text-secondary mb-1">
+                {t('monitor.noActive')}
               </p>
+              <p className="text-[12px] text-text-tertiary">{t('monitor.hint')}</p>
             </div>
           ) : (
             <div className="space-y-2.5">
