@@ -16,7 +16,7 @@ import { OpenclawGateway } from './ai/gateway'
 import { CoworkController } from './ai/cowork-controller'
 import { CoworkStore } from './ai/cowork-store'
 import { SessionManager } from './ai/session-manager'
-import { AgentManager } from './agents/agent-manager'
+import { DirectoryManager } from './ai/directory-manager'
 import { ModelRegistry } from './models/model-registry'
 import { SkillManager } from './skills/skill-manager'
 import { McpManager } from './mcp/mcp-manager'
@@ -43,7 +43,7 @@ let coworkController: CoworkController | null = null
 let sessionManager: SessionManager | null = null
 
 // Phase 2 Manager 实例声明（在 app.whenReady 中初始化）
-let agentManager: AgentManager
+let directoryManager: DirectoryManager
 let modelRegistry: ModelRegistry
 let skillManager: SkillManager
 let mcpManager: McpManager
@@ -288,13 +288,7 @@ async function setupV3Runtime(port: number, token: string): Promise<void> {
 
   // 创建 CoworkController（事件路由）和 SessionManager（会话门面）
   coworkController = new CoworkController(gateway, coworkStore)
-  sessionManager = new SessionManager(
-    coworkStore,
-    coworkController,
-    agentManager,
-    workspacePath,
-    engineManager.getStateDir()
-  )
+  sessionManager = new SessionManager(coworkStore, coworkController, directoryManager)
 
   // Phase 3: CronJobService — 定时任务 Gateway RPC 代理
   const { CronJobService: CronJobServiceClass } = await import('./scheduler/cron-job-service')
@@ -334,9 +328,8 @@ app.whenReady().then(async () => {
   const petclawHome = path.join(app.getPath('home'), '.petclaw')
   workspacePath = path.join(petclawHome, 'workspace')
 
-  // AgentManager：Agent CRUD，确保预设 Agent 存在（幂等）
-  agentManager = new AgentManager(db, workspacePath)
-  agentManager.ensurePresetAgents()
+  // DirectoryManager：Directory CRUD，目录自动注册
+  directoryManager = new DirectoryManager(db, workspacePath)
 
   // ModelRegistry：加载持久化的 Provider 配置和活跃模型
   modelRegistry = new ModelRegistry(db)
@@ -362,15 +355,14 @@ app.whenReady().then(async () => {
   configSync = new ConfigSync({
     configPath: engineManager.getConfigPath(),
     stateDir: engineManager.getStateDir(),
-    agentManager,
+    directoryManager,
     modelRegistry,
     skillManager,
-    mcpManager,
-    workspacePath
+    mcpManager
   })
 
   // 6. 绑定 Manager change 事件 → 触发 ConfigSync 同步，保持 Openclaw 配置与状态一致
-  agentManager.on('change', () => configSync.sync('agent-change'))
+  directoryManager.on('change', () => configSync.sync('directory-change'))
   modelRegistry.on('change', () => configSync.sync('model-change'))
   skillManager.on('change', () => configSync.sync('skill-change'))
   mcpManager.on('change', () => configSync.sync('mcp-change'))
@@ -467,7 +459,7 @@ app.whenReady().then(async () => {
         db,
         sessionManager: sessionManager!,
         coworkController: coworkController!,
-        agentManager,
+        directoryManager,
         modelRegistry,
         skillManager,
         mcpManager,
