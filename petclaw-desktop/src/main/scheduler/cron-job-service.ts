@@ -4,6 +4,8 @@
 
 import { BrowserWindow } from 'electron'
 
+import type Database from 'better-sqlite3'
+
 import type {
   Schedule,
   ScheduledTask,
@@ -69,6 +71,7 @@ interface GatewayRunLogEntry {
 interface CronJobServiceDeps {
   getGatewayClient: () => GatewayClientLike | null
   ensureGatewayReady: () => Promise<void>
+  db?: Database.Database
 }
 
 // ── 工具函数 ──
@@ -200,6 +203,7 @@ function toGatewayDelivery(delivery?: ScheduledTaskDelivery): ScheduledTaskDeliv
 export class CronJobService {
   private readonly getGatewayClient: () => GatewayClientLike | null
   private readonly ensureGatewayReady: () => Promise<void>
+  private readonly db: Database.Database | null
   private pollingTimer: ReturnType<typeof setInterval> | null = null
   private lastKnownStates = new Map<string, string>()
   private polling = false
@@ -213,6 +217,7 @@ export class CronJobService {
   constructor(deps: CronJobServiceDeps) {
     this.getGatewayClient = deps.getGatewayClient
     this.ensureGatewayReady = deps.ensureGatewayReady
+    this.db = deps.db ?? null
   }
 
   // 获取 Gateway 客户端，未就绪时先等待
@@ -226,6 +231,57 @@ export class CronJobService {
       throw new Error('Gateway client unavailable for cron operations')
     }
     return client
+  }
+
+  // ── scheduled_task_meta CRUD ──
+
+  saveTaskMeta(
+    taskId: string,
+    meta: {
+      directoryPath?: string
+      agentId?: string
+      origin?: string
+      binding?: string
+    }
+  ): void {
+    if (!this.db) return
+    this.db
+      .prepare(
+        'INSERT OR REPLACE INTO scheduled_task_meta (task_id, directory_path, agent_id, origin, binding) VALUES (?, ?, ?, ?, ?)'
+      )
+      .run(
+        taskId,
+        meta.directoryPath ?? null,
+        meta.agentId ?? null,
+        meta.origin ?? null,
+        meta.binding ?? null
+      )
+  }
+
+  getTaskMeta(taskId: string): {
+    taskId: string
+    directoryPath: string | null
+    agentId: string | null
+    origin: string | null
+    binding: string | null
+  } | null {
+    if (!this.db) return null
+    const row = this.db
+      .prepare('SELECT * FROM scheduled_task_meta WHERE task_id = ?')
+      .get(taskId) as Record<string, unknown> | undefined
+    if (!row) return null
+    return {
+      taskId: row.task_id as string,
+      directoryPath: (row.directory_path as string) ?? null,
+      agentId: (row.agent_id as string) ?? null,
+      origin: (row.origin as string) ?? null,
+      binding: (row.binding as string) ?? null
+    }
+  }
+
+  deleteTaskMeta(taskId: string): void {
+    if (!this.db) return
+    this.db.prepare('DELETE FROM scheduled_task_meta WHERE task_id = ?').run(taskId)
   }
 
   getJobNameSync(jobId: string): string | null {
@@ -252,6 +308,10 @@ export class CronJobService {
     })
     const mapped = mapGatewayJob(job)
     this.jobNameCache.set(mapped.id, mapped.name)
+    // 如果 input 携带 agentId，自动保存元数据
+    if (this.db && input.agentId) {
+      this.saveTaskMeta(mapped.id, { agentId: input.agentId })
+    }
     return mapped
   }
 
@@ -279,6 +339,7 @@ export class CronJobService {
     const client = await this.client()
     await client.request('cron.remove', { id })
     this.lastKnownStates.delete(id)
+    this.deleteTaskMeta(id)
   }
 
   async listJobs(): Promise<ScheduledTask[]> {
