@@ -21,6 +21,8 @@ export const zh: Record<string, string> = {
   'common.startUsing': '开始使用',
   'common.comingSoon': '即将推出',
   'common.noData': '暂无数据',
+  'common.enable': '启用',
+  'common.disable': '禁用',
 
   // ── welcome ──
   'welcome.morning': '早上好',

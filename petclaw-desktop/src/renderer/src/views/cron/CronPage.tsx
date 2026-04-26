@@ -1,7 +1,8 @@
 // src/renderer/src/chat/components/CronPage.tsx
 import { useState, useEffect, useCallback } from 'react'
-import { Clock, Plus, MoreHorizontal, Play, Trash2, Edit3, Info, Sparkles } from 'lucide-react'
+import { Clock, Plus, MoreHorizontal, Play, Trash2, Edit3, Info } from 'lucide-react'
 
+import { useI18n } from '../../i18n'
 import { CronEditDialog } from './CronEditDialog'
 
 type CronTab = 'tasks' | 'runs'
@@ -32,24 +33,8 @@ interface TaskRun {
   error: string | null
 }
 
-// cron 表达式转人类可读描述
-function cronToDescription(expr: string): string {
-  const parts = expr.split(/\s+/)
-  if (parts.length < 5) return expr
-  const [minute, hour, , , dow] = parts
-  const timeStr = `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`
-
-  if (dow === '*') return `每天 ${timeStr}`
-  if (dow === '1-5') return `工作日 ${timeStr}`
-  if (dow === '0,6' || dow === '6,0') return `周末 ${timeStr}`
-
-  const dayNames = ['日', '一', '二', '三', '四', '五', '六']
-  const days = dow.split(',').map((d) => dayNames[parseInt(d)] ?? d)
-  if (days.length === 1) return `每周${days[0]} ${timeStr}`
-  return `每周${days.join('、')} ${timeStr}`
-}
-
 export function CronPage() {
+  const { t } = useI18n()
   const [activeTab, setActiveTab] = useState<CronTab>('tasks')
   const [tasks, setTasks] = useState<ScheduledTask[]>([])
   const [runs, setRuns] = useState<TaskRun[]>([])
@@ -62,6 +47,26 @@ export function CronPage() {
   >()
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
   const [timeRange, setTimeRange] = useState<TimeRange>('day')
+
+  // cron 表达式转人类可读描述，依赖 i18n 的 dayNames 和格式模板
+  const cronToDescription = useCallback(
+    (expr: string): string => {
+      const parts = expr.split(/\s+/)
+      if (parts.length < 5) return expr
+      const [minute, hour, , , dow] = parts
+      const timeStr = `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`
+
+      if (dow === '*') return t('cron.daily', { time: timeStr })
+      if (dow === '1-5') return t('cron.weekdays', { time: timeStr })
+      if (dow === '0,6' || dow === '6,0') return t('cron.weekends', { time: timeStr })
+
+      const dayNames = t('cron.dayNames').split(',')
+      const days = dow.split(',').map((d) => dayNames[parseInt(d)] ?? d)
+      if (days.length === 1) return t('cron.weeklyOne', { day: days[0], time: timeStr })
+      return t('cron.weeklyMulti', { days: days.join('、'), time: timeStr })
+    },
+    [t]
+  )
 
   const loadTasks = useCallback(async () => {
     setLoading(true)
@@ -124,40 +129,35 @@ export function CronPage() {
     setEditDialogOpen(true)
   }
 
+  // Tab 数据在渲染内部定义，保证 i18n 响应式更新
   const TABS: Array<{ id: CronTab; label: string }> = [
-    { id: 'tasks', label: '我的定时任务' },
-    { id: 'runs', label: '执行记录' }
+    { id: 'tasks', label: t('cron.myTasks') },
+    { id: 'runs', label: t('cron.runHistory') }
   ]
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* 拖拽区 + 按钮 */}
       <div className="drag-region h-[52px] shrink-0 flex items-center justify-end pr-5 gap-2">
-        <button className="no-drag flex items-center gap-1.5 px-3 py-1.5 text-[12px] text-text-secondary hover:text-text-primary transition-colors active:scale-[0.96] duration-[120ms]">
-          <Sparkles size={13} />
-          通过 QoderWork 创建
-        </button>
         <button
           onClick={handleCreate}
           className="no-drag flex items-center gap-1.5 px-3 py-1.5 text-[12px] rounded-[8px] bg-text-primary text-white hover:opacity-90 transition-all active:scale-[0.96] duration-[120ms]"
         >
           <Plus size={13} />
-          新建定时任务
+          {t('cron.newTask')}
         </button>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-[800px] mx-auto px-6 py-2">
           {/* 标题 */}
-          <h1 className="text-[24px] font-bold text-text-primary mb-1">定时任务</h1>
-          <p className="text-[14px] text-text-tertiary mb-5">
-            设置自动化任务，让 QoderWork 按计划帮你完成重复性工作
-          </p>
+          <h1 className="text-[24px] font-bold text-text-primary mb-1">{t('cron.title')}</h1>
+          <p className="text-[14px] text-text-tertiary mb-5">{t('cron.subtitle')}</p>
 
           {/* 信息条 */}
           <div className="flex items-center gap-3 px-4 py-3 mb-5 bg-blue-50 border border-blue-100 rounded-[10px]">
             <Info size={16} className="text-blue-500 shrink-0" />
-            <p className="text-[13px] text-blue-700 flex-1">定时任务仅在电脑保持唤醒时运行</p>
+            <p className="text-[13px] text-blue-700 flex-1">{t('cron.sleepWarning')}</p>
           </div>
 
           {/* Tab */}
@@ -187,16 +187,16 @@ export function CronPage() {
               ) : tasks.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20">
                   <Clock size={48} className="text-text-tertiary mb-4" strokeWidth={1.25} />
-                  <h3 className="text-[15px] font-medium text-text-primary mb-1">还没有定时任务</h3>
-                  <p className="text-[13px] text-text-tertiary mb-4">
-                    创建你的第一个定时任务，让 QoderWork 自动帮你完成
-                  </p>
+                  <h3 className="text-[15px] font-medium text-text-primary mb-1">
+                    {t('cron.noTasks')}
+                  </h3>
+                  <p className="text-[13px] text-text-tertiary mb-4">{t('cron.noTasksHint')}</p>
                   <button
                     onClick={handleCreate}
                     className="flex items-center gap-1.5 px-4 py-2 text-[13px] rounded-[10px] bg-accent text-white hover:bg-accent-hover transition-colors active:scale-[0.96] duration-[120ms]"
                   >
                     <Plus size={14} />
-                    新建定时任务
+                    {t('cron.newTask')}
                   </button>
                 </div>
               ) : (
@@ -251,14 +251,14 @@ export function CronPage() {
                                 className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-text-secondary hover:bg-bg-hover transition-colors"
                               >
                                 <Edit3 size={13} />
-                                编辑
+                                {t('common.edit')}
                               </button>
                               <button
                                 onClick={() => handleRunManually(task.id)}
                                 className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-text-secondary hover:bg-bg-hover transition-colors"
                               >
                                 <Play size={13} />
-                                手动执行
+                                {t('cron.execute')}
                               </button>
                               <button
                                 onClick={() => {
@@ -268,7 +268,7 @@ export function CronPage() {
                                 className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-red-500 hover:bg-red-50 transition-colors"
                               >
                                 <Trash2 size={13} />
-                                删除
+                                {t('common.delete')}
                               </button>
                             </div>
                           )}
@@ -307,7 +307,11 @@ export function CronPage() {
                           : 'text-text-tertiary hover:text-text-secondary'
                       }`}
                     >
-                      {range === 'day' ? '按天' : range === 'week' ? '按周' : '按月'}
+                      {range === 'day'
+                        ? t('cron.byDay')
+                        : range === 'week'
+                          ? t('cron.byWeek')
+                          : t('cron.byMonth')}
                     </button>
                   ))}
                 </div>
@@ -316,10 +320,10 @@ export function CronPage() {
               {runs.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20">
                   <Clock size={48} className="text-text-tertiary mb-4" strokeWidth={1.25} />
-                  <h3 className="text-[15px] font-medium text-text-primary mb-1">暂无执行记录</h3>
-                  <p className="text-[13px] text-text-tertiary">
-                    当定时任务开始执行后，记录将显示在这里
-                  </p>
+                  <h3 className="text-[15px] font-medium text-text-primary mb-1">
+                    {t('cron.noHistory')}
+                  </h3>
+                  <p className="text-[13px] text-text-tertiary">{t('cron.noHistoryHint')}</p>
                 </div>
               ) : (
                 <div className="space-y-1">
@@ -353,12 +357,12 @@ export function CronPage() {
                         }`}
                       >
                         {run.status === 'success'
-                          ? '成功'
+                          ? t('cron.statusSuccess')
                           : run.status === 'error'
-                            ? '失败'
+                            ? t('cron.statusFailed')
                             : run.status === 'running'
-                              ? '运行中'
-                              : '跳过'}
+                              ? t('cron.statusRunning')
+                              : t('cron.statusSkipped')}
                       </span>
                       {run.durationMs !== null && (
                         <span className="text-[12px] text-text-tertiary w-[60px] text-right">

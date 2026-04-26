@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 
 import { Wrench, Search, X, Settings } from 'lucide-react'
 
+import { useI18n } from '../../i18n'
+
 // Skill 数据形状（来自 window.api.skills.list()）
 interface Skill {
   id: string
@@ -18,6 +20,7 @@ interface SkillSelectorProps {
 }
 
 export function SkillSelector({ selectedIds, onChange, onManage }: SkillSelectorProps) {
+  const { t } = useI18n()
   const [open, setOpen] = useState(false)
   const [skills, setSkills] = useState<Skill[]>([])
   const [search, setSearch] = useState('')
@@ -77,7 +80,7 @@ export function SkillSelector({ selectedIds, onChange, onManage }: SkillSelector
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-1 px-2 py-1.5 rounded-[10px] text-[12px] text-text-secondary hover:bg-bg-card hover:text-text-primary transition-all duration-[120ms]"
-        title="选择技能"
+        title={t('skills.selectTitle')}
       >
         <Wrench size={14} strokeWidth={1.75} />
         {/* 已选数量 badge */}
@@ -116,7 +119,7 @@ export function SkillSelector({ selectedIds, onChange, onManage }: SkillSelector
             onClick={() => onChange([])}
             className="text-[11px] text-text-tertiary hover:text-text-secondary transition-colors duration-[120ms] px-1"
           >
-            全部清除
+            {t('skills.clearAll')}
           </button>
         </div>
       )}
@@ -131,7 +134,7 @@ export function SkillSelector({ selectedIds, onChange, onManage }: SkillSelector
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="搜索技能"
+              placeholder={t('skills.searchSkill')}
               className="flex-1 text-[13px] bg-transparent text-text-primary placeholder:text-text-tertiary outline-none"
               autoFocus
             />
@@ -141,7 +144,7 @@ export function SkillSelector({ selectedIds, onChange, onManage }: SkillSelector
           <div className="max-h-56 overflow-y-auto">
             {filtered.length === 0 ? (
               <div className="px-3 py-3 text-[12px] text-text-tertiary text-center">
-                {skills.length === 0 ? '暂无已安装技能' : '无匹配技能'}
+                {skills.length === 0 ? t('skills.noInstalled') : t('skills.noMatch')}
               </div>
             ) : (
               filtered.map((skill) => {
@@ -196,7 +199,7 @@ export function SkillSelector({ selectedIds, onChange, onManage }: SkillSelector
               className="w-full flex items-center gap-2 px-3 py-2.5 text-[12px] text-text-tertiary hover:text-text-secondary hover:bg-bg-input transition-all duration-[120ms] text-left"
             >
               <Settings size={13} strokeWidth={1.75} />
-              <span>管理技能</span>
+              <span>{t('skills.manage')}</span>
             </button>
           </div>
         </div>

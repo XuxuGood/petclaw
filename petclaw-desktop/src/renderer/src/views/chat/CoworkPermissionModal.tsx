@@ -2,6 +2,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ShieldAlert, ShieldCheck, ShieldX, X } from 'lucide-react'
 
+import { useI18n } from '../../i18n'
+
 // 正向/负向确认选项模式匹配，用于自动识别主/次按钮语义
 const POSITIVE_CONFIRM_PATTERNS = [
   /\ballow\b/i,
@@ -128,32 +130,33 @@ function resolveConfirmModeButtons(options: Array<{ label: string; description?:
 
 const DANGER_STYLES: Record<
   DangerLevel,
-  { bg: string; border: string; icon: typeof ShieldAlert; iconColor: string; label: string }
+  { bg: string; border: string; icon: typeof ShieldAlert; iconColor: string; labelKey: string }
 > = {
   safe: {
     bg: 'bg-safe-bg',
     border: 'border-safe-border',
     icon: ShieldCheck,
     iconColor: 'text-safe-icon',
-    label: '工具调用'
+    labelKey: 'permission.toolCall'
   },
   caution: {
     bg: 'bg-caution-bg',
     border: 'border-caution-border',
     icon: ShieldAlert,
     iconColor: 'text-caution-icon',
-    label: '需要确认'
+    labelKey: 'permission.needConfirm'
   },
   destructive: {
     bg: 'bg-danger-bg',
     border: 'border-danger-border',
     icon: ShieldX,
     iconColor: 'text-danger-icon',
-    label: '危险操作'
+    labelKey: 'permission.dangerOp'
   }
 }
 
 export function CoworkPermissionModal({ permission, onRespond }: CoworkPermissionModalProps) {
+  const { t } = useI18n()
   const { toolName, toolInput } = permission
 
   // AskUserQuestion 确认模式：单问题 2 选项
@@ -177,10 +180,10 @@ export function CoworkPermissionModal({ permission, onRespond }: CoworkPermissio
         {/* 标题栏：危险等级色彩区分 */}
         <div className={`flex items-center gap-3 px-5 py-4 ${style.bg} border-b ${style.border}`}>
           <DangerIcon size={20} className={style.iconColor} />
-          <span className="text-[14px] font-semibold text-text-primary">{style.label}</span>
+          <span className="text-[14px] font-semibold text-text-primary">{t(style.labelKey)}</span>
           <div className="flex-1" />
           <button
-            onClick={() => onRespond({ behavior: 'deny', message: '用户取消' })}
+            onClick={() => onRespond({ behavior: 'deny', message: t('permission.userCancel') })}
             className="p-1 rounded-[8px] hover:bg-bg-active transition-colors"
           >
             <X size={16} className="text-text-tertiary" />
@@ -190,11 +193,11 @@ export function CoworkPermissionModal({ permission, onRespond }: CoworkPermissio
         {/* 工具名称 + 参数展示 */}
         <div className="px-5 py-4 overflow-y-auto">
           <div className="mb-3">
-            <span className="text-[12px] text-text-tertiary">工具名称</span>
+            <span className="text-[12px] text-text-tertiary">{t('permission.toolName')}</span>
             <div className="text-[14px] font-mono text-text-primary mt-1">{toolName}</div>
           </div>
           <div>
-            <span className="text-[12px] text-text-tertiary">参数</span>
+            <span className="text-[12px] text-text-tertiary">{t('permission.params')}</span>
             <pre className="text-[12px] font-mono text-text-secondary mt-1 p-3 bg-bg-hover rounded-[10px] overflow-x-auto max-h-[200px]">
               {JSON.stringify(toolInput, null, 2)}
             </pre>
@@ -204,10 +207,10 @@ export function CoworkPermissionModal({ permission, onRespond }: CoworkPermissio
         {/* 操作按钮 */}
         <div className="flex justify-end gap-2 px-5 py-4 border-t border-border">
           <button
-            onClick={() => onRespond({ behavior: 'deny', message: '用户拒绝' })}
+            onClick={() => onRespond({ behavior: 'deny', message: t('permission.userDeny') })}
             className="px-4 py-2 text-[13px] rounded-[10px] bg-bg-hover text-text-secondary hover:bg-bg-active transition-colors active:scale-[0.96] duration-[120ms]"
           >
-            拒绝
+            {t('permission.deny')}
           </button>
           <button
             onClick={() => onRespond({ behavior: 'allow' })}
@@ -217,7 +220,7 @@ export function CoworkPermissionModal({ permission, onRespond }: CoworkPermissio
                 : 'bg-accent hover:bg-accent-hover'
             }`}
           >
-            允许
+            {t('permission.allow')}
           </button>
         </div>
       </div>
@@ -234,6 +237,7 @@ function ConfirmModeModal({
   toolInput: Record<string, unknown>
   onRespond: (result: PermissionResult) => void
 }) {
+  const { t } = useI18n()
   const questions = toolInput.questions as Array<Record<string, unknown>>
   const q = questions[0]
   const options = q.options as Array<{ label: string; description?: string }>
@@ -258,7 +262,7 @@ function ConfirmModeModal({
         {dangerLevel !== 'safe' && (
           <div className={`flex items-center gap-3 px-5 py-3 ${style.bg} border-b ${style.border}`}>
             <DangerIcon size={18} className={style.iconColor} />
-            <span className="text-[13px] font-semibold text-text-primary">{style.label}</span>
+            <span className="text-[13px] font-semibold text-text-primary">{t(style.labelKey)}</span>
           </div>
         )}
         <div className="px-5 py-4">
@@ -311,6 +315,7 @@ function MultiQuestionModal({
   toolInput: Record<string, unknown>
   onRespond: (result: PermissionResult) => void
 }) {
+  const { t } = useI18n()
   const questions = toolInput.questions as Array<Record<string, unknown>>
   const [answers, setAnswers] = useState<Record<string, string>>({})
 
@@ -412,17 +417,17 @@ function MultiQuestionModal({
         </div>
         <div className="flex justify-end gap-2 px-5 py-4 border-t border-border">
           <button
-            onClick={() => onRespond({ behavior: 'deny', message: '用户取消' })}
+            onClick={() => onRespond({ behavior: 'deny', message: t('permission.userCancel') })}
             className="px-4 py-2 text-[13px] rounded-[10px] bg-bg-hover text-text-secondary hover:bg-bg-active transition-colors active:scale-[0.96] duration-[120ms]"
           >
-            取消
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleSubmit}
             disabled={!isComplete}
             className="px-4 py-2 text-[13px] rounded-[10px] bg-accent text-white hover:bg-accent-hover transition-colors active:scale-[0.96] duration-[120ms] disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            确认
+            {t('common.confirm')}
           </button>
         </div>
       </div>

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 
 import { FolderOpen, FolderPlus, Clock, X, ChevronRight } from 'lucide-react'
 
+import { useI18n } from '../i18n'
+
 // 从完整路径中提取最后一级文件夹名
 function getFolderName(p: string): string {
   const parts = p.replace(/\\/g, '/').split('/')
@@ -24,6 +26,7 @@ interface CwdSelectorProps {
 }
 
 export function CwdSelector({ value, onChange }: CwdSelectorProps) {
+  const { t } = useI18n()
   const [open, setOpen] = useState(false)
   const [showRecent, setShowRecent] = useState(false)
   const [recentDirs, setRecentDirs] = useState<string[]>([])
@@ -86,7 +89,7 @@ export function CwdSelector({ value, onChange }: CwdSelectorProps) {
     // 当前 preload 未暴露 dialog API，使用 getSetting 间接触发或直接调用
     // 注意：此处调用 window.api.setSetting 触发主进程的 dialog:selectDirectory
     // TODO: Task 19 补充 dialog:selectDirectory IPC，此处临时用 prompt 降级
-    const dir = window.prompt('请输入工作目录路径：', value || '')
+    const dir = window.prompt(t('cwdSelector.promptPath'), value || '')
     if (dir?.trim()) {
       onChange(dir.trim())
     }
@@ -121,7 +124,7 @@ export function CwdSelector({ value, onChange }: CwdSelectorProps) {
         type="button"
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-1.5 px-2 py-1.5 rounded-[10px] text-[12px] text-text-secondary hover:bg-bg-card hover:text-text-primary transition-all duration-[120ms] max-w-[160px]"
-        title={value || '选择工作目录'}
+        title={value || t('cwdSelector.title')}
       >
         <FolderOpen size={14} strokeWidth={1.75} className="shrink-0" />
         {value ? (
@@ -141,7 +144,7 @@ export function CwdSelector({ value, onChange }: CwdSelectorProps) {
             </span>
           </>
         ) : (
-          <span className="text-text-tertiary">工作目录</span>
+          <span className="text-text-tertiary">{t('cwdSelector.title')}</span>
         )}
       </button>
 
@@ -155,7 +158,7 @@ export function CwdSelector({ value, onChange }: CwdSelectorProps) {
             className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-text-primary hover:bg-bg-input transition-colors duration-[120ms] text-left"
           >
             <FolderPlus size={15} strokeWidth={1.75} className="text-text-secondary shrink-0" />
-            <span>添加文件夹</span>
+            <span>{t('cwdSelector.addFolder')}</span>
           </button>
 
           {/* 最近使用（悬停展开子菜单） */}
@@ -167,7 +170,7 @@ export function CwdSelector({ value, onChange }: CwdSelectorProps) {
           >
             <div className="flex items-center gap-2.5">
               <Clock size={15} strokeWidth={1.75} className="text-text-secondary shrink-0" />
-              <span>最近使用</span>
+              <span>{t('cwdSelector.recent')}</span>
             </div>
             <ChevronRight size={13} strokeWidth={1.75} className="text-text-tertiary" />
           </div>
@@ -210,6 +213,7 @@ function RecentSubmenu({
   onMouseLeave,
   ref
 }: RecentSubmenuProps) {
+  const { t } = useI18n()
   const [pos, setPos] = useState({ top: 0, left: 0 })
 
   // 计算子菜单位置（锚点左边）
@@ -229,9 +233,11 @@ function RecentSubmenu({
       onMouseLeave={onMouseLeave}
     >
       {loading ? (
-        <div className="px-3 py-2.5 text-[12px] text-text-tertiary">加载中...</div>
+        <div className="px-3 py-2.5 text-[12px] text-text-tertiary">{t('common.loading')}</div>
       ) : dirs.length === 0 ? (
-        <div className="px-3 py-2.5 text-[12px] text-text-tertiary">暂无最近目录</div>
+        <div className="px-3 py-2.5 text-[12px] text-text-tertiary">
+          {t('cwdSelector.noRecent')}
+        </div>
       ) : (
         dirs.map((dir) => (
           <button

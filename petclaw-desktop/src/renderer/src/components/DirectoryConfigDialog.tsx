@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 
 import { X } from 'lucide-react'
 
+import { useI18n } from '../i18n'
 import { DirectorySkillSelector } from './DirectorySkillSelector'
 
 type ConfigTab = 'basic' | 'skills'
@@ -21,6 +22,7 @@ export function DirectoryConfigDialog({
   onClose,
   onSaved
 }: DirectoryConfigDialogProps) {
+  const { t } = useI18n()
   const [activeTab, setActiveTab] = useState<ConfigTab>('basic')
   const [saving, setSaving] = useState(false)
 
@@ -68,8 +70,8 @@ export function DirectoryConfigDialog({
   if (!isOpen || !directoryAgentId) return null
 
   const TABS: Array<{ id: ConfigTab; label: string }> = [
-    { id: 'basic', label: '基础信息' },
-    { id: 'skills', label: '技能' }
+    { id: 'basic', label: t('dirConfig.basicInfo') },
+    { id: 'skills', label: t('dirConfig.skills') }
   ]
 
   return (
@@ -112,7 +114,7 @@ export function DirectoryConfigDialog({
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {activeTab === 'basic' && (
             <div className="space-y-4">
-              <Field label="目录别名">
+              <Field label={t('dirConfig.alias')}>
                 <input
                   type="text"
                   value={name}
@@ -120,17 +122,19 @@ export function DirectoryConfigDialog({
                   placeholder={directoryPath.split('/').pop() || ''}
                   className="w-full px-3 py-2 text-[13px] rounded-[10px] bg-bg-hover border border-border text-text-primary focus:outline-none focus:ring-1 focus:ring-accent/40"
                 />
-                <p className="text-[11px] text-text-tertiary mt-1">留空则显示目录名</p>
+                <p className="text-[11px] text-text-tertiary mt-1">{t('dirConfig.aliasHint')}</p>
               </Field>
-              <Field label="模型覆盖">
+              <Field label={t('dirConfig.modelOverride')}>
                 <input
                   type="text"
                   value={modelOverride}
                   onChange={(e) => setModelOverride(e.target.value)}
-                  placeholder="留空则使用全局默认模型"
+                  placeholder={t('dirConfig.modelOverridePlaceholder')}
                   className="w-full px-3 py-2 text-[13px] rounded-[10px] bg-bg-hover border border-border text-text-primary focus:outline-none focus:ring-1 focus:ring-accent/40"
                 />
-                <p className="text-[11px] text-text-tertiary mt-1">仅 OpenClaw 引擎使用此设置</p>
+                <p className="text-[11px] text-text-tertiary mt-1">
+                  {t('dirConfig.modelOverrideHint')}
+                </p>
               </Field>
             </div>
           )}
@@ -146,14 +150,14 @@ export function DirectoryConfigDialog({
             onClick={onClose}
             className="px-4 py-2 text-[13px] rounded-[10px] text-text-secondary hover:bg-bg-hover transition-colors active:scale-[0.96] duration-[120ms] mr-2"
           >
-            取消
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
             className="px-4 py-2 text-[13px] rounded-[10px] bg-accent text-white hover:bg-accent-hover transition-colors active:scale-[0.96] duration-[120ms] disabled:opacity-50"
           >
-            {saving ? '保存中...' : '保存'}
+            {saving ? t('common.saving') : t('common.save')}
           </button>
         </div>
       </div>

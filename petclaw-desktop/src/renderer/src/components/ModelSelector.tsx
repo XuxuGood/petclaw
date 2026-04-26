@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 
 import { Zap, Brain, ChevronDown, Check } from 'lucide-react'
 
+import { useI18n } from '../i18n'
+
 // 模型数据形状（来自 window.api.models.active() 和 providers()）
 interface ModelItem {
   id: string
@@ -38,6 +40,7 @@ interface ModelSelectorProps {
 }
 
 export function ModelSelector({ value, onChange }: ModelSelectorProps) {
+  const { t } = useI18n()
   const [open, setOpen] = useState(false)
   const [models, setModels] = useState<ModelItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -68,7 +71,7 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
 
   // 当前模型展示名
   const currentModel = models.find((m) => m.id === value)
-  const displayName = currentModel?.name ?? (value || '默认模型')
+  const displayName = currentModel?.name ?? (value || t('modelSelector.default'))
   const isReasoning = currentModel?.tier === 'reasoning'
 
   return (
@@ -94,9 +97,13 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
       {open && (
         <div className="absolute bottom-full left-0 mb-2 w-56 rounded-[14px] bg-bg-card border border-border shadow-[var(--shadow-dropdown)] z-50 overflow-hidden">
           {loading ? (
-            <div className="px-3 py-3 text-[12px] text-text-tertiary text-center">加载中...</div>
+            <div className="px-3 py-3 text-[12px] text-text-tertiary text-center">
+              {t('common.loading')}
+            </div>
           ) : models.length === 0 ? (
-            <div className="px-3 py-3 text-[12px] text-text-tertiary text-center">暂无可用模型</div>
+            <div className="px-3 py-3 text-[12px] text-text-tertiary text-center">
+              {t('modelSelector.noModels')}
+            </div>
           ) : (
             <div className="max-h-64 overflow-y-auto py-1">
               {/* 标准模型组 */}
@@ -104,7 +111,7 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
                 <>
                   <div className="px-3 pt-2 pb-1 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1">
                     <Zap size={10} strokeWidth={2} />
-                    <span>标准</span>
+                    <span>{t('modelSettings.standard')}</span>
                   </div>
                   {models
                     .filter((m) => m.tier !== 'reasoning')
@@ -126,7 +133,7 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
                 <>
                   <div className="px-3 pt-3 pb-1 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1 border-t border-border mt-1">
                     <Brain size={10} strokeWidth={2} />
-                    <span>推理</span>
+                    <span>{t('modelSettings.reasoning')}</span>
                   </div>
                   {models
                     .filter((m) => m.tier === 'reasoning')

@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { Server, X, Loader2 } from 'lucide-react'
 
+import { useI18n } from '../i18n'
+
 interface McpServer {
   id: string
   name: string
@@ -18,6 +20,7 @@ interface ConnectorPopupProps {
  * 浮层模式，点击遮罩或 × 关闭。
  */
 export function ConnectorPopup({ open, onClose }: ConnectorPopupProps) {
+  const { t } = useI18n()
   const [servers, setServers] = useState<McpServer[]>([])
   const [loading, setLoading] = useState(false)
   const [toggling, setToggling] = useState<string | null>(null)
@@ -88,11 +91,13 @@ export function ConnectorPopup({ open, onClose }: ConnectorPopupProps) {
         {/* 顶栏 */}
         <div className="flex items-center gap-2 px-3.5 py-3 border-b border-border">
           <Server size={14} strokeWidth={2} className="text-accent shrink-0" />
-          <span className="flex-1 text-[13px] font-semibold text-text-primary">MCP 服务器</span>
+          <span className="flex-1 text-[13px] font-semibold text-text-primary">
+            {t('connectorPopup.mcpServers')}
+          </span>
           <button
             onClick={onClose}
             className="w-6 h-6 flex items-center justify-center rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-input transition-all duration-[120ms] ease active:scale-[0.96]"
-            aria-label="关闭"
+            aria-label={t('common.close')}
           >
             <X size={13} strokeWidth={2} />
           </button>
@@ -103,11 +108,11 @@ export function ConnectorPopup({ open, onClose }: ConnectorPopupProps) {
           {loading ? (
             <div className="flex items-center justify-center gap-2 py-6 text-text-tertiary">
               <Loader2 size={14} strokeWidth={2} className="animate-spin" />
-              <span className="text-[12.5px]">加载中…</span>
+              <span className="text-[12.5px]">{t('common.loading')}</span>
             </div>
           ) : servers.length === 0 ? (
             <div className="py-6 text-center text-[12.5px] text-text-tertiary">
-              暂未配置 MCP 服务器
+              {t('connectorPopup.noMcp')}
             </div>
           ) : (
             servers.map((server) => (
@@ -134,6 +139,7 @@ interface ServerRowProps {
 }
 
 function ServerRow({ server, toggling, onToggle }: ServerRowProps) {
+  const { t } = useI18n()
   return (
     <div className="flex items-center gap-3 px-3.5 py-2.5 hover:bg-bg-input transition-all duration-[120ms] ease">
       {/* 状态指示点 */}
@@ -154,7 +160,7 @@ function ServerRow({ server, toggling, onToggle }: ServerRowProps) {
         className={`relative w-9 h-5 rounded-full shrink-0 transition-all duration-[120ms] ease active:scale-[0.96] disabled:opacity-50 disabled:cursor-not-allowed ${
           server.enabled ? 'bg-accent' : 'bg-bg-input border border-border'
         }`}
-        aria-label={`${server.enabled ? '禁用' : '启用'} ${server.name}`}
+        aria-label={`${server.enabled ? t('common.disable') : t('common.enable')} ${server.name}`}
       >
         {toggling ? (
           <Loader2

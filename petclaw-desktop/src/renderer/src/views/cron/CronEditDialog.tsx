@@ -2,9 +2,11 @@
 import { useState, useEffect } from 'react'
 import { X, Clock, FolderOpen, Calendar, Paperclip, ChevronDown } from 'lucide-react'
 
+import { useI18n } from '../../i18n'
+
 type ScheduleFrequency = 'daily' | 'weekly' | 'monthly' | 'custom'
 
-const WEEKDAY_LABELS = ['一', '二', '三', '四', '五', '六', '日']
+// cron 表达式中星期几的数值（与 WEEKDAY_LABELS 顺序对应）
 const WEEKDAY_CRON_VALUES = [1, 2, 3, 4, 5, 6, 0]
 
 interface CronEditDialogProps {
@@ -26,6 +28,7 @@ export function CronEditDialog({
   onClose,
   onSaved
 }: CronEditDialogProps) {
+  const { t } = useI18n()
   const [name, setName] = useState('')
   const [frequency, setFrequency] = useState<ScheduleFrequency>('daily')
   const [time, setTime] = useState('09:00')
@@ -34,6 +37,9 @@ export function CronEditDialog({
   const [cwd, setCwd] = useState('')
   const [customCron, setCustomCron] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // 从 i18n 获取星期几标签，保证语言切换时响应式更新
+  const weekdayLabels = t('cronEdit.weekdayLabels').split(',')
 
   useEffect(() => {
     if (!isOpen) return
@@ -113,7 +119,7 @@ export function CronEditDialog({
   }
 
   const handleSelectCwd = async () => {
-    const dir = window.prompt('输入工作目录路径')
+    const dir = window.prompt(t('cwdSelector.promptPath'))
     if (dir) setCwd(dir)
   }
 
@@ -126,11 +132,9 @@ export function CronEditDialog({
         <div className="flex items-center justify-between px-6 py-5">
           <div>
             <h2 className="text-[17px] font-semibold text-text-primary">
-              {taskId ? '编辑任务' : '新建定时任务'}
+              {taskId ? t('cronEdit.editTitle') : t('cronEdit.createTitle')}
             </h2>
-            <p className="text-[13px] text-text-tertiary mt-1">
-              按计划自动执行任务，也可随时手动触发。在任意对话中描述你想定期做的事，即可快速创建
-            </p>
+            <p className="text-[13px] text-text-tertiary mt-1">{t('cronEdit.subtitle')}</p>
           </div>
           <button
             onClick={onClose}
@@ -144,29 +148,33 @@ export function CronEditDialog({
         <div className="flex-1 overflow-y-auto px-6 pb-4">
           {/* 任务名称 */}
           <div className="mb-5">
-            <label className="block text-[14px] font-medium text-text-primary mb-2">任务名称</label>
+            <label className="block text-[14px] font-medium text-text-primary mb-2">
+              {t('cronEdit.taskName')}
+            </label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="描述你的任务"
+              placeholder={t('cronEdit.taskNamePlaceholder')}
               className="w-full px-4 py-3 text-[14px] rounded-[10px] bg-bg-root border border-border text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent/40"
             />
           </div>
 
           {/* 计划时间 */}
           <div className="mb-5">
-            <label className="block text-[14px] font-medium text-text-primary mb-2">计划时间</label>
+            <label className="block text-[14px] font-medium text-text-primary mb-2">
+              {t('cronEdit.schedule')}
+            </label>
             <div className="flex items-center gap-3">
               <select
                 value={frequency}
                 onChange={(e) => setFrequency(e.target.value as ScheduleFrequency)}
                 className="px-4 py-3 text-[14px] rounded-[10px] bg-bg-root border border-border text-text-primary focus:outline-none focus:ring-1 focus:ring-accent/40 min-w-[120px]"
               >
-                <option value="daily">每天</option>
-                <option value="weekly">每周</option>
-                <option value="monthly">每月</option>
-                <option value="custom">自定义 Cron</option>
+                <option value="daily">{t('cronEdit.daily')}</option>
+                <option value="weekly">{t('cronEdit.weekly')}</option>
+                <option value="monthly">{t('cronEdit.monthly')}</option>
+                <option value="custom">{t('cronEdit.customCron')}</option>
               </select>
 
               {frequency !== 'custom' ? (
@@ -196,7 +204,7 @@ export function CronEditDialog({
             {/* 星期选择器（仅每周模式） */}
             {frequency === 'weekly' && (
               <div className="flex items-center gap-2 mt-3">
-                {WEEKDAY_LABELS.map((label, idx) => {
+                {weekdayLabels.map((label, idx) => {
                   const cronValue = WEEKDAY_CRON_VALUES[idx]
                   const isActive = selectedWeekdays.includes(cronValue)
                   return (
@@ -219,15 +227,12 @@ export function CronEditDialog({
 
           {/* Prompt */}
           <div className="mb-4">
-            <label className="block text-[14px] font-medium text-text-primary mb-2">
-              让 QoderWork 帮你做什么...
-            </label>
             <div className="border border-border rounded-[10px] overflow-hidden">
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 rows={6}
-                placeholder="让 QoderWork 帮你做什么..."
+                placeholder={t('cronEdit.promptPlaceholder')}
                 className="w-full px-4 py-3 text-[14px] text-text-primary bg-bg-root resize-none focus:outline-none placeholder:text-text-tertiary"
               />
               {/* 工具栏 */}
@@ -237,7 +242,7 @@ export function CronEditDialog({
                   className="flex items-center gap-1.5 px-2.5 py-1.5 text-[12px] text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded-[8px] transition-colors"
                 >
                   <FolderOpen size={14} />
-                  {cwd ? cwd.split('/').pop() : '选择工作目录'}
+                  {cwd ? cwd.split('/').pop() : t('cronEdit.selectDir')}
                 </button>
                 <button className="p-1.5 text-text-tertiary hover:text-text-secondary rounded-[6px] hover:bg-bg-hover transition-colors">
                   <Calendar size={16} />
@@ -247,7 +252,7 @@ export function CronEditDialog({
                 </button>
                 <div className="flex-1" />
                 <button className="flex items-center gap-1 px-2 py-1 text-[12px] text-text-tertiary hover:text-text-secondary rounded-[6px] hover:bg-bg-hover transition-colors">
-                  <span>标准</span>
+                  <span>{t('cronEdit.standard')}</span>
                   <ChevronDown size={12} />
                 </button>
               </div>
@@ -261,14 +266,14 @@ export function CronEditDialog({
             onClick={onClose}
             className="px-5 py-2.5 text-[14px] text-text-secondary hover:text-text-primary transition-colors active:scale-[0.96] duration-[120ms]"
           >
-            取消
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleSave}
             disabled={!name.trim() || !prompt.trim() || saving}
             className="px-5 py-2.5 text-[14px] rounded-[10px] bg-text-primary text-white hover:opacity-90 transition-all active:scale-[0.96] duration-[120ms] disabled:opacity-40"
           >
-            {saving ? '保存中...' : '保存'}
+            {saving ? t('common.saving') : t('common.save')}
           </button>
         </div>
       </div>

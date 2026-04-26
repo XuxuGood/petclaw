@@ -21,6 +21,8 @@ export const en: Record<string, string> = {
   'common.startUsing': 'Get Started',
   'common.comingSoon': 'Coming Soon',
   'common.noData': 'No data',
+  'common.enable': 'Enable',
+  'common.disable': 'Disable',
 
   // ── welcome ──
   'welcome.morning': 'Good Morning',

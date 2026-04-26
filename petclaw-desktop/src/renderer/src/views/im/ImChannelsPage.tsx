@@ -2,15 +2,21 @@
 import { useState, useEffect } from 'react'
 import { Settings2, MoreHorizontal, Info } from 'lucide-react'
 
+import { useI18n } from '../../i18n'
 import { ImConfigDialog } from './ImConfigDialog'
 
-// 平台静态元数据，key 与后端 IM 配置 key 保持一致
-const PLATFORMS = [
-  { key: 'dingtalk', name: '钉钉', icon: '📌', description: '通过钉钉机器人接收用户消息' },
-  { key: 'feishu', name: '飞书', icon: '🐦', description: '通过飞书机器人接收用户消息' },
-  { key: 'wechat', name: '微信', icon: '💬', description: '通过微信接收用户消息' },
-  { key: 'wecom', name: '企业微信', icon: '🏢', description: '通过企业微信机器人接收用户消息' }
-] as const
+// 平台 key 列表，name/description 通过 i18n 获取
+const PLATFORM_KEYS = ['dingtalk', 'feishu', 'wechat', 'wecom'] as const
+
+type PlatformKey = (typeof PLATFORM_KEYS)[number]
+
+// 平台图标不含文本，直接硬编码 emoji
+const PLATFORM_ICONS: Record<PlatformKey, string> = {
+  dingtalk: '📌',
+  feishu: '🐦',
+  wechat: '💬',
+  wecom: '🏢'
+}
 
 interface PlatformStatus {
   enabled: boolean
@@ -18,6 +24,7 @@ interface PlatformStatus {
 }
 
 export function ImChannelsPage() {
+  const { t } = useI18n()
   const [statuses, setStatuses] = useState<Record<string, PlatformStatus>>({})
   const [configDialogOpen, setConfigDialogOpen] = useState(false)
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null)
@@ -65,27 +72,32 @@ export function ImChannelsPage() {
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-[720px] mx-auto px-6 py-4">
-          <h1 className="text-[24px] font-bold text-text-primary mb-2">IM 频道</h1>
+          <h1 className="text-[24px] font-bold text-text-primary mb-2">{t('im.title')}</h1>
           <p className="text-[14px] text-text-tertiary mb-6 leading-[1.6]">
-            配置 IM 频道，让 QoderWork 接收来自钉钉、飞书等平台的消息。
-            频道配置信息仅存储在本地，不会上传到云端。
+            {t('im.subtitle')}
+            {t('im.localOnly')}
           </p>
 
           {/* 权限提示信息条 */}
           <div className="flex items-start gap-3 px-4 py-3 mb-6 bg-accent/5 border border-accent/15 rounded-[10px]">
             <Info size={16} className="text-accent shrink-0 mt-0.5" />
             <p className="text-[13px] text-text-secondary leading-[1.6] flex-1">
-              建议授予「完全磁盘访问权限」，可避免系统使用过程中反复弹出文件访问确认，体验更流畅。
+              {t('im.fullDiskHint')}
             </p>
-            <button className="text-[13px] text-accent hover:underline shrink-0">前往设置</button>
+            <button className="text-[13px] text-accent hover:underline shrink-0">
+              {t('im.goSettings')}
+            </button>
           </div>
 
           {/* 平台列表 */}
           <div className="space-y-2">
-            {PLATFORMS.map(({ key, name, icon, description }) => {
+            {PLATFORM_KEYS.map((key) => {
               const status = statuses[key]
               const enabled = status?.enabled ?? false
               const connected = status?.connected ?? false
+              // i18n 键名约定：im.dingtalk / im.dingtalkDesc 等
+              const nameKey = `im.${key}` as const
+              const descKey = `im.${key}Desc` as const
 
               return (
                 <div
@@ -94,19 +106,19 @@ export function ImChannelsPage() {
                 >
                   {/* 平台图标 */}
                   <div className="w-10 h-10 rounded-full bg-bg-hover flex items-center justify-center text-[20px] shrink-0">
-                    {icon}
+                    {PLATFORM_ICONS[key]}
                   </div>
 
                   {/* 名称 + 描述 */}
                   <div className="flex-1 min-w-0">
-                    <div className="text-[14px] font-medium text-text-primary">{name}</div>
-                    <div className="text-[12px] text-text-tertiary mt-0.5">{description}</div>
+                    <div className="text-[14px] font-medium text-text-primary">{t(nameKey)}</div>
+                    <div className="text-[12px] text-text-tertiary mt-0.5">{t(descKey)}</div>
                   </div>
 
                   {/* 已连接徽标 */}
                   {connected && (
                     <span className="px-2 py-0.5 text-[11px] font-medium text-green-600 bg-green-50 rounded-full">
-                      已连接
+                      {t('im.connected')}
                     </span>
                   )}
 
@@ -116,7 +128,7 @@ export function ImChannelsPage() {
                     className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] text-text-secondary hover:text-text-primary bg-bg-hover hover:bg-bg-active rounded-[10px] transition-colors active:scale-[0.96] duration-[120ms]"
                   >
                     <Settings2 size={14} />
-                    {connected ? '配置/管理' : '配置'}
+                    {connected ? t('im.configManage') : t('im.configure')}
                   </button>
 
                   {/* Toggle 开关 */}

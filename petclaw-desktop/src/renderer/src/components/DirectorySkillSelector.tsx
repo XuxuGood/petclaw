@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 
 import { Check } from 'lucide-react'
 
+import { useI18n } from '../i18n'
+
 interface Skill {
   id: string
   name: string
@@ -17,6 +19,7 @@ interface DirectorySkillSelectorProps {
 }
 
 export function DirectorySkillSelector({ selectedIds, onChange }: DirectorySkillSelectorProps) {
+  const { t } = useI18n()
   const [skills, setSkills] = useState<Skill[]>([])
   const [search, setSearch] = useState('')
 
@@ -48,7 +51,7 @@ export function DirectorySkillSelector({ selectedIds, onChange }: DirectorySkill
         type="text"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        placeholder="搜索技能..."
+        placeholder={t('skills.searchPlaceholder')}
         className="w-full px-3 py-2 text-[13px] rounded-[10px] bg-bg-hover border border-border text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent/40"
       />
       <div className="max-h-[300px] overflow-y-auto space-y-1">
@@ -80,7 +83,9 @@ export function DirectorySkillSelector({ selectedIds, onChange }: DirectorySkill
           )
         })}
       </div>
-      <div className="text-[12px] text-text-tertiary">已选 {selectedIds.length} 个技能</div>
+      <div className="text-[12px] text-text-tertiary">
+        {t('dirConfig.selectedSkills').replace('{count}', String(selectedIds.length))}
+      </div>
     </div>
   )
 }

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { ListChecks, Package, Puzzle, ChevronDown, ChevronRight, Loader2 } from 'lucide-react'
 
+import { useI18n } from '../i18n'
+
 interface TaskMonitorPanelProps {
   sessionId: string
 }
@@ -11,6 +13,7 @@ interface TaskMonitorPanelProps {
  * 完整数据对接待 Task 18 Cowork 实现后补充。
  */
 export function TaskMonitorPanel({ sessionId }: TaskMonitorPanelProps) {
+  const { t } = useI18n()
   const [todoOpen, setTodoOpen] = useState(true)
   const [artifactsOpen, setArtifactsOpen] = useState(true)
   const [skillsOpen, setSkillsOpen] = useState(false)
@@ -25,33 +28,33 @@ export function TaskMonitorPanel({ sessionId }: TaskMonitorPanelProps) {
         {/* 待办区域 */}
         <SectionHeader
           icon={ListChecks}
-          label="待办任务"
+          label={t('taskMonitor.todoTasks')}
           open={todoOpen}
           onToggle={() => setTodoOpen((v) => !v)}
         />
         {todoOpen && (
           <div className="px-1 pb-2">
-            {loading ? <LoadingRow /> : <EmptyHint text="暂无待办任务" />}
+            {loading ? <LoadingRow /> : <EmptyHint text={t('taskMonitor.noTodo')} />}
           </div>
         )}
 
         {/* 产物区域 */}
         <SectionHeader
           icon={Package}
-          label="产物"
+          label={t('taskMonitor.artifacts')}
           open={artifactsOpen}
           onToggle={() => setArtifactsOpen((v) => !v)}
         />
         {artifactsOpen && (
           <div className="px-1 pb-2">
-            {loading ? <LoadingRow /> : <EmptyHint text="暂无产物" />}
+            {loading ? <LoadingRow /> : <EmptyHint text={t('taskMonitor.noArtifacts')} />}
           </div>
         )}
 
         {/* 技能与 MCP 区域 */}
         <SectionHeader
           icon={Puzzle}
-          label="技能与 MCP"
+          label={t('taskMonitor.skillsAndMcp')}
           open={skillsOpen}
           onToggle={() => setSkillsOpen((v) => !v)}
         />
@@ -98,16 +101,18 @@ function EmptyHint({ text }: { text: string }) {
 }
 
 function LoadingRow() {
+  const { t } = useI18n()
   return (
     <div className="flex items-center gap-1.5 py-1 px-1 text-text-tertiary">
       <Loader2 size={12} strokeWidth={2} className="animate-spin" />
-      <span className="text-[11.5px]">加载中…</span>
+      <span className="text-[11.5px]">{t('common.loading')}</span>
     </div>
   )
 }
 
 /** 技能与 MCP 子区域：列出当前会话启用的技能（骨架版） */
 function ActiveSkillsSection() {
+  const { t } = useI18n()
   const [skills, setSkills] = useState<Array<{ id: string; name: string; enabled: boolean }>>([])
 
   useEffect(() => {
@@ -118,7 +123,7 @@ function ActiveSkillsSection() {
     })
   }, [])
 
-  if (skills.length === 0) return <EmptyHint text="暂无启用的技能" />
+  if (skills.length === 0) return <EmptyHint text={t('taskMonitor.noSkills')} />
 
   return (
     <div className="space-y-0.5">

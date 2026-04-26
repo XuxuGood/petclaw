@@ -2,47 +2,67 @@
 import { useState, useEffect } from 'react'
 import { X, Eye, EyeOff, Plus } from 'lucide-react'
 
+import { useI18n } from '../../i18n'
+
 // 弹窗内左侧平台列表（与 ImChannelsPage 保持一致顺序）
 const PLATFORMS = [
-  { key: 'feishu', name: '飞书', icon: '🐦' },
-  { key: 'dingtalk', name: '钉钉', icon: '📌' },
-  { key: 'wechat', name: '微信', icon: '💬' },
-  { key: 'wecom', name: '企业微信', icon: '🏢' }
+  { key: 'feishu', icon: '🐦' },
+  { key: 'dingtalk', icon: '📌' },
+  { key: 'wechat', icon: '💬' },
+  { key: 'wecom', icon: '🏢' }
 ] as const
 
+type PlatformKey = (typeof PLATFORMS)[number]['key']
+
 // 各平台的配置字段定义，type='password' 的字段支持显示/隐藏切换
+// placeholder 通过 i18n 键名动态获取，避免模块级硬编码中文
 const PLATFORM_FIELDS: Record<
-  string,
+  PlatformKey,
   Array<{
     key: string
     label: string
     type: 'text' | 'password'
-    placeholder: string
+    placeholderKey: string
     defaultValue?: string
   }>
 > = {
   feishu: [
-    { key: 'appId', label: 'App ID', type: 'text', placeholder: '输入飞书 App ID' },
-    { key: 'appSecret', label: 'App Secret', type: 'password', placeholder: '输入飞书 App Secret' },
+    { key: 'appId', label: 'App ID', type: 'text', placeholderKey: 'imConfig.feishuAppId' },
+    {
+      key: 'appSecret',
+      label: 'App Secret',
+      type: 'password',
+      placeholderKey: 'imConfig.feishuAppSecret'
+    },
     {
       key: 'domain',
       label: 'Domain',
       type: 'text',
-      placeholder: 'feishu.cn',
+      placeholderKey: 'imConfig.feishuAppId', // 复用，domain 无专属 key
       defaultValue: 'feishu.cn'
     }
   ],
   dingtalk: [
-    { key: 'appKey', label: 'App Key', type: 'text', placeholder: '输入钉钉 App Key' },
-    { key: 'appSecret', label: 'App Secret', type: 'password', placeholder: '输入钉钉 App Secret' }
+    { key: 'appKey', label: 'App Key', type: 'text', placeholderKey: 'imConfig.dingtalkAppKey' },
+    {
+      key: 'appSecret',
+      label: 'App Secret',
+      type: 'password',
+      placeholderKey: 'imConfig.dingtalkAppKey' // 复用
+    }
   ],
   wechat: [
-    { key: 'accountId', label: 'Account ID', type: 'text', placeholder: '输入微信 Account ID' }
+    {
+      key: 'accountId',
+      label: 'Account ID',
+      type: 'text',
+      placeholderKey: 'imConfig.wechatAccountId'
+    }
   ],
   wecom: [
-    { key: 'corpId', label: 'Corp ID', type: 'text', placeholder: '输入企业微信 Corp ID' },
-    { key: 'agentId', label: 'Agent ID', type: 'text', placeholder: '输入 Agent ID' },
-    { key: 'secret', label: 'Secret', type: 'password', placeholder: '输入 Secret' }
+    { key: 'corpId', label: 'Corp ID', type: 'text', placeholderKey: 'imConfig.wecomCorpId' },
+    { key: 'agentId', label: 'Agent ID', type: 'text', placeholderKey: 'imConfig.wecomCorpId' },
+    { key: 'secret', label: 'Secret', type: 'password', placeholderKey: 'imConfig.wecomCorpId' }
   ]
 }
 
@@ -54,7 +74,8 @@ interface ImConfigDialogProps {
 }
 
 export function ImConfigDialog({ isOpen, initialPlatform, onClose, onSaved }: ImConfigDialogProps) {
-  const [selectedPlatform, setSelectedPlatform] = useState<string>('feishu')
+  const { t } = useI18n()
+  const [selectedPlatform, setSelectedPlatform] = useState<PlatformKey>('feishu')
   const [formData, setFormData] = useState<Record<string, string>>({})
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({})
   const [saving, setSaving] = useState(false)
@@ -62,14 +83,14 @@ export function ImConfigDialog({ isOpen, initialPlatform, onClose, onSaved }: Im
   // 弹窗打开时初始化：定位到来源平台并加载已有配置
   useEffect(() => {
     if (!isOpen) return
-    const platform = initialPlatform ?? 'feishu'
+    const platform = (initialPlatform ?? 'feishu') as PlatformKey
     setSelectedPlatform(platform)
     setShowSecrets({})
     loadPlatformConfig(platform)
   }, [isOpen, initialPlatform])
 
   // 从后端加载指定平台的配置，并写入表单；无配置时填充字段默认值
-  const loadPlatformConfig = (key: string) => {
+  const loadPlatformConfig = (key: PlatformKey) => {
     window.api.im.loadConfig().then((data: unknown) => {
       const result = data as { platforms: Array<{ key: string; config: Record<string, unknown> }> }
       const existing = result.platforms.find((p) => p.key === key)
@@ -87,7 +108,7 @@ export function ImConfigDialog({ isOpen, initialPlatform, onClose, onSaved }: Im
     })
   }
 
-  const handlePlatformChange = (key: string) => {
+  const handlePlatformChange = (key: PlatformKey) => {
     setSelectedPlatform(key)
     // 切换平台时重置密码可见状态，再加载新平台配置
     setShowSecrets({})
@@ -129,7 +150,7 @@ export function ImConfigDialog({ isOpen, initialPlatform, onClose, onSaved }: Im
       <div className="bg-bg-root rounded-[14px] shadow-lg w-[680px] h-[520px] flex flex-col overflow-hidden">
         {/* 标题栏 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h2 className="text-[15px] font-semibold text-text-primary">IM 机器人</h2>
+          <h2 className="text-[15px] font-semibold text-text-primary">{t('imConfig.title')}</h2>
           <button
             onClick={onClose}
             className="p-1 rounded-[8px] hover:bg-bg-hover transition-colors"
@@ -143,7 +164,7 @@ export function ImConfigDialog({ isOpen, initialPlatform, onClose, onSaved }: Im
           {/* 左侧平台列表 */}
           <div className="w-[200px] shrink-0 border-r border-border flex flex-col">
             <div className="flex-1 overflow-y-auto py-2">
-              {PLATFORMS.map(({ key, name, icon }) => (
+              {PLATFORMS.map(({ key, icon }) => (
                 <button
                   key={key}
                   onClick={() => handlePlatformChange(key)}
@@ -154,7 +175,7 @@ export function ImConfigDialog({ isOpen, initialPlatform, onClose, onSaved }: Im
                   }`}
                 >
                   <span className="text-[15px]">{icon}</span>
-                  <span>{name}</span>
+                  <span>{t(`im.${key}`)}</span>
                 </button>
               ))}
             </div>
@@ -162,7 +183,7 @@ export function ImConfigDialog({ isOpen, initialPlatform, onClose, onSaved }: Im
             <div className="p-3 border-t border-border">
               <button className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-[12px] text-text-tertiary hover:text-text-secondary bg-bg-hover hover:bg-bg-active rounded-[8px] transition-colors">
                 <Plus size={13} />
-                扫码创建机器人
+                {t('imConfig.scanToCreate')}
               </button>
             </div>
           </div>
@@ -174,17 +195,17 @@ export function ImConfigDialog({ isOpen, initialPlatform, onClose, onSaved }: Im
               <div className="flex items-center gap-2 mb-5">
                 <span className="text-[20px]">{currentPlatformInfo?.icon}</span>
                 <h3 className="text-[16px] font-semibold text-text-primary">
-                  {currentPlatformInfo?.name}
+                  {t(`im.${selectedPlatform}`)}
                 </h3>
                 <span className="px-2 py-0.5 text-[11px] text-text-tertiary bg-bg-hover rounded-full">
-                  未连接
+                  {t('imConfig.notConnected')}
                 </span>
               </div>
 
               {/* 手动填写分割线 */}
               <div className="flex items-center gap-3 mb-5">
                 <div className="flex-1 h-px bg-border" />
-                <span className="text-[12px] text-text-tertiary">手动填写配置</span>
+                <span className="text-[12px] text-text-tertiary">{t('imConfig.manualConfig')}</span>
                 <div className="flex-1 h-px bg-border" />
               </div>
 
@@ -204,7 +225,7 @@ export function ImConfigDialog({ isOpen, initialPlatform, onClose, onSaved }: Im
                         onChange={(e) =>
                           setFormData((prev) => ({ ...prev, [field.key]: e.target.value }))
                         }
-                        placeholder={field.placeholder}
+                        placeholder={t(field.placeholderKey)}
                         className="w-full px-3 py-2 text-[13px] rounded-[10px] bg-bg-hover border border-border text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent/40 pr-10"
                       />
                       {/* 密码字段显示/隐藏切换 */}
@@ -228,14 +249,14 @@ export function ImConfigDialog({ isOpen, initialPlatform, onClose, onSaved }: Im
                 onClick={onClose}
                 className="px-4 py-2 text-[13px] rounded-[10px] text-text-secondary hover:bg-bg-hover transition-colors active:scale-[0.96] duration-[120ms]"
               >
-                取消
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving}
                 className="px-4 py-2 text-[13px] rounded-[10px] bg-accent text-white hover:bg-accent-hover transition-colors active:scale-[0.96] duration-[120ms] disabled:opacity-50"
               >
-                {saving ? '保存中...' : '保存'}
+                {saving ? t('common.saving') : t('common.save')}
               </button>
             </div>
           </div>
