@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import fs from 'fs'
 
 import { CoworkSessionManager } from '../../../src/main/ai/cowork-session-manager'
 import type { CoworkStore } from '../../../src/main/data/cowork-store'
@@ -6,6 +7,19 @@ import type { CoworkController } from '../../../src/main/ai/cowork-controller'
 import type { DirectoryManager } from '../../../src/main/ai/directory-manager'
 import type { CoworkSession } from '../../../src/main/ai/types'
 import { deriveAgentId } from '../../../src/main/ai/types'
+
+// mock i18n，使 t() 返回中文模板插值结果
+vi.mock('../../../src/main/i18n', () => ({
+  t: (key: string, params?: Record<string, string>) => {
+    const templates: Record<string, string> = {
+      'error.dirNotFound': '工作目录不存在：{path}',
+      'error.dirDeleted': '该会话的工作目录已不存在：{path}，请创建新会话选择新路径'
+    }
+    const tpl = templates[key]
+    if (!tpl) return key
+    return tpl.replace(/\{(\w+)\}/g, (_, k: string) => params?.[k] ?? '')
+  }
+}))
 
 // ── 测试辅助：构造 mock session ──
 function makeMockSession(overrides?: Partial<CoworkSession>): CoworkSession {
@@ -36,10 +50,11 @@ function createMocks() {
   } as unknown as CoworkStore
 
   const mockController = {
-    startSession: vi.fn(),
-    continueSession: vi.fn(),
+    startSession: vi.fn().mockResolvedValue(undefined),
+    continueSession: vi.fn().mockResolvedValue(undefined),
     stopSession: vi.fn(),
-    isSessionActive: vi.fn()
+    isSessionActive: vi.fn(),
+    onSessionDeleted: vi.fn()
   } as unknown as CoworkController
 
   const mockDirectoryManager = {
@@ -60,6 +75,9 @@ describe('CoworkSessionManager', () => {
     mockStore = mocks.mockStore
     mockController = mocks.mockController
     mockDirectoryManager = mocks.mockDirectoryManager
+
+    // 默认所有路径都存在，路径校验测试单独 mock
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true)
 
     manager = new CoworkSessionManager(mockStore, mockController, mockDirectoryManager)
   })
@@ -111,6 +129,13 @@ describe('CoworkSessionManager', () => {
 
       expect(result).toBe(session)
     })
+
+    it('工作目录不存在时抛出错误', () => {
+      vi.spyOn(fs, 'existsSync').mockReturnValue(false)
+      expect(() => manager.createAndStart('测试', '/nonexistent', 'hello')).toThrow(
+        '工作目录不存在'
+      )
+    })
   })
 
   // ── getSessionsByDirectory ──
@@ -142,30 +167,19 @@ describe('CoworkSessionManager', () => {
     })
   })
 
-  // ── buildSessionKey（通过公开方法间接验证格式）──
-
-  describe('buildSessionKey 格式', () => {
-    it('格式为 agent:{agentId}:petclaw:{sessionId}', () => {
-      const key = (
-        manager as unknown as { buildSessionKey(a: string, b: string): string }
-      ).buildSessionKey('main', 'sess-001')
-      expect(key).toBe('agent:main:petclaw:sess-001')
-    })
-
-    it('非默认 agentId 的 key 格式正确', () => {
-      const key = (
-        manager as unknown as { buildSessionKey(a: string, b: string): string }
-      ).buildSessionKey('agent-42', 'sess-999')
-      expect(key).toBe('agent:agent-42:petclaw:sess-999')
-    })
-  })
-
   // ── 已有方法回归测试 ──
 
   describe('continueSession', () => {
     it('转发给 controller.continueSession', () => {
+      vi.mocked(mockStore.getSession).mockReturnValue(makeMockSession())
       manager.continueSession('sess-001', 'follow-up')
       expect(mockController.continueSession).toHaveBeenCalledWith('sess-001', 'follow-up')
+    })
+
+    it('工作目录不存在时抛出错误', () => {
+      vi.mocked(mockStore.getSession).mockReturnValue(makeMockSession({ directoryPath: '/gone' }))
+      vi.spyOn(fs, 'existsSync').mockReturnValue(false)
+      expect(() => manager.continueSession('sess-001', 'hello')).toThrow('工作目录已不存在')
     })
   })
 
@@ -177,18 +191,20 @@ describe('CoworkSessionManager', () => {
   })
 
   describe('deleteSession', () => {
-    it('活跃会话先 stop 再 delete', () => {
+    it('活跃会话先 stop 再 delete 再清理 controller 状态', () => {
       vi.mocked(mockController.isSessionActive).mockReturnValue(true)
       manager.deleteSession('sess-001')
       expect(mockController.stopSession).toHaveBeenCalledWith('sess-001')
       expect(mockStore.deleteSession).toHaveBeenCalledWith('sess-001')
+      expect(mockController.onSessionDeleted).toHaveBeenCalledWith('sess-001')
     })
 
-    it('非活跃会话直接 delete', () => {
+    it('非活跃会话直接 delete 并清理 controller 状态', () => {
       vi.mocked(mockController.isSessionActive).mockReturnValue(false)
       manager.deleteSession('sess-001')
       expect(mockController.stopSession).not.toHaveBeenCalled()
       expect(mockStore.deleteSession).toHaveBeenCalledWith('sess-001')
+      expect(mockController.onSessionDeleted).toHaveBeenCalledWith('sess-001')
     })
   })
 
