@@ -1,29 +1,32 @@
 import { useState, useEffect } from 'react'
 
-// 语言选项
-const LANGUAGE_OPTIONS = [
-  { value: 'zh', label: '中文（简体）' },
-  { value: 'en', label: 'English' }
-]
-
-// 主题选项
-const THEME_OPTIONS = [
-  { value: 'system', label: '跟随系统' },
-  { value: 'light', label: '浅色' },
-  { value: 'dark', label: '深色' }
-]
-
-// 字号选项
-const FONT_SIZE_OPTIONS = [
-  { value: 'small', label: '小' },
-  { value: 'medium', label: '中（默认）' },
-  { value: 'large', label: '大' }
-]
+import { useI18n, i18nService } from '../../i18n'
 
 export function PreferenceSettings() {
+  const { t } = useI18n()
   const [language, setLanguage] = useState('zh')
   const [theme, setTheme] = useState('system')
   const [fontSize, setFontSize] = useState('medium')
+
+  // 语言选项（放组件内以便使用 t()）
+  const LANGUAGE_OPTIONS = [
+    { value: 'zh', label: t('preferences.languageZh') },
+    { value: 'en', label: t('preferences.languageEn') }
+  ]
+
+  // 主题选项
+  const THEME_OPTIONS = [
+    { value: 'system', label: t('preferences.themeSystem') },
+    { value: 'light', label: t('preferences.themeLight') },
+    { value: 'dark', label: t('preferences.themeDark') }
+  ]
+
+  // 字号选项
+  const FONT_SIZE_OPTIONS = [
+    { value: 'small', label: t('preferences.fontSmall') },
+    { value: 'medium', label: t('preferences.fontMedium') },
+    { value: 'large', label: t('preferences.fontLarge') }
+  ]
 
   // 从持久化存储加载偏好
   useEffect(() => {
@@ -40,21 +43,25 @@ export function PreferenceSettings() {
 
   const handleChange = (key: string, value: string) => {
     window.api.setSetting(key, value)
-    if (key === 'language') setLanguage(value)
+    if (key === 'language') {
+      setLanguage(value)
+      // 切换语言时同步更新渲染进程 i18n 服务，触发所有订阅者重渲染
+      i18nService.setLanguage(value as 'zh' | 'en')
+    }
     if (key === 'theme') setTheme(value)
     if (key === 'fontSize') setFontSize(value)
   }
 
   return (
     <div>
-      <h1 className="text-[20px] font-bold text-text-primary mb-1">偏好设置</h1>
-      <p className="text-[13px] text-text-tertiary mb-6">自定义应用外观和语言</p>
+      <h1 className="text-[20px] font-bold text-text-primary mb-1">{t('preferences.title')}</h1>
+      <p className="text-[13px] text-text-tertiary mb-6">{t('preferences.subtitle')}</p>
 
       {/* 语言 */}
       <div className="rounded-[14px] bg-bg-card border border-border overflow-hidden mb-4">
         <div className="px-5 py-3 border-b border-border">
           <span className="text-[12px] text-text-tertiary font-medium uppercase tracking-wider">
-            语言
+            {t('preferences.language')}
           </span>
         </div>
         {LANGUAGE_OPTIONS.map((opt, i) => (
@@ -79,7 +86,7 @@ export function PreferenceSettings() {
       <div className="rounded-[14px] bg-bg-card border border-border overflow-hidden mb-4">
         <div className="px-5 py-3 border-b border-border">
           <span className="text-[12px] text-text-tertiary font-medium uppercase tracking-wider">
-            主题
+            {t('preferences.theme')}
           </span>
         </div>
         {THEME_OPTIONS.map((opt, i) => (
@@ -104,7 +111,7 @@ export function PreferenceSettings() {
       <div className="rounded-[14px] bg-bg-card border border-border overflow-hidden">
         <div className="px-5 py-3 border-b border-border">
           <span className="text-[12px] text-text-tertiary font-medium uppercase tracking-wider">
-            字体大小
+            {t('preferences.fontSize')}
           </span>
         </div>
         {FONT_SIZE_OPTIONS.map((opt, i) => (

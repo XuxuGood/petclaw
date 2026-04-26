@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 
 import { RefreshCw, Circle } from 'lucide-react'
 
+import { useI18n } from '../../i18n'
+
 // 引擎状态类型
 interface EngineStatus {
   running: boolean
@@ -11,6 +13,7 @@ interface EngineStatus {
 }
 
 export function EngineSettings() {
+  const { t } = useI18n()
   const [status, setStatus] = useState<EngineStatus | null>(null)
 
   // 订阅引擎状态推送
@@ -26,14 +29,14 @@ export function EngineSettings() {
 
   return (
     <div>
-      <h1 className="text-[20px] font-bold text-text-primary mb-1">Agent 引擎</h1>
-      <p className="text-[13px] text-text-tertiary mb-6">查看引擎运行状态和版本信息</p>
+      <h1 className="text-[20px] font-bold text-text-primary mb-1">{t('engineSettings.title')}</h1>
+      <p className="text-[13px] text-text-tertiary mb-6">{t('engineSettings.subtitle')}</p>
 
       {/* 状态卡片 */}
       <div className="rounded-[14px] bg-bg-card border border-border overflow-hidden mb-4">
         {/* 运行状态 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <span className="text-[14px] text-text-primary">运行状态</span>
+          <span className="text-[14px] text-text-primary">{t('engineSettings.status')}</span>
           <div className="flex items-center gap-2">
             <Circle
               size={8}
@@ -44,7 +47,11 @@ export function EngineSettings() {
               }
             />
             <span className={`text-[14px] ${isRunning ? 'text-green-500' : 'text-text-tertiary'}`}>
-              {status === null ? '加载中...' : isRunning ? '运行中' : '未运行'}
+              {status === null
+                ? t('engineSettings.loading')
+                : isRunning
+                  ? t('engineSettings.running')
+                  : t('engineSettings.notRunning')}
             </span>
           </div>
         </div>
@@ -52,7 +59,7 @@ export function EngineSettings() {
         {/* 版本号 */}
         {status?.version && (
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-            <span className="text-[14px] text-text-primary">引擎版本</span>
+            <span className="text-[14px] text-text-primary">{t('engineSettings.version')}</span>
             <span className="text-[14px] text-text-secondary font-mono">{status.version}</span>
           </div>
         )}
@@ -60,7 +67,7 @@ export function EngineSettings() {
         {/* 进程 ID */}
         {status?.pid && (
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-            <span className="text-[14px] text-text-primary">进程 ID</span>
+            <span className="text-[14px] text-text-primary">{t('engineSettings.pid')}</span>
             <span className="text-[14px] text-text-secondary font-mono">{status.pid}</span>
           </div>
         )}
@@ -68,9 +75,11 @@ export function EngineSettings() {
         {/* 运行时长 */}
         {status?.uptime !== undefined && (
           <div className="flex items-center justify-between px-5 py-4">
-            <span className="text-[14px] text-text-primary">运行时长</span>
+            <span className="text-[14px] text-text-primary">{t('engineSettings.uptime')}</span>
             <span className="text-[14px] text-text-secondary">
-              {Math.floor(status.uptime / 60)} 分钟
+              {t('engineSettings.uptimeMinutes', {
+                minutes: String(Math.floor(status.uptime / 60))
+              })}
             </span>
           </div>
         )}
@@ -79,7 +88,7 @@ export function EngineSettings() {
       {/* 说明文字 */}
       <p className="text-[12px] text-text-tertiary flex items-center gap-1.5">
         <RefreshCw size={12} />
-        引擎状态实时更新，如需重启请从系统托盘菜单操作
+        {t('engineSettings.hint')}
       </p>
     </div>
   )

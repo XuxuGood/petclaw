@@ -13,6 +13,8 @@ import {
   X
 } from 'lucide-react'
 
+import { useI18n } from '../../i18n'
+
 // ── 类型定义 ────────────────────────────────────────────────────────────────
 
 interface ModelDefinition {
@@ -86,6 +88,7 @@ interface AddModelDialogProps {
 }
 
 function AddModelDialog({ onConfirm, onCancel }: AddModelDialogProps) {
+  const { t } = useI18n()
   const [id, setId] = useState('')
   const [name, setName] = useState('')
   const [contextWindow, setContextWindow] = useState('128000')
@@ -111,7 +114,9 @@ function AddModelDialog({ onConfirm, onCancel }: AddModelDialogProps) {
       <div className="w-[420px] rounded-[14px] bg-bg-card border border-border shadow-2xl">
         {/* 标题 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <span className="text-[14px] font-semibold text-text-primary">添加模型</span>
+          <span className="text-[14px] font-semibold text-text-primary">
+            {t('modelSettings.addModel')}
+          </span>
           <button
             onClick={onCancel}
             className="text-text-tertiary hover:text-text-primary transition-colors duration-[120ms]"
@@ -124,7 +129,7 @@ function AddModelDialog({ onConfirm, onCancel }: AddModelDialogProps) {
           {/* 模型 ID */}
           <div>
             <label className="block text-[12px] text-text-tertiary mb-1.5 font-medium">
-              模型 ID <span className="text-red-500">*</span>
+              {t('modelSettings.modelId')} <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -138,7 +143,7 @@ function AddModelDialog({ onConfirm, onCancel }: AddModelDialogProps) {
           {/* 显示名称 */}
           <div>
             <label className="block text-[12px] text-text-tertiary mb-1.5 font-medium">
-              显示名称 <span className="text-red-500">*</span>
+              {t('modelSettings.displayName')} <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -153,7 +158,7 @@ function AddModelDialog({ onConfirm, onCancel }: AddModelDialogProps) {
           <div className="flex gap-3">
             <div className="flex-1">
               <label className="block text-[12px] text-text-tertiary mb-1.5 font-medium">
-                上下文窗口
+                {t('modelSettings.contextWindow')}
               </label>
               <input
                 type="number"
@@ -164,7 +169,7 @@ function AddModelDialog({ onConfirm, onCancel }: AddModelDialogProps) {
             </div>
             <div className="flex-1">
               <label className="block text-[12px] text-text-tertiary mb-1.5 font-medium">
-                最大输出 Token
+                {t('modelSettings.maxOutputTokens')}
               </label>
               <input
                 type="number"
@@ -184,7 +189,9 @@ function AddModelDialog({ onConfirm, onCancel }: AddModelDialogProps) {
                 onChange={(e) => setReasoning(e.target.checked)}
                 className="accent-accent w-3.5 h-3.5"
               />
-              <span className="text-[13px] text-text-secondary">推理模型</span>
+              <span className="text-[13px] text-text-secondary">
+                {t('modelSettings.reasoningModel')}
+              </span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -193,7 +200,9 @@ function AddModelDialog({ onConfirm, onCancel }: AddModelDialogProps) {
                 onChange={(e) => setSupportsImage(e.target.checked)}
                 className="accent-accent w-3.5 h-3.5"
               />
-              <span className="text-[13px] text-text-secondary">支持图片</span>
+              <span className="text-[13px] text-text-secondary">
+                {t('modelSettings.imageSupport')}
+              </span>
             </label>
           </div>
         </div>
@@ -204,14 +213,14 @@ function AddModelDialog({ onConfirm, onCancel }: AddModelDialogProps) {
             onClick={onCancel}
             className="px-4 py-1.5 rounded-[10px] text-[13px] text-text-secondary hover:bg-bg-hover transition-all duration-[120ms] active:scale-[0.96]"
           >
-            取消
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleSubmit}
             disabled={!id.trim() || !name.trim()}
             className="px-4 py-1.5 rounded-[10px] text-[13px] bg-accent text-white font-medium hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-[120ms] active:scale-[0.96]"
           >
-            添加
+            {t('common.add')}
           </button>
         </div>
       </div>
@@ -231,6 +240,7 @@ interface AddProviderDialogProps {
 }
 
 function AddProviderDialog({ onConfirm, onCancel }: AddProviderDialogProps) {
+  const { t } = useI18n()
   const [name, setName] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
   const [apiFormat, setApiFormat] = useState<'openai-completions' | 'anthropic'>(
@@ -246,7 +256,9 @@ function AddProviderDialog({ onConfirm, onCancel }: AddProviderDialogProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="w-[420px] rounded-[14px] bg-bg-card border border-border shadow-2xl">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <span className="text-[14px] font-semibold text-text-primary">添加自定义 Provider</span>
+          <span className="text-[14px] font-semibold text-text-primary">
+            {t('modelSettings.addProvider')}
+          </span>
           <button
             onClick={onCancel}
             className="text-text-tertiary hover:text-text-primary transition-colors duration-[120ms]"
@@ -258,7 +270,7 @@ function AddProviderDialog({ onConfirm, onCancel }: AddProviderDialogProps) {
         <div className="px-5 py-4 space-y-3">
           <div>
             <label className="block text-[12px] text-text-tertiary mb-1.5 font-medium">
-              显示名称 <span className="text-red-500">*</span>
+              {t('modelSettings.displayName')} <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -284,7 +296,7 @@ function AddProviderDialog({ onConfirm, onCancel }: AddProviderDialogProps) {
 
           <div>
             <label className="block text-[12px] text-text-tertiary mb-1.5 font-medium">
-              API 格式
+              {t('modelSettings.apiFormat')}
             </label>
             <div className="flex gap-3">
               {(['openai-completions', 'anthropic'] as const).map((fmt) => (
@@ -298,7 +310,7 @@ function AddProviderDialog({ onConfirm, onCancel }: AddProviderDialogProps) {
                     className="accent-accent"
                   />
                   <span className="text-[13px] text-text-secondary">
-                    {fmt === 'openai-completions' ? 'OpenAI 兼容' : 'Anthropic'}
+                    {fmt === 'openai-completions' ? t('modelSettings.openaiCompat') : 'Anthropic'}
                   </span>
                 </label>
               ))}
@@ -311,14 +323,14 @@ function AddProviderDialog({ onConfirm, onCancel }: AddProviderDialogProps) {
             onClick={onCancel}
             className="px-4 py-1.5 rounded-[10px] text-[13px] text-text-secondary hover:bg-bg-hover transition-all duration-[120ms] active:scale-[0.96]"
           >
-            取消
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleSubmit}
             disabled={!name.trim() || !baseUrl.trim()}
             className="px-4 py-1.5 rounded-[10px] text-[13px] bg-accent text-white font-medium hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-[120ms] active:scale-[0.96]"
           >
-            添加
+            {t('common.add')}
           </button>
         </div>
       </div>
@@ -347,6 +359,7 @@ function ProviderPanel({
   testStatus,
   testError
 }: ProviderPanelProps) {
+  const { t } = useI18n()
   // API Key 本地草稿，失焦时保存
   const [apiKeyDraft, setApiKeyDraft] = useState(provider.apiKey)
   const [showApiKey, setShowApiKey] = useState(false)
@@ -392,7 +405,9 @@ function ProviderPanel({
           <div>
             <h2 className="text-[16px] font-semibold text-text-primary">{provider.name}</h2>
             <p className="text-[12px] text-text-tertiary">
-              {provider.isPreset ? '预设提供商' : '自定义提供商'}
+              {provider.isPreset
+                ? t('modelSettings.presetProvider')
+                : t('modelSettings.customProvider')}
             </p>
           </div>
         </div>
@@ -410,7 +425,7 @@ function ProviderPanel({
                 value={apiKeyDraft}
                 onChange={(e) => setApiKeyDraft(e.target.value)}
                 onBlur={handleApiKeyBlur}
-                placeholder="请输入 API Key"
+                placeholder={t('modelSettings.apiKeyPlaceholder')}
                 className="w-full px-3 py-2 pr-9 rounded-[10px] bg-bg-input border border-border-input text-[13px] text-text-primary outline-none focus:border-accent transition-all duration-[120ms] font-mono"
               />
               {/* 显示/隐藏 API Key 切换按钮 */}
@@ -438,7 +453,9 @@ function ProviderPanel({
 
         {/* API 格式 */}
         <div className="px-5 py-4 border-b border-border">
-          <label className="block text-[12px] text-text-tertiary mb-2 font-medium">API 格式</label>
+          <label className="block text-[12px] text-text-tertiary mb-2 font-medium">
+            {t('modelSettings.apiFormat')}
+          </label>
           <div className="flex gap-4">
             {(['openai-completions', 'anthropic'] as const).map((fmt) => (
               <label key={fmt} className="flex items-center gap-2 cursor-pointer">
@@ -451,7 +468,7 @@ function ProviderPanel({
                   className="accent-accent"
                 />
                 <span className="text-[13px] text-text-secondary">
-                  {fmt === 'openai-completions' ? 'OpenAI 兼容' : 'Anthropic'}
+                  {fmt === 'openai-completions' ? t('modelSettings.openaiCompat') : 'Anthropic'}
                 </span>
               </label>
             ))}
@@ -469,10 +486,10 @@ function ProviderPanel({
               {testStatus === 'testing' ? (
                 <>
                   <Loader2 size={13} className="animate-spin" />
-                  <span>测试中...</span>
+                  <span>{t('modelSettings.testing')}</span>
                 </>
               ) : (
-                '测试连接'
+                t('modelSettings.testConnection')
               )}
             </button>
 
@@ -480,13 +497,13 @@ function ProviderPanel({
             {testStatus === 'ok' && (
               <div className="flex items-center gap-1.5 text-green-500">
                 <CheckCircle size={14} />
-                <span className="text-[13px]">连接成功</span>
+                <span className="text-[13px]">{t('modelSettings.connected')}</span>
               </div>
             )}
             {testStatus === 'fail' && (
               <div className="flex items-center gap-1.5 text-red-500">
                 <XCircle size={14} />
-                <span className="text-[13px]">{testError || '连接失败'}</span>
+                <span className="text-[13px]">{testError || t('modelSettings.connectFailed')}</span>
               </div>
             )}
           </div>
@@ -496,20 +513,22 @@ function ProviderPanel({
       {/* 模型列表 */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[13px] font-semibold text-text-primary">可用模型</span>
+          <span className="text-[13px] font-semibold text-text-primary">
+            {t('modelSettings.availableModels')}
+          </span>
           <button
             onClick={() => setShowAddModel(true)}
             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-[10px] text-[12px] text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-all duration-[120ms] active:scale-[0.96]"
           >
             <Plus size={13} />
-            <span>添加模型</span>
+            <span>{t('modelSettings.addModel')}</span>
           </button>
         </div>
 
         <div className="rounded-[14px] bg-bg-card border border-border overflow-hidden">
           {provider.models.length === 0 ? (
             <div className="flex items-center justify-center py-10">
-              <span className="text-[13px] text-text-tertiary">暂无模型，点击「添加模型」</span>
+              <span className="text-[13px] text-text-tertiary">{t('modelSettings.noModels')}</span>
             </div>
           ) : (
             <div className="divide-y divide-border">
@@ -524,12 +543,12 @@ function ProviderPanel({
                     <div className="flex gap-1.5">
                       {model.reasoning && (
                         <span className="px-1.5 py-0.5 rounded-md bg-violet-500/10 text-[10px] text-violet-400 font-medium">
-                          推理
+                          {t('modelSettings.reasoning')}
                         </span>
                       )}
                       {model.supportsImage && (
                         <span className="px-1.5 py-0.5 rounded-md bg-sky-500/10 text-[10px] text-sky-400 font-medium">
-                          图片
+                          {t('modelSettings.image')}
                         </span>
                       )}
                     </div>
@@ -559,6 +578,7 @@ function ProviderPanel({
 // ── 主组件 ────────────────────────────────────────────────────────────────────
 
 export function ModelSettings() {
+  const { t } = useI18n()
   const [providers, setProviders] = useState<ModelProvider[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -619,7 +639,7 @@ export function ModelSettings() {
         setTestStatusMap((prev) => ({ ...prev, [id]: 'ok' }))
       } else {
         setTestStatusMap((prev) => ({ ...prev, [id]: 'fail' }))
-        setTestErrorMap((prev) => ({ ...prev, [id]: r.error ?? '连接失败' }))
+        setTestErrorMap((prev) => ({ ...prev, [id]: r.error ?? t('modelSettings.connectFailed') }))
       }
     } catch (e) {
       setTestStatusMap((prev) => ({ ...prev, [id]: 'fail' }))
@@ -678,8 +698,8 @@ export function ModelSettings() {
 
   return (
     <div>
-      <h1 className="text-[20px] font-bold text-text-primary mb-1">模型配置</h1>
-      <p className="text-[13px] text-text-tertiary mb-6">管理 AI 模型 Provider 和可用模型</p>
+      <h1 className="text-[20px] font-bold text-text-primary mb-1">{t('modelSettings.title')}</h1>
+      <p className="text-[13px] text-text-tertiary mb-6">{t('modelSettings.subtitle')}</p>
 
       {loading ? (
         // 加载中骨架
@@ -695,7 +715,9 @@ export function ModelSettings() {
             <div className="rounded-[14px] bg-bg-card border border-border overflow-hidden">
               {providers.length === 0 ? (
                 <div className="flex items-center justify-center py-10">
-                  <span className="text-[12px] text-text-tertiary">暂无 Provider</span>
+                  <span className="text-[12px] text-text-tertiary">
+                    {t('modelSettings.noProvider')}
+                  </span>
                 </div>
               ) : (
                 <div className="divide-y divide-border">
@@ -737,12 +759,12 @@ export function ModelSettings() {
                             />
                             <span className="text-[10px] text-text-tertiary">
                               {!isEnabled
-                                ? '已禁用'
+                                ? t('modelSettings.disabled')
                                 : tStatus === 'ok'
-                                  ? '已连接'
+                                  ? t('modelSettings.connectedStatus')
                                   : tStatus === 'fail'
-                                    ? '失败'
-                                    : '未测试'}
+                                    ? t('modelSettings.failed')
+                                    : t('modelSettings.notTested')}
                             </span>
                           </div>
                         </div>
@@ -780,7 +802,7 @@ export function ModelSettings() {
               className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-[10px] border border-dashed border-border text-[12px] text-text-tertiary hover:border-accent hover:text-accent transition-all duration-[120ms] active:scale-[0.96]"
             >
               <Plus size={13} />
-              <span>添加自定义</span>
+              <span>{t('modelSettings.addCustom')}</span>
             </button>
           </div>
 
@@ -799,7 +821,9 @@ export function ModelSettings() {
           ) : (
             // 未选中时占位
             <div className="flex-1 rounded-[14px] bg-bg-card border border-border flex items-center justify-center py-20">
-              <span className="text-[13px] text-text-tertiary">请从左侧选择一个 Provider</span>
+              <span className="text-[13px] text-text-tertiary">
+                {t('modelSettings.selectProvider')}
+              </span>
             </div>
           )}
         </div>

@@ -1,5 +1,6 @@
 import { ArrowLeft } from 'lucide-react'
 
+import { useI18n } from '../../i18n'
 import { PreferenceSettings } from './PreferenceSettings'
 import { ProfileSettings } from './ProfileSettings'
 import { AboutSettings } from './AboutSettings'
@@ -10,34 +11,6 @@ import { MemorySettings } from './MemorySettings'
 import { ConnectorSettings } from './ConnectorSettings'
 import { McpSettings } from './McpSettings'
 
-// 左侧菜单分组配置
-const MENU_SECTIONS = [
-  {
-    label: '通用',
-    items: [
-      { id: 'preferences', label: '偏好设置', icon: '⚙️' },
-      { id: 'profile', label: '个人资料', icon: '👤' },
-      { id: 'about', label: '关于', icon: 'ℹ️' }
-    ]
-  },
-  {
-    label: 'AI 配置',
-    items: [
-      { id: 'engine', label: '引擎', icon: '⚙️' },
-      { id: 'models', label: '模型', icon: '🧠' },
-      { id: 'directories', label: '工作目录', icon: '📂' },
-      { id: 'memory', label: '记忆', icon: '📝' }
-    ]
-  },
-  {
-    label: '扩展与集成',
-    items: [
-      { id: 'connectors', label: '连接器', icon: '🔌' },
-      { id: 'mcp', label: 'MCP 服务', icon: '🔧' }
-    ]
-  }
-]
-
 interface SettingsPageProps {
   activeTab: string
   onTabChange: (tab: string) => void
@@ -45,6 +18,36 @@ interface SettingsPageProps {
 }
 
 export function SettingsPage({ activeTab, onTabChange, onBack }: SettingsPageProps) {
+  const { t } = useI18n()
+
+  // 菜单分组配置放在组件内，以便使用 t() 动态翻译
+  const MENU_SECTIONS = [
+    {
+      label: t('settings.general'),
+      items: [
+        { id: 'preferences', label: t('settings.preferences'), icon: '⚙️' },
+        { id: 'profile', label: t('settings.profile'), icon: '👤' },
+        { id: 'about', label: t('settings.about'), icon: 'ℹ️' }
+      ]
+    },
+    {
+      label: t('settings.aiConfig'),
+      items: [
+        { id: 'engine', label: t('settings.engine'), icon: '⚙️' },
+        { id: 'models', label: t('settings.models'), icon: '🧠' },
+        { id: 'directories', label: t('settings.directories'), icon: '📂' },
+        { id: 'memory', label: t('settings.memory'), icon: '📝' }
+      ]
+    },
+    {
+      label: t('settings.extensions'),
+      items: [
+        { id: 'connectors', label: t('settings.connectors'), icon: '🔌' },
+        { id: 'mcp', label: t('settings.mcp'), icon: '🔧' }
+      ]
+    }
+  ]
+
   return (
     <div className="w-full h-full flex bg-bg-root overflow-hidden">
       {/* 左侧菜单 */}
@@ -56,7 +59,7 @@ export function SettingsPage({ activeTab, onTabChange, onBack }: SettingsPagePro
             className="no-drag flex items-center gap-1.5 text-[14px] text-text-secondary hover:text-text-primary transition-colors duration-[120ms]"
           >
             <ArrowLeft size={15} strokeWidth={2} />
-            <span>返回应用</span>
+            <span>{t('settings.backToApp')}</span>
           </button>
         </div>
 

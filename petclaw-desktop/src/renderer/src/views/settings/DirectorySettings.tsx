@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 
 import { Settings2, FolderOpen } from 'lucide-react'
 
+import { useI18n } from '../../i18n'
 import { DirectoryConfigDialog } from '../../components/DirectoryConfigDialog'
 
 interface DirectoryInfo {
@@ -15,6 +16,7 @@ interface DirectoryInfo {
 }
 
 export function DirectorySettings() {
+  const { t } = useI18n()
   const [directories, setDirectories] = useState<DirectoryInfo[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -38,18 +40,18 @@ export function DirectorySettings() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-[20px] font-bold text-text-primary mb-1">工作目录</h1>
-          <p className="text-[13px] text-text-tertiary">已注册的工作目录会在首次使用时自动添加</p>
+          <h1 className="text-[20px] font-bold text-text-primary mb-1">
+            {t('directorySettings.title')}
+          </h1>
+          <p className="text-[13px] text-text-tertiary">{t('directorySettings.subtitle')}</p>
         </div>
       </div>
 
       {directories.length === 0 ? (
         <div className="text-center py-12">
           <FolderOpen size={32} className="text-text-tertiary mx-auto mb-3" />
-          <p className="text-[13px] text-text-tertiary">暂无已注册目录</p>
-          <p className="text-[12px] text-text-tertiary mt-1">
-            开始对话时选择工作目录，将自动注册到此列表
-          </p>
+          <p className="text-[13px] text-text-tertiary">{t('directorySettings.noDirectories')}</p>
+          <p className="text-[12px] text-text-tertiary mt-1">{t('directorySettings.hint')}</p>
         </div>
       ) : (
         <div className="space-y-2">
