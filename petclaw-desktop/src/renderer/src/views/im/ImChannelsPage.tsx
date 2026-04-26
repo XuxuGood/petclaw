@@ -4,18 +4,19 @@ import { Settings2, MoreHorizontal, Info } from 'lucide-react'
 
 import { useI18n } from '../../i18n'
 import { ImConfigDialog } from './ImConfigDialog'
+import { DingTalkIcon, FeishuIcon, WeChatIcon, WeComIcon } from './im-platform-icons'
 
 // 平台 key 列表，name/description 通过 i18n 获取
 const PLATFORM_KEYS = ['dingtalk', 'feishu', 'wechat', 'wecom'] as const
 
 type PlatformKey = (typeof PLATFORM_KEYS)[number]
 
-// 平台图标不含文本，直接硬编码 emoji
-const PLATFORM_ICONS: Record<PlatformKey, string> = {
-  dingtalk: '📌',
-  feishu: '🐦',
-  wechat: '💬',
-  wecom: '🏢'
+// 平台品牌 SVG 图标（彩色圆底 + 白色 logo）
+const PLATFORM_ICONS: Record<PlatformKey, React.ReactNode> = {
+  dingtalk: <DingTalkIcon />,
+  feishu: <FeishuIcon />,
+  wechat: <WeChatIcon />,
+  wecom: <WeComIcon />
 }
 
 interface PlatformStatus {
@@ -105,9 +106,7 @@ export function ImChannelsPage() {
                   className="flex items-center gap-4 px-4 py-3.5 rounded-[14px] border border-border hover:border-text-tertiary/30 transition-colors"
                 >
                   {/* 平台图标 */}
-                  <div className="w-10 h-10 rounded-full bg-bg-hover flex items-center justify-center text-[20px] shrink-0">
-                    {PLATFORM_ICONS[key]}
-                  </div>
+                  <div className="w-10 h-10 shrink-0">{PLATFORM_ICONS[key]}</div>
 
                   {/* 名称 + 描述 */}
                   <div className="flex-1 min-w-0">
