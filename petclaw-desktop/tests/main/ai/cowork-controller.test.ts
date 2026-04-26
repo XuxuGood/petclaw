@@ -163,6 +163,33 @@ describe('CoworkController', () => {
 
       expect(listener).toHaveBeenCalledWith('session-1', req)
     })
+
+    it('disconnected 事件 → 所有活跃 session 变 error，清空 activeSessionIds', async () => {
+      await controller.startSession('session-1', 'test1')
+      await controller.startSession('session-2', 'test2')
+      expect(controller.getActiveSessionCount()).toBe(2)
+
+      const errorListener = vi.fn()
+      controller.on('error', errorListener)
+
+      gateway.emit('disconnected', 'network timeout')
+
+      expect(controller.getActiveSessionCount()).toBe(0)
+      expect(store.updateSession).toHaveBeenCalledWith('session-1', { status: 'error' })
+      expect(store.updateSession).toHaveBeenCalledWith('session-2', { status: 'error' })
+      expect(errorListener).toHaveBeenCalledWith('session-1', 'Gateway 连接断开: network timeout')
+      expect(errorListener).toHaveBeenCalledWith('session-2', 'Gateway 连接断开: network timeout')
+    })
+
+    it('disconnected 事件 → 无活跃 session 时不发出 error 事件', () => {
+      const errorListener = vi.fn()
+      controller.on('error', errorListener)
+
+      gateway.emit('disconnected', 'server closed')
+
+      expect(errorListener).not.toHaveBeenCalled()
+      expect(controller.getActiveSessionCount()).toBe(0)
+    })
   })
 
   describe('respondToPermission', () => {

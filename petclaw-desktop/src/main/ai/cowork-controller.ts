@@ -81,5 +81,15 @@ export class CoworkController extends EventEmitter {
       this.store.updateSession(sessionId, { status: 'error' })
       this.emit('error', sessionId, error)
     })
+
+    // Gateway 连接断开时，清理所有活跃 session，避免它们永远挂在 running 状态
+    this.gateway.on('disconnected', (reason: string) => {
+      console.warn('[CoworkController] gateway 断开:', reason)
+      for (const sessionId of this.activeSessionIds) {
+        this.store.updateSession(sessionId, { status: 'error' })
+        this.emit('error', sessionId, `Gateway 连接断开: ${reason}`)
+      }
+      this.activeSessionIds.clear()
+    })
   }
 }
