@@ -5,7 +5,6 @@ import { useChatStore } from '../../stores/chat-store'
 import { useI18n } from '../../i18n'
 import { ChatHeader } from './ChatHeader'
 import { ChatInputBox } from './ChatInputBox'
-import { CoworkPermissionModal } from './CoworkPermissionModal'
 import { WelcomePage } from '../../components/WelcomePage'
 import { TaskMonitorPanel } from '../../components/TaskMonitorPanel'
 import type { SelectedModel } from '../../components/ModelSelector'
@@ -32,14 +31,6 @@ export function ChatView({
 
   // 会话标题（后续可从 session 数据中读取，此处先用默认值）
   const [sessionTitle, setSessionTitle] = useState(() => t('chat.newConversation'))
-
-  // 权限审批弹窗状态
-  const [pendingPermission, setPendingPermission] = useState<{
-    requestId: string
-    toolName: string
-    toolInput: Record<string, unknown>
-    toolUseId?: string | null
-  } | null>(null)
 
   // 订阅协作消息事件
   useEffect(() => {
@@ -75,19 +66,6 @@ export function ChatView({
       setLoading(false)
     })
 
-    // 权限审批请求：主进程发来待审批工具调用，展示弹窗等待用户决策
-    const unsubPermission = window.api.cowork.onPermission((data) => {
-      const d = data as { sessionId: string; request: typeof pendingPermission }
-      if (d.request) {
-        setPendingPermission(d.request)
-      }
-    })
-
-    const unsubPermissionDismiss = window.api.cowork.onPermissionDismiss((data) => {
-      const d = data as Record<string, unknown>
-      setPendingPermission((current) => (current?.requestId === d.requestId ? null : current))
-    })
-
     const unsubSessionStopped = window.api.cowork.onSessionStopped(() => {
       setLoading(false)
     })
@@ -97,8 +75,6 @@ export function ChatView({
       unsubUpdate()
       unsubComplete()
       unsubError()
-      unsubPermission()
-      unsubPermissionDismiss()
       unsubSessionStopped()
     }
   }, [addMessage, replaceLastAssistantMessage, setLoading, t])
@@ -196,17 +172,6 @@ export function ChatView({
 
       {/* 右侧任务监控面板：仅在 taskMonitorOpen 且有活跃会话时显示 */}
       {taskMonitorOpen && activeSessionId && <TaskMonitorPanel sessionId={activeSessionId} />}
-
-      {/* 权限审批弹窗：AI 请求工具调用时需用户明确授权 */}
-      {pendingPermission && (
-        <CoworkPermissionModal
-          permission={pendingPermission}
-          onRespond={(result) => {
-            window.api.cowork.respondPermission(pendingPermission.requestId, result)
-            setPendingPermission(null)
-          }}
-        />
-      )}
     </div>
   )
 }

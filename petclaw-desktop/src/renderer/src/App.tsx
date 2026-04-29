@@ -10,6 +10,10 @@ import { StatusBar } from './components/StatusBar'
 
 import { OnboardingPanel } from './views/onboarding/OnboardingPanel'
 import { BootCheckPanel } from './views/onboarding/BootCheckPanel'
+import { usePermissionListener } from './hooks/use-permission-listener'
+import { usePermissionStore } from './stores/permission-store'
+import { CoworkPermissionModal } from './views/chat/CoworkPermissionModal'
+import { CoworkQuestionWizard } from './views/chat/CoworkQuestionWizard'
 
 // 路由类型
 export type ViewType = 'chat' | 'skills' | 'cron' | 'im-channels' | 'settings'
@@ -17,6 +21,11 @@ export type ViewType = 'chat' | 'skills' | 'cron' | 'im-channels' | 'settings'
 type AppPhase = 'bootcheck' | 'onboarding' | 'main'
 
 export function App() {
+  // 全局权限请求监听：订阅 IPC 事件维护队列
+  usePermissionListener()
+  const firstPending = usePermissionStore((s) => s.pendingPermissions[0] ?? null)
+  const dequeue = usePermissionStore((s) => s.dequeue)
+
   const [phase, setPhase] = useState<AppPhase>('bootcheck')
 
   // 核心路由状态
@@ -36,6 +45,33 @@ export function App() {
 
   // 任务监控面板开关
   const [taskMonitorOpen, setTaskMonitorOpen] = useState(false)
+
+  // 权限弹窗响应：发送结果到主进程并出队
+  const handlePermissionRespond = useCallback(
+    (result: {
+      behavior: 'allow' | 'deny'
+      updatedInput?: Record<string, unknown>
+      message?: string
+    }) => {
+      if (!firstPending) return
+      window.api.cowork.respondPermission(firstPending.requestId, result)
+      dequeue(firstPending.requestId)
+    },
+    [firstPending, dequeue]
+  )
+
+  // 根据 toolName 和 questions 数量选择弹窗组件
+  const renderPermissionModal = useCallback(() => {
+    if (!firstPending) return null
+    const isAskUser = firstPending.toolName === 'AskUserQuestion'
+    const questions = (firstPending.toolInput as Record<string, unknown>).questions
+    const isMultiQuestion = isAskUser && Array.isArray(questions) && questions.length > 1
+
+    if (isMultiQuestion) {
+      return <CoworkQuestionWizard permission={firstPending} onRespond={handlePermissionRespond} />
+    }
+    return <CoworkPermissionModal permission={firstPending} onRespond={handlePermissionRespond} />
+  }, [firstPending, handlePermissionRespond])
 
   // 切换视图：进入 settings 时记录来源页，便于返回
   const handleViewChange = useCallback(
@@ -126,58 +162,74 @@ export function App() {
   }, [handleViewChange])
 
   if (phase === 'bootcheck') {
-    return <BootCheckPanel onRetry={() => window.api.retryBoot()} />
+    return (
+      <>
+        {renderPermissionModal()}
+        <BootCheckPanel onRetry={() => window.api.retryBoot()} />
+      </>
+    )
   }
 
   if (phase === 'onboarding') {
-    return <OnboardingPanel onComplete={() => setPhase('main')} />
+    return (
+      <>
+        {renderPermissionModal()}
+        <OnboardingPanel onComplete={() => setPhase('main')} />
+      </>
+    )
   }
 
   // Settings 全页面模式：隐藏主侧栏，独占渲染
   if (activeView === 'settings') {
     return (
-      <SettingsPage
-        activeTab={settingsTab}
-        onTabChange={setSettingsTab}
-        onBack={handleBackFromSettings}
-      />
+      <>
+        {renderPermissionModal()}
+        <SettingsPage
+          activeTab={settingsTab}
+          onTabChange={setSettingsTab}
+          onBack={handleBackFromSettings}
+        />
+      </>
     )
   }
 
   // 三栏布局：Sidebar (220px) + Main (flex-1) + StatusBar（底部）
   return (
-    <div className="w-full h-full flex bg-bg-root overflow-hidden">
-      <Sidebar
-        activeView={activeView}
-        onViewChange={handleViewChange}
-        currentDirectoryId={currentDirectoryId}
-        onDirectoryChange={handleDirectoryChange}
-        activeSessionId={activeSessionId}
-        onSessionSelect={setActiveSessionId}
-        sidebarTab={sidebarTab}
-        onSidebarTabChange={setSidebarTab}
-        onNewTask={handleNewTask}
-        onSettingsOpen={() => handleViewChange('settings')}
-      />
-      <div className="flex-1 flex flex-col min-w-0">
-        <main className="flex-1 flex min-h-0">
-          <div className="flex-1 flex flex-col min-w-0">
-            {activeView === 'chat' && (
-              <ChatView
-                activeSessionId={activeSessionId}
-                onSessionCreated={setActiveSessionId}
-                currentDirectoryId={currentDirectoryId}
-                taskMonitorOpen={taskMonitorOpen}
-                onToggleMonitor={() => setTaskMonitorOpen((p) => !p)}
-              />
-            )}
-            {activeView === 'skills' && <SkillsPage />}
-            {activeView === 'cron' && <CronPage />}
-            {activeView === 'im-channels' && <ImChannelsPage />}
-          </div>
-        </main>
-        <StatusBar />
+    <>
+      {renderPermissionModal()}
+      <div className="w-full h-full flex bg-bg-root overflow-hidden">
+        <Sidebar
+          activeView={activeView}
+          onViewChange={handleViewChange}
+          currentDirectoryId={currentDirectoryId}
+          onDirectoryChange={handleDirectoryChange}
+          activeSessionId={activeSessionId}
+          onSessionSelect={setActiveSessionId}
+          sidebarTab={sidebarTab}
+          onSidebarTabChange={setSidebarTab}
+          onNewTask={handleNewTask}
+          onSettingsOpen={() => handleViewChange('settings')}
+        />
+        <div className="flex-1 flex flex-col min-w-0">
+          <main className="flex-1 flex min-h-0">
+            <div className="flex-1 flex flex-col min-w-0">
+              {activeView === 'chat' && (
+                <ChatView
+                  activeSessionId={activeSessionId}
+                  onSessionCreated={setActiveSessionId}
+                  currentDirectoryId={currentDirectoryId}
+                  taskMonitorOpen={taskMonitorOpen}
+                  onToggleMonitor={() => setTaskMonitorOpen((p) => !p)}
+                />
+              )}
+              {activeView === 'skills' && <SkillsPage />}
+              {activeView === 'cron' && <CronPage />}
+              {activeView === 'im-channels' && <ImChannelsPage />}
+            </div>
+          </main>
+          <StatusBar />
+        </div>
       </div>
-    </div>
+    </>
   )
 }
