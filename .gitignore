@@ -15,8 +15,11 @@ coverage/
 # Vite cache
 .vite/
 
-# Openclaw runtime (built locally, too large for git)
-**/vendor/openclaw-runtime/
+# Openclaw source (submodule / local clone, not part of this repo)
+openclaw/
+
+# Vendor binaries (built locally, too large for git)
+**/vendor/
 
 # Openclaw build tarballs
 build-tar/
