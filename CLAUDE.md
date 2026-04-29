@@ -24,6 +24,7 @@ Openclaw runtime：
 
 ```bash
 pnpm --filter petclaw-desktop openclaw:ensure
+pnpm --filter petclaw-desktop openclaw:patch
 pnpm --filter petclaw-desktop openclaw:runtime:host
 pnpm --filter petclaw-desktop openclaw:plugins
 pnpm --filter petclaw-desktop openclaw:extensions:local
@@ -34,8 +35,8 @@ pnpm --filter petclaw-desktop openclaw:extensions:local
 ```bash
 pnpm --filter petclaw-desktop dist:mac:arm64
 pnpm --filter petclaw-desktop dist:mac:x64
-pnpm --filter petclaw-desktop dist:win
-pnpm --filter petclaw-desktop dist:linux
+pnpm --filter petclaw-desktop dist:win:x64
+pnpm --filter petclaw-desktop dist:linux:x64
 ```
 
 启动 dev server 前先清理旧进程，避免 Electron/Vite 多实例冲突：

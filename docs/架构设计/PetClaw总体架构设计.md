@@ -2614,14 +2614,14 @@ interface ChatSendPayload {
 ```json
 {
   "openclaw": {
-    "version": "v2026.3.2",
+    "version": "v2026.4.26",
     "repo": "https://github.com/openclaw/openclaw.git",
     "plugins": [
       { "id": "dingtalk-connector", "npm": "@dingtalk-real-ai/dingtalk-connector", "version": "0.8.16" },
       { "id": "openclaw-lark", "npm": "@larksuite/openclaw-lark", "version": "2026.4.7" },
-      { "id": "wecom-openclaw-plugin", "npm": "@wecom/wecom-openclaw-plugin", "version": "2026.4.3" },
+      { "id": "wecom-openclaw-plugin", "npm": "@wecom/wecom-openclaw-plugin", "version": "2026.4.22" },
       { "id": "openclaw-weixin", "npm": "@tencent-weixin/openclaw-weixin", "version": "2.1.7" },
-      { "id": "openclaw-nim-channel", "npm": "openclaw-nim-channel", "version": "1.1.1" },
+      { "id": "openclaw-nim-channel", "npm": "git+https://github.com/netease-im/openclaw-nim-channel.git#1.1.1", "version": "1.1.1" },
       { "id": "clawemail-email", "npm": "@clawemail/email", "version": "0.9.12" }
     ]
   }
@@ -2667,9 +2667,7 @@ interface ChatSendPayload {
     "openclaw:precompile": "node scripts/precompile-openclaw-extensions.cjs",
     "openclaw:channel-deps": "node scripts/install-openclaw-channel-deps.cjs",
     "openclaw:prune": "node scripts/prune-openclaw-runtime.cjs",
-    "openclaw:finalize": "node scripts/finalize-openclaw-runtime.cjs",
-    "electron:dev": "electron-vite dev",
-    "electron:dev:openclaw": "npm run openclaw:ensure && npm run openclaw:runtime:host && electron-vite dev"
+    "openclaw:finalize": "node scripts/finalize-openclaw-runtime.cjs"
   }
 }
 ```
@@ -2707,7 +2705,7 @@ vendor/openclaw-runtime/
 vim package.json  # 改 openclaw.version 为新 tag
 
 # 2. 重建（自动检测版本变更）
-npm run electron:dev:openclaw
+npm run dev:openclaw
 
 # 3. 提交
 git add package.json
@@ -3832,31 +3830,32 @@ cd petclaw/petclaw-desktop
 npm install
 
 # 3. 首次运行：自动克隆并构建 Openclaw（可能需要几分钟）
-npm run electron:dev:openclaw
+npm run dev:openclaw
 ```
 
-首次执行 `electron:dev:openclaw` 时会：
+首次执行 `dev:openclaw` 时会：
 1. 克隆 `../openclaw` 仓库并切换到锁定版本
-2. 执行完整构建流水线（§21.2 的 13 个步骤）
-3. 启动 Vite dev server + Electron 热重载
+2. 应用 `scripts/patches/<version>/` 下的定制补丁
+3. 执行完整构建流水线（§21.2 的步骤）
+4. 启动 Vite dev server + Electron 热重载
 
 ### 25.3 日常开发
 
 ```bash
 # 常规开发（Openclaw 版本未变，自动跳过构建）
-npm run electron:dev:openclaw
+npm run dev:openclaw
 
 # 仅前端开发（不需要 Openclaw 变更时）
-npm run electron:dev
+npm run dev
 
 # 强制重建 Openclaw（即使版本未变）
-OPENCLAW_FORCE_BUILD=1 npm run electron:dev:openclaw
+OPENCLAW_FORCE_BUILD=1 npm run dev:openclaw
 
 # 本地开发 Openclaw 源码时（跳过版本切换，使用本地修改）
-OPENCLAW_SKIP_ENSURE=1 npm run electron:dev:openclaw
+OPENCLAW_SKIP_ENSURE=1 npm run dev:openclaw
 
 # 覆盖 Openclaw 源码路径
-OPENCLAW_SRC=/path/to/openclaw npm run electron:dev:openclaw
+OPENCLAW_SRC=/path/to/openclaw npm run dev:openclaw
 ```
 
 开发服务器默认运行在 `http://localhost:5173`。
@@ -3918,15 +3917,15 @@ v3 的 package.json 变化：移除 `build` 字段（迁到 `electron-builder.js
 
   // ─── Openclaw 版本锁定 + 插件声明 ───
   "openclaw": {
-    "version": "v2026.3.2",
+    "version": "v2026.4.26",
     "repo": "https://github.com/openclaw/openclaw.git",
     "plugins": [
       // IM 平台插件
       { "id": "dingtalk-connector", "npm": "@dingtalk-real-ai/dingtalk-connector", "version": "0.8.16" },   // 钉钉
       { "id": "openclaw-lark", "npm": "@larksuite/openclaw-lark", "version": "2026.4.7" },                  // 飞书
-      { "id": "wecom-openclaw-plugin", "npm": "@wecom/wecom-openclaw-plugin", "version": "2026.4.3" },      // 企业微信
+      { "id": "wecom-openclaw-plugin", "npm": "@wecom/wecom-openclaw-plugin", "version": "2026.4.22" },     // 企业微信
       { "id": "openclaw-weixin", "npm": "@tencent-weixin/openclaw-weixin", "version": "2.1.7" },            // 微信
-      { "id": "openclaw-nim-channel", "npm": "openclaw-nim-channel", "version": "1.1.1" },                  // 云信 IM
+      { "id": "openclaw-nim-channel", "npm": "git+https://github.com/netease-im/openclaw-nim-channel.git#1.1.1", "version": "1.1.1" },  // 云信 IM
       { "id": "clawemail-email", "npm": "@clawemail/email", "version": "0.9.12" }                           // 邮件 IMAP/SMTP
       // 不包含：moltbot-popo（网易内部）、openclaw-netease-bee（网易内部）
     ]
@@ -3973,15 +3972,10 @@ v3 的 package.json 变化：移除 `build` 字段（迁到 `electron-builder.js
     "openclaw:finalize": "node scripts/finalize-openclaw-runtime.cjs",
 
     // == 打包分发 ==
-    "predist:mac": "npm run build && npm run openclaw:runtime:mac-arm64",
-    "dist:mac": "electron-builder --mac --config electron-builder.json",
-    "dist:mac:arm64": "npm run build && npm run openclaw:runtime:mac-arm64 && electron-builder --mac --arm64",
-    "dist:mac:x64": "npm run build && npm run openclaw:runtime:mac-x64 && electron-builder --mac --x64",
-    "dist:mac:universal": "npm run build && electron-builder --mac --universal",
-    "predist:win": "npm run openclaw:runtime:win-x64",
-    "dist:win": "npm run build && electron-builder --win --x64",
-    "predist:linux": "npm run openclaw:runtime:linux-x64",
-    "dist:linux": "npm run build && electron-builder --linux",
+    "dist:mac:arm64": "electron-vite build && npm run openclaw:runtime:mac-arm64 && npm run openclaw:finalize && electron-builder --mac --arm64 --config electron-builder.json",
+    "dist:mac:x64": "electron-vite build && npm run openclaw:runtime:mac-x64 && npm run openclaw:finalize && electron-builder --mac --x64 --config electron-builder.json",
+    "dist:win:x64": "electron-vite build && npm run openclaw:runtime:win-x64 && npm run openclaw:finalize && electron-builder --win --x64 --config electron-builder.json",
+    "dist:linux:x64": "electron-vite build && npm run openclaw:runtime:linux-x64 && npm run openclaw:finalize && electron-builder --linux --x64 --config electron-builder.json",
     "clean:release": "rimraf release",
 
     // == 安装钩子 ==
@@ -4112,23 +4106,17 @@ v3 的 package.json 变化：移除 `build` 字段（迁到 `electron-builder.js
 使用 [electron-builder](https://www.electron.build/) 生成各平台安装包，输出到 `release/` 目录。
 
 ```bash
-# macOS (.dmg)
-npm run dist:mac
-
 # macOS - Apple Silicon
 npm run dist:mac:arm64
 
 # macOS - Intel
 npm run dist:mac:x64
 
-# macOS - Universal (双架构)
-npm run dist:mac:universal
-
 # Windows (.exe NSIS 安装包)
-npm run dist:win
+npm run dist:win:x64
 
-# Linux (.AppImage)
-npm run dist:linux
+# Linux (.AppImage + .deb)
+npm run dist:linux:x64
 ```
 
 打包时自动执行 Openclaw runtime 构建（如果本地没有缓存）。Runtime 捆绑到 `Resources/petmind`。
@@ -4321,35 +4309,93 @@ name: Build & Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      build_macos_arm64:
+        description: 'Build macOS (arm64)'
+        type: boolean
+        default: true
+      build_macos_x64:
+        description: 'Build macOS (x64)'
+        type: boolean
+        default: true
+      build_windows:
+        description: 'Build Windows (x64)'
+        type: boolean
+        default: true
+      build_linux:
+        description: 'Build Linux (x64)'
+        type: boolean
+        default: true
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        include:
-          - os: macos-latest
-            target: mac-arm64
-          - os: macos-13
-            target: mac-x64
-          - os: windows-latest
-            target: win-x64
-          - os: ubuntu-latest
-            target: linux-x64
-    runs-on: ${{ matrix.os }}
+  build-macos-arm64:
+    if: ${{ github.event_name == 'push' || inputs.build_macos_arm64 }}
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - run: npm install
-      - name: Build Openclaw Runtime (cached)
-        run: npm run openclaw:runtime:${{ matrix.target }}
-      - name: Package
-        run: npm run dist:${{ matrix.target }}
-      - uses: actions/upload-artifact@v4
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter petclaw-desktop dist:mac:arm64
+
+  build-macos-x64:
+    if: ${{ github.event_name == 'push' || inputs.build_macos_x64 }}
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
         with:
-          name: release-${{ matrix.target }}
-          path: release/*
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter petclaw-desktop dist:mac:x64
+
+  build-windows:
+    if: ${{ github.event_name == 'push' || inputs.build_windows }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter petclaw-desktop dist:win:x64
+
+  build-linux:
+    if: ${{ github.event_name == 'push' || inputs.build_linux }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter petclaw-desktop dist:linux:x64
+
+  create-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-macos-arm64, build-macos-x64, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: artifacts/**/*
+          generate_release_notes: true
 ```
 
 ```yaml
@@ -4380,31 +4426,33 @@ jobs:
 git clone https://github.com/xxx/petclaw.git
 cd petclaw/petclaw-desktop
 npm install                          # 安装 Electron + React + 所有 npm 依赖
-npm run electron:dev:openclaw        # 首次运行：自动 clone openclaw 源码 + 完整构建
+npm run dev:openclaw        # 首次运行：自动 clone openclaw 源码 + 完整构建
                                      # 内部执行顺序：
-                                     #   1. ensure-openclaw-version   — git clone ../openclaw && checkout v2026.3.2
-                                     #   2. build-openclaw-runtime    — pnpm install → tsc → 打包 asar → 生成入口
-                                     #   3. sync-openclaw-current     — symlink current/ → darwin-arm64/
-                                     #   4. bundle-openclaw-gateway   — esbuild 1100个ESM → 1个文件(27MB)
-                                     #   5. ensure-openclaw-plugins   — 下载 IM 插件(飞书/钉钉等)
-                                     #   6. sync-local-extensions     — symlink 本地扩展
-                                     #   7. precompile-extensions     — esbuild 预编译 TS 扩展
-                                     #   8. install-channel-deps      — 修复 channel 缺失依赖
-                                     #   9. prune-openclaw-runtime    — 裁剪体积(删 .map/.d.ts, stub 未用包)
+                                     #   1. ensure-openclaw-version   — git clone ../openclaw && checkout v2026.4.26
+                                     #   2. apply-openclaw-patches    — 应用 scripts/patches/<version>/ 下的 patch
+                                     #   3. build-openclaw-runtime    — pnpm install → tsc → 打包 asar → 生成入口
+                                     #   4. sync-openclaw-current     — symlink current/ → darwin-arm64/
+                                     #   5. bundle-openclaw-gateway   — esbuild 1100个ESM → 1个文件(27MB)
+                                     #   6. ensure-openclaw-plugins   — 下载 IM 插件(飞书/钉钉等)
+                                     #   7. sync-local-extensions     — symlink 本地扩展
+                                     #   8. precompile-extensions     — esbuild 预编译 TS 扩展
+                                     #   9. install-channel-deps      — 修复 channel 缺失依赖
+                                     #  10. prune-openclaw-runtime    — 裁剪体积(删 .map/.d.ts, stub 未用包)
+                                     #  11. finalize-openclaw-runtime — 打包 gateway.asar（加速 Electron 加载）
                                      # 然后启动 Vite dev server + Electron
 
 # ═══════════════════════════════════════════════
 # 阶段 2：日常开发（每天重复）
 # ═══════════════════════════════════════════════
 
-npm run electron:dev:openclaw        # 后续运行：检测 runtime-build-info.json 版本匹配 → 跳过构建 → 直接启动
+npm run dev:openclaw        # 后续运行：检测 runtime-build-info.json 版本匹配 → 跳过构建 → 直接启动
 # 或
-npm run electron:dev                 # 只启动前端+Electron，不检查 Openclaw（纯 UI 开发时用）
+npm run dev                 # 只启动前端+Electron，不检查 Openclaw（纯 UI 开发时用）
 
 # 特殊场景：
-OPENCLAW_FORCE_BUILD=1 npm run electron:dev:openclaw   # 强制重建（改了 openclaw 源码后）
-OPENCLAW_SKIP_ENSURE=1 npm run electron:dev:openclaw   # 跳过版本切换（本地调试 openclaw 时）
-OPENCLAW_SRC=/other/path npm run electron:dev:openclaw  # 指定 openclaw 源码路径
+OPENCLAW_FORCE_BUILD=1 npm run dev:openclaw   # 强制重建（改了 openclaw 源码后）
+OPENCLAW_SKIP_ENSURE=1 npm run dev:openclaw   # 跳过版本切换（本地调试 openclaw 时）
+OPENCLAW_SRC=/other/path npm run dev:openclaw  # 指定 openclaw 源码路径
 
 # ═══════════════════════════════════════════════
 # 阶段 3：提交前检查 
@@ -4444,10 +4492,11 @@ npm test -- engine-manager           # 只跑指定模块的测试
 # 阶段 4：升级 Openclaw 版本
 # ═══════════════════════════════════════════════
 
-vim package.json                     # 修改 openclaw.version: "v2026.3.2" → "v2026.4.0"
-npm run electron:dev:openclaw        # 自动检测版本变更 → 重新 checkout + 完整构建
+vim package.json                     # 修改 openclaw.version: "v2026.4.26" → "v2026.x.x"
+npm run dev:openclaw        # 自动检测版本变更 → 重新 checkout + 完整构建
+                                     # 注意：新版本需要在 scripts/patches/<新版本>/ 下重新生成 patch
 git add package.json
-git commit -m "chore: bump openclaw to v2026.4.0"
+git commit -m "chore: bump openclaw to v2026.x.x"
 
 # ═══════════════════════════════════════════════
 # 阶段 5：生产打包
@@ -4455,9 +4504,8 @@ git commit -m "chore: bump openclaw to v2026.4.0"
 
 npm run dist:mac:arm64               # → release/PetClaw-x.y.z-arm64.dmg
 npm run dist:mac:x64                 # → release/PetClaw-x.y.z-x64.dmg
-npm run dist:mac:universal           # → release/PetClaw-x.y.z-universal.dmg（双架构）
-npm run dist:win                     # → release/PetClaw-x.y.z-Setup.exe（NSIS 安装包）
-npm run dist:linux                   # → release/PetClaw-x.y.z.AppImage
+npm run dist:win:x64                 # → release/PetClaw-x.y.z-Setup.exe（NSIS 安装包）
+npm run dist:linux:x64               # → release/PetClaw-x.y.z.AppImage
                                      # 打包时自动构建 Openclaw runtime（有缓存则跳过）
                                      # runtime 捆绑到 app 内的 Resources/petmind/
 
