@@ -99,16 +99,22 @@ petclaw-desktop/src/main/
 
 ```text
 petclaw-desktop/src/renderer/src/
-├── views/chat/           Cowork 对话主界面
-├── views/settings/       设置
-├── views/cron/           定时任务
-├── views/im/             IM 频道
-├── views/onboarding/     初始化引导
-├── pet/                  宠物窗口 UI 和状态机
-├── stores/               Zustand stores
-├── components/           共享组件
-└── i18n.ts               renderer i18n service / useI18n
+├── views/chat/                       Cowork 对话主界面
+│   └── CoworkQuestionWizard.tsx      多问题分步向导（AskUserQuestion）
+├── views/settings/                   设置
+├── views/cron/                       定时任务
+├── views/im/                         IM 频道
+├── views/onboarding/                 初始化引导
+├── pet/                              宠物窗口 UI 和状态机
+├── stores/                           Zustand stores
+│   └── permission-store.ts           权限请求 FIFO 队列（usePermissionStore）
+├── hooks/
+│   └── use-permission-listener.ts    全局权限 IPC 监听（usePermissionListener）
+├── components/                       共享组件
+└── i18n.ts                           renderer i18n service / useI18n
 ```
+
+权限弹窗渲染模式：`CoworkPermissionModal` 由 `App.tsx` 在全局根层统一渲染（而非 ChatView 内），通过 `usePermissionStore` FIFO 队列驱动，支持 Exec Approval 和 AskUserQuestion 两种来源的请求串行展示。
 
 Preload：
 
@@ -311,7 +317,7 @@ pnpm --filter petclaw-desktop test -- tests/main/ai/config-sync.test.ts
 2. 用 `rg` 查调用方、旧路径、IPC channel、配置 key。
 3. 列清楚修改边界，保持改动最小。
 4. 先测试后实现；文档重组类任务至少做引用检查和 `typecheck`。
-5. 开发完成后同步 `CLAUDE.md` / `AGENTS.md` 中仍然有效的规则，以及 `docs/架构设计/PetClaw总体架构设计.md` 的相关章节。
+5. 开发完成后同步 `CLAUDE.md` / `AGENTS.md` 中仍然有效的规则，以及 `petclaw-desktop/README.md`、`docs/架构设计/PetClaw总体架构设计.md` 的相关章节。
 6. 不回滚、不覆盖、不格式化无关用户改动。
 
 前端 UI/UX：
@@ -319,6 +325,12 @@ pnpm --filter petclaw-desktop test -- tests/main/ai/config-sync.test.ts
 - 设计前端 UI/UX 时，先使用项目要求的 UI/UX skill。
 - 参考 `docs/设计/` 下的对应设计稿。
 - 做实际可用界面，不做营销式占位页。
+
+Git 提交：
+
+- Commit message 使用英文，遵循 Conventional Commits（`feat:` / `fix:` / `refactor:` / `docs:` 等）。
+- Body 每行不超过 100 字符（commitlint `body-max-line-length` 规则）。
+- 不加 `Co-Authored-By` AI 署名行。
 
 ## 11. 参考文档
 

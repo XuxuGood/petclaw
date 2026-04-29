@@ -1357,6 +1357,25 @@ Gateway SSE exec.approval.requested
   2. 标准 Gateway exec approval 请求 → `coworkController.respondToPermission(requestId, result)`
 - AskUser 请求使用 `sessionId='__askuser__'` 标记，以此区分来源
 
+**Renderer 权限弹窗架构（全局队列模式）**:
+
+权限请求在渲染进程通过 FIFO 队列串行展示，避免多请求同时弹窗冲突：
+
+```
+主进程 IPC push
+  → usePermissionListener（全局 hook，在 App.tsx 挂载）
+      → usePermissionStore.enqueue(request)  // FIFO 队列
+
+CoworkPermissionModal（App.tsx 全局渲染，非 ChatView 内）
+  ← usePermissionStore.current              // 取队头请求展示
+  → 用户响应 → dequeue() → IPC cowork:permission:respond
+```
+
+- `usePermissionStore`（`stores/permission-store.ts`）：Zustand FIFO 队列，`enqueue` 入队、`dequeue` 出队、`dismiss` 按 requestId 移除
+- `usePermissionListener`（`hooks/use-permission-listener.ts`）：全局单例 hook，订阅 `cowork:stream:permission` + `mcp:bridge:askUser` + dismiss 事件
+- `CoworkPermissionModal`：三种模式（exec-approval / ask-user-question / ask-user-question-wizard），含 `DANGER_REASON_I18N_MAP` 危险等级警告条
+- `CoworkQuestionWizard`（`views/chat/CoworkQuestionWizard.tsx`）：AskUserQuestion 多问题分步向导，每步展示单个问题 + 选项（radio/checkbox），全部回答后统一提交
+
 ### 9.4 流式事件协议
 
 CoworkController 作为 EventEmitter，emit 以下事件（对应 LobsterAI `CoworkRuntimeEvents`）：
@@ -2713,6 +2732,11 @@ PetClaw 维护 2 个**本地扩展**，它们是 Openclaw 插件（遵循 `openc
 - `callbackUrl` + `secret` 由 ConfigSync 写入 `openclaw.json` 的插件配置
 - 仅桌面端会话（`sessionKey.startsWith('agent:main:petclaw:')`）启用，IM 渠道会话不注册此工具
 
+**Renderer 展示层**：
+- 多问题场景使用 `CoworkQuestionWizard`（分步向导），每步展示单个问题 + radio/checkbox 选项
+- 单问题场景直接在 `CoworkPermissionModal` 内联展示（`ask-user-question` 模式）
+- 所有权限请求经由 `usePermissionStore` FIFO 队列串行处理，`usePermissionListener` 全局订阅主进程推送事件
+
 #### mcp-bridge
 
 **职责**：将 App 管理的 MCP 服务器工具暴露为 Openclaw 原生工具。
@@ -3330,18 +3354,21 @@ petclaw-desktop/
 │   │   └── index.d.ts                 # 类型声明（IPC channel 全覆盖）
 │   │
 │   └── renderer/src/                  # ═══ React 前端 ═══
-│       ├── App.tsx                    # 根组件
+│       ├── App.tsx                    # 根组件；全局渲染 CoworkPermissionModal（权限弹窗统一出口）
 │       ├── i18n.ts                    # Renderer i18nService + useI18n
 │       ├── chat/                      # 聊天模块
 │       │   ├── ChatApp.tsx
 │       │   └── components/
 │       │       ├── ChatView.tsx
 │       │       ├── ChatInputBox.tsx   # 输入框（cwd + 附件 + 技能）
+│       │       ├── CoworkQuestionWizard.tsx  # AskUserQuestion 多问题分步向导
 │       │       ├── MonitorView.tsx
 │       │       ├── SettingsView.tsx
 │       │       ├── Sidebar.tsx
 │       │       ├── StatusBar.tsx
 │       │       └── TitleBar.tsx
+│       ├── hooks/                     # 全局 React hooks
+│       │   └── use-permission-listener.ts  # 订阅主进程权限事件，写入 permission store
 │       ├── panels/                    # 启动/引导面板
 │       │   ├── BootCheckPanel.tsx
 │       │   └── OnboardingPanel.tsx
@@ -3349,6 +3376,7 @@ petclaw-desktop/
 │       │   ├── PetCanvas.tsx
 │       │   └── state-machine.ts
 │       └── stores/                    # Zustand 状态
+│           └── permission-store.ts    # 权限请求 FIFO 队列（usePermissionStore）
 │
 ├── scripts/                           # ═══ 构建脚本（13 个） ═══
 │   ├── ensure-openclaw-version.cjs    # git checkout 锁定版本
@@ -4202,7 +4230,10 @@ git push origin v1.0.0               # 推送 tag → 触发 GitHub Actions
 - `src/main/pet/pet-event-bridge.ts` — PetEventBridge 多源事件聚合（已扩展支持 IM/Cron/Hook）
 
 渲染层：
-- `src/renderer/src/chat/components/CoworkPermissionModal.tsx` — Exec Approval 审批弹窗（三种模式）
+- `src/renderer/src/chat/components/CoworkPermissionModal.tsx` — Exec Approval 审批弹窗（三种模式）含 `DANGER_REASON_I18N_MAP` 危险等级警告条
+- `src/renderer/src/chat/components/CoworkQuestionWizard.tsx` — AskUserQuestion 多问题分步向导（radio/checkbox 选项）
+- `src/renderer/src/stores/permission-store.ts` — 权限请求 FIFO 队列（`usePermissionStore`）
+- `src/renderer/src/hooks/use-permission-listener.ts` — 全局 IPC 权限事件订阅，写入 permission store
 - `src/renderer/src/chat/components/DirectoryConfigDialog.tsx` — 目录配置对话框（模型覆盖 + 技能白名单）
 - `src/renderer/src/chat/components/DirectorySkillSelector.tsx` — 目录技能多选子组件
 - `src/renderer/src/chat/components/ImChannelsPage.tsx` — IM 频道主视图（ViewType `'im-channels'`）
