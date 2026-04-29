@@ -5,9 +5,12 @@
 #   - workflow_dispatch → 手动触发，可选择构建哪些平台
 #
 # 构建矩阵：
-#   - macOS (arm64)  — macos-latest runner，prepare-runtime.sh 准备 OpenClaw runtime
-#   - Windows (x64)  — windows-latest runner，额外需要 Python 运行时（setup-python-runtime.js）
-#   - Linux (x64)    — ubuntu-latest runner，需要 GTK/NSS/ATK 等 Electron 系统依赖
+#   - macOS arm64  — macos-latest（Apple Silicon）
+#   - macOS x64    — macos-13（Intel）
+#   - Windows x64  — windows-latest
+#   - Linux x64    — ubuntu-latest
+#
+# OpenClaw runtime 由 dist:* 命令内部的 openclaw:ensure 自动 clone 源码并构建。
 #
 # 打包产物：
 #   - macOS: .dmg + .zip → release/ 目录
@@ -17,7 +20,7 @@
 # Release 策略：
 #   - tag push 时自动创建 draft Release，需要人工审核后发布
 #   - beta/alpha/rc tag 自动标记为 prerelease
-#   - 产物保留 30 天（比默认的 90 天短，节省存储）
+#   - 产物保留 30 天
 
 name: Build & Release
 
@@ -26,28 +29,32 @@ on:
     tags: ['v*']
   workflow_dispatch:
     inputs:
-      build_macos:
-        description: 'Build macOS'
+      build_macos_arm64:
+        description: 'Build macOS (arm64)'
+        required: true
+        default: true
+        type: boolean
+      build_macos_x64:
+        description: 'Build macOS (x64)'
         required: true
         default: true
         type: boolean
       build_windows:
-        description: 'Build Windows'
+        description: 'Build Windows (x64)'
         required: true
         default: true
         type: boolean
       build_linux:
-        description: 'Build Linux'
+        description: 'Build Linux (x64)'
         required: true
         default: true
         type: boolean
 
 jobs:
-  # ========== macOS 构建 ==========
-  # tag push 时始终构建；手动触发时根据 input 决定
-  build-macos:
-    if: ${{ github.event_name == 'push' || inputs.build_macos }}
-    name: Build (macOS)
+  # ========== macOS arm64 构建 ==========
+  build-macos-arm64:
+    if: ${{ github.event_name == 'push' || inputs.build_macos_arm64 }}
+    name: Build (macOS arm64)
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -56,41 +63,66 @@ jobs:
           version: 9
       - uses: actions/setup-node@v4
         with:
-          node-version: '22.x'
+          node-version: '24.x'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
 
-      # prepare-runtime.sh：克隆 OpenClaw 源码 → npm install → 构建 → 打包 tar
-      - name: Prepare runtime
-        run: |
-          chmod +x petclaw-desktop/scripts/prepare-runtime.sh
-          cd petclaw-desktop && ./scripts/prepare-runtime.sh mac arm64
-
-      - run: pnpm --filter petclaw-desktop build
-
-      # electron-builder 打包，签名环境变量从 Secrets 注入
-      - name: Package (macOS)
-        run: pnpm --filter petclaw-desktop package
+      - name: Build macOS arm64
+        run: pnpm --filter petclaw-desktop dist:mac:arm64
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_LINK: ${{ secrets.CSC_LINK }}              # 开发者证书 p12（base64）
+          CSC_LINK: ${{ secrets.CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}               # 公证用 Apple ID
+          APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
       - uses: actions/upload-artifact@v4
         with:
-          name: macos-build
+          name: macos-arm64-build
           path: |
             petclaw-desktop/release/*.dmg
             petclaw-desktop/release/*.zip
           retention-days: 30
 
-  # ========== Windows 构建 ==========
+  # ========== macOS x64 构建 ==========
+  build-macos-x64:
+    if: ${{ github.event_name == 'push' || inputs.build_macos_x64 }}
+    name: Build (macOS x64)
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build macOS x64
+        run: pnpm --filter petclaw-desktop dist:mac:x64
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-x64-build
+          path: |
+            petclaw-desktop/release/*.dmg
+            petclaw-desktop/release/*.zip
+          retention-days: 30
+
+  # ========== Windows x64 构建 ==========
   build-windows:
     if: ${{ github.event_name == 'push' || inputs.build_windows }}
-    name: Build (Windows)
+    name: Build (Windows x64)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -99,24 +131,15 @@ jobs:
           version: 9
       - uses: actions/setup-node@v4
         with:
-          node-version: '22.x'
+          node-version: '24.x'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
 
-      # Windows 需要内嵌 Python 运行时（供 Skill 依赖使用）
-      # PETCLAW_PORTABLE_PYTHON_ARCHIVE：预打包的 Python 压缩包 URL（可选，缺失时从官网下载）
-      - name: Setup Python Runtime
-        run: pnpm --filter petclaw-desktop setup:python-runtime
-        env:
-          PETCLAW_PORTABLE_PYTHON_ARCHIVE: ${{ secrets.WINDOWS_PYTHON_ARCHIVE }}
-
-      - run: pnpm --filter petclaw-desktop build
-
-      - name: Package (Windows)
-        run: pnpm --filter petclaw-desktop package
+      - name: Build Windows x64
+        run: pnpm --filter petclaw-desktop dist:win:x64
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}           # Windows 代码签名证书
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
 
       - uses: actions/upload-artifact@v4
@@ -126,10 +149,10 @@ jobs:
             petclaw-desktop/release/*.exe
           retention-days: 30
 
-  # ========== Linux 构建 ==========
+  # ========== Linux x64 构建 ==========
   build-linux:
     if: ${{ github.event_name == 'push' || inputs.build_linux }}
-    name: Build (Linux)
+    name: Build (Linux x64)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -138,25 +161,19 @@ jobs:
           version: 9
       - uses: actions/setup-node@v4
         with:
-          node-version: '22.x'
+          node-version: '24.x'
           cache: 'pnpm'
 
-      # Electron 在 Linux 上需要 GTK3、NSS、ATK-Bridge 等系统库
+      # Electron 在 Linux 上需要 GTK3、NSS 等系统库
       - name: Install Linux build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libnotify-dev libnss3-dev libxss1 libgconf-2-4 libatk-bridge2.0-0 libdrm2 libgbm1
+
       - run: pnpm install --frozen-lockfile
 
-      - name: Prepare runtime
-        run: |
-          chmod +x petclaw-desktop/scripts/prepare-runtime.sh
-          cd petclaw-desktop && ./scripts/prepare-runtime.sh linux x64
-
-      - run: pnpm --filter petclaw-desktop build
-
-      - name: Package (Linux)
-        run: pnpm --filter petclaw-desktop package
+      - name: Build Linux x64
+        run: pnpm --filter petclaw-desktop dist:linux:x64
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -172,10 +189,10 @@ jobs:
   # 仅 v* tag push 时运行，下载所有平台产物后创建 draft Release
   create-release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build-macos, build-windows, build-linux]
+    needs: [build-macos-arm64, build-macos-x64, build-windows, build-linux]
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # 创建 Release 需要写权限
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -184,8 +201,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          draft: true   # draft 状态，需要人工确认后发布
-          # beta/alpha/rc tag 自动标记为预发布版本
+          draft: true
           prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-alpha') || contains(github.ref, '-rc') }}
           files: artifacts/**/*
-          generate_release_notes: true  # 自动生成变更日志
+          generate_release_notes: true
