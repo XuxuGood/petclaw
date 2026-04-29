@@ -1,6 +1,6 @@
 // 权限审批弹窗：支持标准工具审批、AskUserQuestion 确认、多选三种模式
 import { useEffect, useMemo, useState } from 'react'
-import { ShieldAlert, ShieldCheck, ShieldX, X } from 'lucide-react'
+import { AlertTriangle, ShieldAlert, ShieldCheck, ShieldX, X } from 'lucide-react'
 
 import { useI18n } from '../../i18n'
 
@@ -128,6 +128,21 @@ function resolveConfirmModeButtons(options: Array<{ label: string; description?:
   return { primary: first, secondary: second }
 }
 
+// 危险原因 → i18n key 映射，用于弹窗中展示具体危险原因文案
+const DANGER_REASON_I18N_MAP: Record<string, string> = {
+  'recursive-delete': 'dangerReason.recursiveDelete',
+  'git-force-push': 'dangerReason.gitForcePush',
+  'git-reset-hard': 'dangerReason.gitResetHard',
+  'disk-overwrite': 'dangerReason.diskOverwrite',
+  'disk-format': 'dangerReason.diskFormat',
+  'file-delete': 'dangerReason.fileDelete',
+  'git-push': 'dangerReason.gitPush',
+  'process-kill': 'dangerReason.processKill',
+  'permission-change': 'dangerReason.permissionChange',
+  'git-clean': 'dangerReason.gitClean',
+  'find-delete': 'dangerReason.findDelete'
+}
+
 const DANGER_STYLES: Record<
   DangerLevel,
   { bg: string; border: string; icon: typeof ShieldAlert; iconColor: string; labelKey: string }
@@ -189,6 +204,22 @@ export function CoworkPermissionModal({ permission, onRespond }: CoworkPermissio
             <X size={16} className="text-text-tertiary" />
           </button>
         </div>
+
+        {/* 危险原因警告条：dangerReason 为字符串时才渲染，避免 unknown 类型问题 */}
+        {dangerLevel !== 'safe' &&
+          typeof toolInput.dangerReason === 'string' &&
+          toolInput.dangerReason && (
+            <div
+              className={`flex items-center gap-2 px-5 py-2.5 text-[12px] ${style.bg} border-b ${style.border}`}
+            >
+              <AlertTriangle size={14} className={style.iconColor} />
+              <span className="text-text-secondary">
+                {t(
+                  DANGER_REASON_I18N_MAP[String(toolInput.dangerReason)] ?? 'permission.needConfirm'
+                )}
+              </span>
+            </div>
+          )}
 
         {/* 工具名称 + 参数展示 */}
         <div className="px-5 py-4 overflow-y-auto">
@@ -263,6 +294,17 @@ function ConfirmModeModal({
           <div className={`flex items-center gap-3 px-5 py-3 ${style.bg} border-b ${style.border}`}>
             <DangerIcon size={18} className={style.iconColor} />
             <span className="text-[13px] font-semibold text-text-primary">{t(style.labelKey)}</span>
+          </div>
+        )}
+        {/* 危险原因警告条 */}
+        {typeof toolInput.dangerReason === 'string' && toolInput.dangerReason && (
+          <div
+            className={`flex items-center gap-2 px-5 py-2.5 text-[12px] ${style.bg} border-b ${style.border}`}
+          >
+            <AlertTriangle size={14} className={style.iconColor} />
+            <span className="text-text-secondary">
+              {t(DANGER_REASON_I18N_MAP[toolInput.dangerReason] ?? 'permission.needConfirm')}
+            </span>
           </div>
         )}
         <div className="px-5 py-4">
@@ -397,16 +439,52 @@ function MultiQuestionModal({
                             }))
                           }
                         }}
-                        className={`w-full text-left px-3 py-2 rounded-[10px] text-[13px] transition-colors duration-[120ms] ${
+                        className={`w-full text-left px-3 py-2.5 rounded-[10px] text-[13px] transition-colors duration-[120ms] flex items-start gap-3 ${
                           isSelected
                             ? 'bg-accent/10 text-accent border border-accent/30'
                             : 'bg-bg-hover text-text-secondary hover:bg-bg-active border border-transparent'
                         }`}
                       >
-                        <span className="font-medium">{opt.label}</span>
-                        {opt.description && (
-                          <span className="text-text-tertiary ml-2">{opt.description}</span>
+                        {/* radio/checkbox 指示器：多选用方形 checkbox，单选用圆形 radio */}
+                        {isMulti ? (
+                          <span
+                            className={`w-4 h-4 rounded-[3px] border-2 flex items-center justify-center mt-0.5 flex-shrink-0 transition-colors ${
+                              isSelected ? 'border-accent bg-accent' : 'border-text-tertiary'
+                            }`}
+                          >
+                            {isSelected && (
+                              <svg
+                                className="w-2.5 h-2.5 text-white"
+                                viewBox="0 0 16 16"
+                                fill="none"
+                              >
+                                <path
+                                  d="M13 4L6 11L3 8"
+                                  stroke="currentColor"
+                                  strokeWidth="2.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            )}
+                          </span>
+                        ) : (
+                          <span
+                            className={`w-4 h-4 rounded-full border-2 flex items-center justify-center mt-0.5 flex-shrink-0 transition-colors ${
+                              isSelected ? 'border-accent' : 'border-text-tertiary'
+                            }`}
+                          >
+                            {isSelected && <span className="w-2 h-2 rounded-full bg-accent" />}
+                          </span>
                         )}
+                        <div className="flex-1 min-w-0">
+                          <span className="font-medium">{opt.label}</span>
+                          {opt.description && (
+                            <span className="text-text-tertiary ml-2 text-[12px]">
+                              {opt.description}
+                            </span>
+                          )}
+                        </div>
                       </button>
                     )
                   })}
