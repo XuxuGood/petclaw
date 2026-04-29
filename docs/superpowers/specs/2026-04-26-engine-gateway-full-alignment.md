@@ -563,10 +563,10 @@ private throttledStoreUpdateMessage(sessionId: string, messageId: string, conten
 
 ## 模块 5：index.ts 适配
 
-### 5.1 setupV3Runtime 重构
+### 5.1 initializeRuntimeServices 重构
 
 ```typescript
-async function setupV3Runtime(): Promise<void> {
+async function initializeRuntimeServices(): Promise<void> {
   const connectionInfo = engineManager.getGatewayConnectionInfo()
   if (!connectionInfo.url || !connectionInfo.token) {
     console.warn('Gateway 连接信息不完整，跳过 V3 Runtime 初始化')

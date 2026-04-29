@@ -1650,7 +1650,7 @@ git commit -m "feat(preload): add scheduler and IM IPC channels for Phase 3"
   const imGatewayManager = new ImGatewayManager(db)
 ```
 
-在 `setupV3Runtime` 函数中（Gateway 连接成功后），创建 CronJobService：
+在 `initializeRuntimeServices` 函数中（Gateway 连接成功后），创建 CronJobService：
 
 ```typescript
   // Phase 3: CronJobService — 定时任务 Gateway RPC 代理

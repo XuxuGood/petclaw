@@ -14,16 +14,11 @@ interface OpenclawAgentEntry {
 }
 
 interface OpenclawAgentsConfig {
-  defaults: { timeoutSeconds: number; model: { primary: string }; workspace: string }
   list: OpenclawAgentEntry[]
 }
 
 export class DirectoryManager extends EventEmitter {
-  constructor(
-    private store: DirectoryStore,
-    // main agent 的默认 workspace 路径
-    private defaultWorkspace: string
-  ) {
+  constructor(private store: DirectoryStore) {
     super()
   }
 
@@ -84,13 +79,6 @@ export class DirectoryManager extends EventEmitter {
       list.push(entry)
     }
 
-    return {
-      defaults: {
-        timeoutSeconds: 3600,
-        model: { primary: 'llm/petclaw-fast' },
-        workspace: this.defaultWorkspace
-      },
-      list
-    }
+    return { list }
   }
 }

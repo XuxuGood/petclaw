@@ -376,8 +376,8 @@ export function BootCheckPanel({ onRetry }: { onRetry?: () => void }) {
           {/* Error message + retry */}
           {errorStep && (
             <div className="w-full max-w-[400px] mt-8 flex flex-col items-center gap-4 mx-auto">
-              <div className="w-full rounded-[10px] bg-[#fef2f2] border border-[#fecaca] px-4 py-3">
-                <p className="text-[13px] text-[#991b1b] leading-relaxed">{errorStep.error}</p>
+              <div className="w-full rounded-[10px] bg-danger-bg border border-danger-border px-4 py-3">
+                <p className="text-[13px] text-error leading-relaxed">{errorStep.error}</p>
               </div>
               {onRetry && (
                 <button

@@ -70,7 +70,7 @@ export function Sidebar({
 
   // 加载会话列表（每次 currentDirectoryId 变化时重新过滤）
   useEffect(() => {
-    window.api.cowork.sessions().then((raw: unknown) => {
+    window.api.cowork.listSessions().then((raw: unknown) => {
       if (Array.isArray(raw)) {
         setSessions(raw as Session[])
       }

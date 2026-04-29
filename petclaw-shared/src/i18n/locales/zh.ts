@@ -182,6 +182,11 @@ export const zh: Record<string, string> = {
   'modelSettings.presetProvider': '预设提供商',
   'modelSettings.customProvider': '自定义提供商',
   'modelSettings.apiKeyPlaceholder': '请输入 API Key',
+  'modelSettings.apiKeyConfigured': '已配置 API Key，输入新值后自动替换',
+  'modelSettings.clearApiKey': '清除',
+  'modelSettings.googleGenerativeAi': 'Google Gemini',
+  'modelSettings.defaultModel': '默认',
+  'modelSettings.setDefaultModel': '设为默认',
   'modelSettings.standard': '标准',
 
   // ── directory settings ──
@@ -386,7 +391,23 @@ export const zh: Record<string, string> = {
   'modelSelector.default': '默认模型',
   'modelSelector.noModels': '暂无可用模型',
 
+  // ── engine status (主进程) ──
+  'engine.runtimeReady': 'OpenClaw 运行时就绪。',
+  'engine.runtimeNotFound': '未找到 OpenClaw 运行时，预期路径：{path}',
+  'engine.runtimeReadyGatewayStopped': 'OpenClaw 运行时就绪，Gateway 已停止。',
+  'engine.gatewayRunning': 'OpenClaw gateway 运行中，端口 {port}。',
+  'engine.gatewayStarting': '正在启动 OpenClaw gateway...',
+  'engine.gatewayStartingProgress': '正在启动 OpenClaw gateway...（{seconds}s）',
+  'engine.gatewayTimeout': 'OpenClaw gateway 未能在超时时间内就绪。',
+  'engine.entryMissing': '运行时中缺少入口文件：{root}',
+  'engine.noAvailablePort': '没有可用的回环端口用于 OpenClaw gateway。',
+  'engine.gatewayProcessError': 'OpenClaw gateway 进程错误: {error}',
+  'engine.gatewayExited': 'OpenClaw gateway 意外退出（code={code}）。',
+  'engine.gatewayMaxRetries': 'OpenClaw gateway 在 {attempts} 次尝试后仍无法启动，请检查配置或手动重启。',
+
   // ── errors (主进程) ──
+  'error.dirRequired': '请先选择工作目录。',
   'error.dirNotFound': '工作目录不存在：{path}',
   'error.dirDeleted': '该会话的工作目录已不存在：{path}，请创建新会话选择新路径',
+  'error.gatewayDisconnected': 'Gateway 连接断开: {reason}',
 }

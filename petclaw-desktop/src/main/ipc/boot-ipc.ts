@@ -1,9 +1,10 @@
-import { ipcMain, app } from 'electron'
+import { app } from 'electron'
 import { join } from 'path'
 import { writeFileSync } from 'fs'
 
 import type Database from 'better-sqlite3'
 
+import { safeHandle } from './ipc-registry'
 import { ConfigInstaller } from '../hooks/installer'
 import { checkEnvironment, checkGatewayConnectivity, installHooks } from '../onboarding'
 import { kvGet, kvSet } from '../data/db'
@@ -17,15 +18,17 @@ export interface BootIpcDeps {
 export function registerBootIpcHandlers(deps: BootIpcDeps): void {
   const { db } = deps
 
-  ipcMain.handle('onboarding:check-env', async () => {
+  safeHandle('app:version', async () => app.getVersion())
+
+  safeHandle('onboarding:check-env', async () => {
     return checkEnvironment()
   })
 
-  ipcMain.handle('onboarding:check-gateway', async (_event, url: string) => {
+  safeHandle('onboarding:check-gateway', async (_event, url: string) => {
     return checkGatewayConnectivity(url)
   })
 
-  ipcMain.handle('onboarding:install-hooks', async () => {
+  safeHandle('onboarding:install-hooks', async () => {
     const settingsPath = join(app.getPath('home'), '.claude', 'settings.json')
     const bridgePath = join(app.getAppPath(), 'resources', 'petclaw-bridge')
     const installer = new ConfigInstaller(bridgePath)
@@ -33,7 +36,7 @@ export function registerBootIpcHandlers(deps: BootIpcDeps): void {
   })
 
   // 保存 Onboarding 结果
-  ipcMain.handle(
+  safeHandle(
     'onboarding:save-config',
     async (
       _event,
@@ -74,9 +77,9 @@ export function registerBootIpcHandlers(deps: BootIpcDeps): void {
   )
 
   // i18n 语言查询与切换
-  ipcMain.handle('i18n:get-language', () => getLanguage())
+  safeHandle('i18n:get-language', () => getLanguage())
 
-  ipcMain.handle('i18n:set-language', (_event, locale: string) => {
+  safeHandle('i18n:set-language', (_event, locale: string) => {
     if (locale === 'zh' || locale === 'en') {
       setLanguage(locale as Locale)
     }

@@ -1,18 +1,6 @@
-interface ChatMessage {
-  role: 'user' | 'assistant'
-  content: string
-}
-
 interface ElectronAPI {
   moveWindow: (dx: number, dy: number) => void
   toggleMainWindow: () => void
-  sendChat: (message: string) => Promise<void>
-  loadHistory: (limit: number) => Promise<ChatMessage[]>
-  onChatChunk: (callback: (chunk: string) => void) => () => void
-  onChatDone: (callback: () => void) => () => void
-  onChatError: (callback: (error: string) => void) => () => void
-  onAIResponding: (callback: () => void) => () => void
-  onChatSent: (callback: () => void) => () => void
   onHookEvent: (
     callback: (event: {
       type: string
@@ -58,18 +46,39 @@ interface ElectronAPI {
   onPetTogglePause: (callback: () => void) => () => void
   // Cowork
   cowork: {
-    send: (message: string, cwd: string) => Promise<unknown>
-    continue: (sessionId: string, message: string) => Promise<void>
-    stop: (sessionId: string) => Promise<void>
-    sessions: () => Promise<unknown[]>
-    session: (id: string) => Promise<unknown>
+    startSession: (options: {
+      prompt: string
+      cwd?: string
+      systemPrompt?: string
+      skillIds?: string[]
+      selectedModel?: { providerId: string; modelId: string }
+    }) => Promise<unknown>
+    continueSession: (options: {
+      sessionId: string
+      prompt: string
+      systemPrompt?: string
+      skillIds?: string[]
+      selectedModel?: { providerId: string; modelId: string }
+    }) => Promise<void>
+    getConfig: () => Promise<unknown>
+    setConfig: (patch: {
+      defaultDirectory?: string
+      systemPrompt?: string
+      memoryEnabled?: boolean
+      skipMissedJobs?: boolean
+    }) => Promise<unknown>
+    stopSession: (sessionId: string) => Promise<void>
+    listSessions: () => Promise<unknown[]>
+    getSession: (id: string) => Promise<unknown>
     deleteSession: (id: string) => Promise<void>
     respondPermission: (requestId: string, result: unknown) => Promise<void>
     onMessage: (cb: (data: unknown) => void) => () => void
     onMessageUpdate: (cb: (data: unknown) => void) => () => void
     onPermission: (cb: (data: unknown) => void) => () => void
+    onPermissionDismiss: (cb: (data: unknown) => void) => () => void
     onComplete: (cb: (data: unknown) => void) => () => void
     onError: (cb: (data: unknown) => void) => () => void
+    onSessionStopped: (cb: (data: unknown) => void) => () => void
   }
   // Pet
   pet: {
@@ -110,8 +119,10 @@ interface ElectronAPI {
     updateProvider: (id: string, patch: unknown) => Promise<unknown>
     removeProvider: (id: string) => Promise<unknown>
     toggleProvider: (id: string, enabled: boolean) => Promise<unknown>
-    active: () => Promise<unknown>
-    setActive: (id: string) => Promise<unknown>
+    defaultModel: () => Promise<unknown>
+    setDefaultModel: (selected: unknown) => Promise<unknown>
+    setApiKey: (providerId: string, apiKey: string) => Promise<unknown>
+    clearApiKey: (providerId: string) => Promise<unknown>
     testConnection: (id: string) => Promise<unknown>
     addModel: (providerId: string, model: unknown) => Promise<unknown>
     removeModel: (providerId: string, modelId: string) => Promise<unknown>
@@ -126,6 +137,9 @@ interface ElectronAPI {
     update: (id: string, patch: unknown) => Promise<unknown>
     delete: (id: string) => Promise<unknown>
     setEnabled: (id: string, enabled: boolean) => Promise<unknown>
+    refreshBridge: () => Promise<{ success: boolean; error?: string }>
+    onBridgeSyncStart: (cb: () => void) => () => void
+    onBridgeSyncDone: (cb: (data: { tools: number; error?: string }) => void) => () => void
   }
   memory: {
     read: (workspace: string) => Promise<unknown>
@@ -150,11 +164,22 @@ interface ElectronAPI {
   }
   // IM
   im: {
-    loadConfig: () => Promise<unknown>
-    saveConfig: (key: string, config: unknown) => Promise<void>
+    listInstances: () => Promise<unknown>
+    createInstance: (
+      platform: string,
+      credentials: Record<string, unknown>,
+      name?: string
+    ) => Promise<unknown>
+    updateInstance: (id: string, patch: Record<string, unknown>) => Promise<void>
+    deleteInstance: (id: string) => Promise<void>
     getStatus: () => Promise<unknown>
-    loadSettings: () => Promise<unknown>
-    saveSettings: (settings: unknown) => Promise<void>
+    setBinding: (
+      conversationId: string,
+      instanceId: string,
+      peerKind: 'dm' | 'group',
+      directoryPath: string,
+      agentId: string
+    ) => Promise<void>
     onStatusUpdate: (cb: (data: unknown) => void) => () => void
   }
 }

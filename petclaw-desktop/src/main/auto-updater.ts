@@ -2,9 +2,11 @@
 // electron-updater 自动更新逻辑
 // 通过 GitHub Releases 检测和分发更新
 
-import { BrowserWindow, ipcMain } from 'electron'
+import { BrowserWindow } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import log from 'electron-log'
+
+import { safeHandle } from './ipc/ipc-registry'
 
 // electron-updater 使用 electron-log 输出日志
 autoUpdater.logger = log
@@ -56,13 +58,13 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
   })
 
   // 注册 IPC handlers
-  ipcMain.handle('updater:check', async () => {
+  safeHandle('updater:check', async () => {
     autoUpdater.checkForUpdates()
   })
-  ipcMain.handle('updater:download', async () => {
+  safeHandle('updater:download', async () => {
     autoUpdater.downloadUpdate()
   })
-  ipcMain.handle('updater:install', async () => {
+  safeHandle('updater:install', async () => {
     autoUpdater.quitAndInstall()
   })
 

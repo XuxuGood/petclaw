@@ -3,6 +3,7 @@ import { EventEmitter } from 'events'
 
 import { app } from 'electron'
 
+import type { OpenclawEngineManager } from './engine-manager'
 import type { GatewayConnectionInfo } from './types'
 
 // ── GatewayClient duck-type 接口（从 runtime 动态加载）──
@@ -49,7 +50,12 @@ export interface ApprovalRequestedPayload {
   request: {
     sessionKey: string
     command?: string
-    cwd?: string
+    cwd?: string | null
+    host?: string | null
+    security?: string | null
+    ask?: string | null
+    resolvedPath?: string | null
+    agentId?: string | null
     toolUseId?: string
     [key: string]: unknown
   }
@@ -97,8 +103,38 @@ export class OpenclawGateway extends EventEmitter {
   // 并发锁
   private gatewayClientInitLock: Promise<void> | null = null
 
+  // 引擎管理器引用（按需连接时启动引擎 + 获取连接信息）
+  private engineManager: OpenclawEngineManager | null = null
+
   constructor() {
     super()
+  }
+
+  // 注入 EngineManager（启动后调用一次）
+  setEngineManager(em: OpenclawEngineManager): void {
+    this.engineManager = em
+  }
+
+  // ── 按需连接（参考 LobsterAI ensureGatewayClientReady）──
+
+  // 确保 GatewayClient 已连接：引擎未启动则启动，WS 未连接则连接
+  // RPC 方法内部自动调用，调用方无需关心连接状态
+  async ensureConnected(): Promise<void> {
+    if (this.client && this.connected) return
+    if (!this.engineManager) {
+      throw new Error('EngineManager not set — call setEngineManager() first')
+    }
+
+    const status = await this.engineManager.startGateway()
+    if (status.phase !== 'running') {
+      throw new Error(status.message || 'OpenClaw engine is not running')
+    }
+
+    const connectionInfo = this.engineManager.getGatewayConnectionInfo()
+    if (!connectionInfo.clientEntryPath) {
+      throw new Error('GatewayClient entry path not found')
+    }
+    await this.connect(connectionInfo)
   }
 
   // ── 公开连接接口 ──
@@ -164,25 +200,27 @@ export class OpenclawGateway extends EventEmitter {
     sessionKey: string,
     message: string,
     options?: Record<string, unknown>
-  ): Promise<void> {
-    this.ensureConnected()
-    await this.client!.request('chat.send', {
+  ): Promise<{ runId?: string }> {
+    await this.ensureConnected()
+    const result = await this.client!.request<{ runId?: string }>('chat.send', {
       sessionKey,
       message,
       ...options
     })
+    return result ?? {}
   }
 
   async chatAbort(sessionKey: string, runId: string): Promise<void> {
-    this.ensureConnected()
+    await this.ensureConnected()
     await this.client!.request('chat.abort', { sessionKey, runId })
   }
 
-  async approvalResolve(requestId: string, result: unknown): Promise<void> {
-    this.ensureConnected()
+  // decision: 'allow-always' | 'allow-once' | 'deny'，对齐 gateway exec.approval.resolve 协议
+  async approvalResolve(requestId: string, decision: string): Promise<void> {
+    await this.ensureConnected()
     await this.client!.request('exec.approval.resolve', {
       id: requestId,
-      result
+      decision
     })
   }
 
@@ -366,12 +404,6 @@ export class OpenclawGateway extends EventEmitter {
 
   // ── 事件分发 ──
 
-  private ensureConnected(): void {
-    if (!this.client || !this.connected) {
-      throw new Error('Gateway not connected')
-    }
-  }
-
   private handleEvent(frame: GatewayEventFrame): void {
     const { event, payload } = frame
 
@@ -446,7 +478,12 @@ export class OpenclawGateway extends EventEmitter {
       request: {
         sessionKey: (request.sessionKey ?? '') as string,
         command: request.command as string | undefined,
-        cwd: request.cwd as string | undefined,
+        cwd: (request.cwd as string | null) ?? null,
+        host: (request.host as string | null) ?? null,
+        security: (request.security as string | null) ?? null,
+        ask: (request.ask as string | null) ?? null,
+        resolvedPath: (request.resolvedPath as string | null) ?? null,
+        agentId: (request.agentId as string | null) ?? null,
         toolUseId: request.toolUseId as string | undefined
       }
     }

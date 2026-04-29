@@ -155,9 +155,9 @@ export function CronPage() {
           <p className="text-[14px] text-text-tertiary mb-5">{t('cron.subtitle')}</p>
 
           {/* 信息条 */}
-          <div className="flex items-center gap-3 px-4 py-3 mb-5 bg-blue-50 border border-blue-100 rounded-[10px]">
-            <Info size={16} className="text-blue-500 shrink-0" />
-            <p className="text-[13px] text-blue-700 flex-1">{t('cron.sleepWarning')}</p>
+          <div className="flex items-center gap-3 px-4 py-3 mb-5 bg-caution-bg border border-caution-border rounded-[10px]">
+            <Info size={16} className="text-caution-icon shrink-0" />
+            <p className="text-[13px] text-warning flex-1">{t('cron.sleepWarning')}</p>
           </div>
 
           {/* Tab */}
@@ -211,7 +211,7 @@ export function CronPage() {
                         <button
                           onClick={() => handleToggle(task.id, !task.enabled)}
                           className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
-                            task.enabled ? 'border-accent bg-accent' : 'border-gray-300'
+                            task.enabled ? 'border-accent bg-accent' : 'border-border'
                           }`}
                         >
                           {task.enabled && (
@@ -265,7 +265,7 @@ export function CronPage() {
                                   handleDelete(task.id)
                                   setMenuOpenId(null)
                                 }}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-red-500 hover:bg-red-50 transition-colors"
+                                className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-error hover:bg-danger-bg transition-colors"
                               >
                                 <Trash2 size={13} />
                                 {t('common.delete')}
@@ -348,12 +348,12 @@ export function CronPage() {
                       <span
                         className={`px-2 py-0.5 text-[11px] rounded-full font-medium ${
                           run.status === 'success'
-                            ? 'bg-green-50 text-green-600'
+                            ? 'bg-safe-bg text-success'
                             : run.status === 'error'
-                              ? 'bg-red-50 text-red-500'
+                              ? 'bg-danger-bg text-error'
                               : run.status === 'running'
-                                ? 'bg-blue-50 text-blue-500'
-                                : 'bg-gray-100 text-text-tertiary'
+                                ? 'bg-bg-active text-text-secondary'
+                                : 'bg-bg-hover text-text-tertiary'
                         }`}
                       >
                         {run.status === 'success'

@@ -21,7 +21,7 @@ describe('CoworkStore', () => {
 
   describe('createSession', () => {
     it('返回完整 CoworkSession 对象', () => {
-      const session = store.createSession('测试会话', '/workspace/test', 'agent-1')
+      const session = store.createSession('测试会话', '/workspace/test', 'agent-1', 'system prompt')
       expect(session.id).toBeTruthy()
       expect(session.title).toBe('测试会话')
       expect(session.directoryPath).toBe('/workspace/test')
@@ -29,14 +29,38 @@ describe('CoworkStore', () => {
       expect(session.status).toBe('idle')
       expect(session.pinned).toBe(false)
       expect(session.engineSessionId).toBeNull()
-      expect(session.modelOverride).toBe('')
+      expect(session.selectedModel).toBeNull()
+      expect(session.systemPrompt).toBe('system prompt')
       expect(session.messages).toEqual([])
       expect(typeof session.createdAt).toBe('number')
       expect(typeof session.updatedAt).toBe('number')
     })
+
+    it('持久化结构化 selectedModel', () => {
+      const session = store.createSession('测试会话', '/workspace/test', 'agent-1', '', {
+        providerId: 'gemini',
+        modelId: 'gemini-2.0-flash'
+      })
+
+      expect(session.selectedModel).toEqual({
+        providerId: 'gemini',
+        modelId: 'gemini-2.0-flash'
+      })
+      expect(store.getSession(session.id)?.selectedModel).toEqual({
+        providerId: 'gemini',
+        modelId: 'gemini-2.0-flash'
+      })
+    })
   })
 
   describe('getSession', () => {
+    it('返回创建时固化的 systemPrompt', () => {
+      const session = store.createSession('测试', '/workspace', 'agent-1', 'fixed prompt')
+
+      const fetched = store.getSession(session.id)
+      expect(fetched?.systemPrompt).toBe('fixed prompt')
+    })
+
     it('包含 messages 数组', () => {
       const session = store.createSession('测试', '/workspace', 'agent-1')
       store.addMessage(session.id, 'user', '你好')
@@ -91,6 +115,16 @@ describe('CoworkStore', () => {
 
       const updated = store.getSession(session.id)
       expect(updated!.engineSessionId).toBe('engine-123')
+    })
+
+    it('更新 selectedModel', () => {
+      const session = store.createSession('会话', '/workspace', 'a1')
+      store.updateSession(session.id, {
+        selectedModel: { providerId: 'openai', modelId: 'gpt-4o' }
+      })
+
+      const updated = store.getSession(session.id)
+      expect(updated!.selectedModel).toEqual({ providerId: 'openai', modelId: 'gpt-4o' })
     })
 
     it('空 updates 不报错', () => {

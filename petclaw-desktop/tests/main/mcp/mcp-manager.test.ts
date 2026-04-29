@@ -83,15 +83,23 @@ describe('McpManager', () => {
     expect(count).toBe(1)
   })
 
-  it('should generate toOpenclawConfig', () => {
+  it('should list enabled servers', () => {
     manager.create({
-      name: 'my-server',
+      name: 'enabled-server',
       description: '',
       enabled: true,
       transportType: 'stdio',
       config: { command: 'npx', args: ['-y', 'mcp-server'] }
     })
-    const config = manager.toOpenclawConfig()
-    expect(config.entries['mcp-bridge'].config.servers['my-server']).toBeTruthy()
+    manager.create({
+      name: 'disabled-server',
+      description: '',
+      enabled: false,
+      transportType: 'stdio',
+      config: { command: 'node', args: [] }
+    })
+    const enabled = manager.listEnabled()
+    expect(enabled).toHaveLength(1)
+    expect(enabled[0].name).toBe('enabled-server')
   })
 })

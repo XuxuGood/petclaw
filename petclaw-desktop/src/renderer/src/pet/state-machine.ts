@@ -3,7 +3,6 @@ export enum PetState {
   Thinking = 'thinking',
   Working = 'working',
   Happy = 'happy',
-  Dragging = 'dragging',
   Sleep = 'sleep'
 }
 
@@ -12,8 +11,6 @@ export enum PetEvent {
   AIResponding = 'AI_RESPONDING',
   AIDone = 'AI_DONE',
   Timeout = 'TIMEOUT',
-  DragStart = 'DRAG_START',
-  DragEnd = 'DRAG_END',
   HookActive = 'HOOK_ACTIVE',
   HookIdle = 'HOOK_IDLE',
   SleepStart = 'SLEEP_START',
@@ -25,33 +22,27 @@ type TransitionCallback = (from: PetState, to: PetState) => void
 const transitions: Record<PetState, Partial<Record<PetEvent, PetState>>> = {
   [PetState.Idle]: {
     [PetEvent.ChatSent]: PetState.Thinking,
-    [PetEvent.DragStart]: PetState.Dragging,
     [PetEvent.HookActive]: PetState.Working,
     [PetEvent.SleepStart]: PetState.Sleep
   },
   [PetState.Thinking]: {
     [PetEvent.AIResponding]: PetState.Working,
-    [PetEvent.DragStart]: PetState.Dragging,
+    [PetEvent.AIDone]: PetState.Happy, // AI 极快返回时跳过 Working 直接完成
     [PetEvent.Timeout]: PetState.Idle
   },
   [PetState.Working]: {
     [PetEvent.AIDone]: PetState.Happy,
     [PetEvent.HookIdle]: PetState.Idle,
-    [PetEvent.DragStart]: PetState.Dragging,
     [PetEvent.Timeout]: PetState.Idle
   },
   [PetState.Happy]: {
     [PetEvent.Timeout]: PetState.Idle,
     [PetEvent.ChatSent]: PetState.Thinking,
-    [PetEvent.DragStart]: PetState.Dragging
-  },
-  [PetState.Dragging]: {
-    [PetEvent.DragEnd]: PetState.Idle
+    [PetEvent.HookActive]: PetState.Working // Happy 期间新 hook 事件不再被丢弃
   },
   [PetState.Sleep]: {
     [PetEvent.WakeUp]: PetState.Idle,
     [PetEvent.ChatSent]: PetState.Thinking,
-    [PetEvent.DragStart]: PetState.Dragging,
     [PetEvent.HookActive]: PetState.Working
   }
 }

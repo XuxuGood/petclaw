@@ -182,6 +182,11 @@ export const en: Record<string, string> = {
   'modelSettings.presetProvider': 'Preset Provider',
   'modelSettings.customProvider': 'Custom Provider',
   'modelSettings.apiKeyPlaceholder': 'Enter API Key',
+  'modelSettings.apiKeyConfigured': 'API Key configured. Enter a new value to replace it',
+  'modelSettings.clearApiKey': 'Clear',
+  'modelSettings.googleGenerativeAi': 'Google Gemini',
+  'modelSettings.defaultModel': 'Default',
+  'modelSettings.setDefaultModel': 'Set Default',
   'modelSettings.standard': 'Standard',
 
   // ── directory settings ──
@@ -386,7 +391,23 @@ export const en: Record<string, string> = {
   'modelSelector.default': 'Default Model',
   'modelSelector.noModels': 'No models available',
 
+  // ── engine status ──
+  'engine.runtimeReady': 'OpenClaw runtime ready.',
+  'engine.runtimeNotFound': 'OpenClaw runtime not found, expected path: {path}',
+  'engine.runtimeReadyGatewayStopped': 'OpenClaw runtime ready, Gateway stopped.',
+  'engine.gatewayRunning': 'OpenClaw gateway running on port {port}.',
+  'engine.gatewayStarting': 'Starting OpenClaw gateway...',
+  'engine.gatewayStartingProgress': 'Starting OpenClaw gateway... ({seconds}s)',
+  'engine.gatewayTimeout': 'OpenClaw gateway failed to become ready within timeout.',
+  'engine.entryMissing': 'Entry file missing in runtime: {root}',
+  'engine.noAvailablePort': 'No available loopback port for OpenClaw gateway.',
+  'engine.gatewayProcessError': 'OpenClaw gateway process error: {error}',
+  'engine.gatewayExited': 'OpenClaw gateway exited unexpectedly (code={code}).',
+  'engine.gatewayMaxRetries': 'OpenClaw gateway failed to start after {attempts} attempts. Please check configuration or restart manually.',
+
   // ── errors ──
+  'error.dirRequired': 'Please select a working directory first.',
   'error.dirNotFound': 'Working directory not found: {path}',
   'error.dirDeleted': 'Working directory no longer exists: {path}. Please create a new session with a different path.',
+  'error.gatewayDisconnected': 'Gateway disconnected: {reason}',
 }

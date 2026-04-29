@@ -31,6 +31,7 @@ build-tar/
 
 # Editor / local tool state
 .claude/
+.openclaw/
 .idea/
 .vscode/settings.json
 
@@ -46,9 +47,5 @@ Thumbs.db
 # Logs
 **/*.log
 
-# Local reference assets (design mockups)
-设计/
-
-# Legacy bundled resources (v1, removed in v3)
-petclaw-desktop/resources/node/
-petclaw-desktop/resources/openclaw/
+# Design mockups (images & videos, stored in docs/设计/)
+docs/设计/

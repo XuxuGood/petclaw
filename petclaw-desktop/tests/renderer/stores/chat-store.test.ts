@@ -25,6 +25,12 @@ describe('ChatStore', () => {
     expect(useChatStore.getState().messages[0].content).toBe('Hello world')
   })
 
+  it('replaces the last assistant message with a streaming snapshot', () => {
+    useChatStore.getState().addMessage({ role: 'assistant', content: 'Hello' })
+    useChatStore.getState().replaceLastAssistantMessage('Hello world')
+    expect(useChatStore.getState().messages[0].content).toBe('Hello world')
+  })
+
   it('sets loading state', () => {
     useChatStore.getState().setLoading(true)
     expect(useChatStore.getState().isLoading).toBe(true)

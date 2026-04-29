@@ -1,9 +1,11 @@
 // McpManager: MCP 服务器 CRUD 管理
-// SQL 操作委托给 McpStore，Manager 只含业务逻辑和事件通知
+// SQL 操作委托给 McpStore，Manager 只含业务逻辑和事件通知。
+// MCP Bridge 集成后，toOpenclawConfig() 被移除，
+// plugin config 由 ConfigSync 通过 getMcpBridgeConfig 回调生成。
 import { EventEmitter } from 'events'
 
 import type { McpStore } from '../data/mcp-store'
-import type { McpServer, StdioConfig, HttpConfig } from '../ai/types'
+import type { McpServer } from '../ai/types'
 
 export class McpManager extends EventEmitter {
   constructor(private store: McpStore) {
@@ -44,39 +46,8 @@ export class McpManager extends EventEmitter {
     this.emit('change')
   }
 
-  // 将已启用的 MCP 服务器序列化为 openclaw 配置格式（mcp-bridge 插件 config）
-  toOpenclawConfig(): {
-    entries: Record<string, { enabled: boolean; config: { servers: Record<string, unknown> } }>
-  } {
-    const servers: Record<string, unknown> = {}
-    for (const s of this.store.list()) {
-      // 仅导出已启用的服务器
-      if (!s.enabled) continue
-      if (s.transportType === 'stdio') {
-        const cfg = s.config as StdioConfig
-        servers[s.name] = {
-          transport: 'stdio',
-          command: cfg.command,
-          args: cfg.args,
-          ...(cfg.env && { env: cfg.env })
-        }
-      } else {
-        // sse / streamable-http 均通过 url 方式连接
-        const cfg = s.config as HttpConfig
-        servers[s.name] = {
-          transport: s.transportType,
-          url: cfg.url,
-          ...(cfg.headers && { headers: cfg.headers })
-        }
-      }
-    }
-    return {
-      entries: {
-        'mcp-bridge': {
-          enabled: Object.keys(servers).length > 0,
-          config: { servers }
-        }
-      }
-    }
+  /** 返回所有已启用的 MCP servers，供 McpServerManager 启动连接 */
+  listEnabled(): McpServer[] {
+    return this.store.list().filter((s) => s.enabled)
   }
 }

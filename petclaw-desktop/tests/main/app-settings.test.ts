@@ -2,12 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import {
-  getAppSetting,
-  readAppSettings,
-  saveOnboardingSettings,
-  setAppSetting
-} from '../../src/main/app-settings'
+import { readAppSettings, writeAppSettings } from '../../src/main/app-settings'
 
 describe('app-settings', () => {
   let tmpDir: string
@@ -22,45 +17,36 @@ describe('app-settings', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  it('reads string settings from petclaw-settings.json', () => {
+  it('returns empty object when file does not exist', () => {
+    expect(readAppSettings(settingsPath)).toEqual({})
+  })
+
+  it('reads settings from JSON file', () => {
     fs.writeFileSync(
       settingsPath,
       JSON.stringify({
-        gatewayUrl: 'ws://127.0.0.1:29890',
-        onboardingComplete: true
+        windowBounds: { x: 100, y: 200, width: 800, height: 600 },
+        petPosition: { x: 50, y: 50 }
       })
     )
 
-    expect(getAppSetting('gatewayUrl', settingsPath)).toBe('ws://127.0.0.1:29890')
-    expect(getAppSetting('onboardingComplete', settingsPath)).toBe('true')
+    const settings = readAppSettings(settingsPath)
+    expect(settings.windowBounds).toEqual({ x: 100, y: 200, width: 800, height: 600 })
+    expect(settings.petPosition).toEqual({ x: 50, y: 50 })
   })
 
-  it('updates a single app setting in petclaw-settings.json', () => {
-    setAppSetting('gatewayUrl', 'ws://127.0.0.1:39999', settingsPath)
-
-    const settings = readAppSettings(settingsPath)
-    expect(settings.gatewayUrl).toBe('ws://127.0.0.1:39999')
+  it('returns empty object when file contains invalid JSON', () => {
+    fs.writeFileSync(settingsPath, 'not-json')
+    expect(readAppSettings(settingsPath)).toEqual({})
   })
 
-  it('persists onboarding results in petclaw-settings.json', () => {
-    saveOnboardingSettings(
-      {
-        nickname: 'Mochi',
-        roles: ['developer', 'founder'],
-        selectedSkills: ['github', 'browser'],
-        voiceShortcut: 'Meta + D',
-        language: 'zh'
-      },
-      settingsPath
-    )
+  it('writes settings to JSON file and creates parent dirs', () => {
+    const nestedPath = path.join(tmpDir, 'sub', 'dir', 'settings.json')
+    writeAppSettings(nestedPath, {
+      windowBounds: { x: 0, y: 0, width: 1024, height: 768 }
+    })
 
-    const settings = readAppSettings(settingsPath)
-    expect(settings.onboardingComplete).toBe(true)
-    expect(settings.sopComplete).toBe(true)
-    expect(settings.language).toBe('zh')
-    expect(settings.nickname).toBe('Mochi')
-    expect(settings.roles).toEqual(['developer', 'founder'])
-    expect(settings.selectedSkills).toEqual(['github', 'browser'])
-    expect(settings.voiceShortcut).toEqual(['Meta', 'D'])
+    const written = readAppSettings(nestedPath)
+    expect(written.windowBounds).toEqual({ x: 0, y: 0, width: 1024, height: 768 })
   })
 })

@@ -9,6 +9,7 @@
   "afterPack": "./scripts/electron-builder-hooks.cjs",
   "files": [
     "package.json",
+    "resources/SYSTEM_PROMPT.md",
     {
       "from": "out",
       "to": "out",

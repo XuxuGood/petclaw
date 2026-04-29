@@ -1,5 +1,6 @@
-import { ipcMain, BrowserWindow, Menu, app } from 'electron'
+import { BrowserWindow, Menu, app } from 'electron'
 
+import { safeOn } from './ipc-registry'
 import { t } from '../i18n'
 
 export interface WindowIpcDeps {
@@ -10,18 +11,18 @@ export interface WindowIpcDeps {
 export function registerWindowIpcHandlers(deps: WindowIpcDeps): void {
   const { getPetWindow, toggleMainWindow } = deps
 
-  ipcMain.on('window:move', (event, dx: number, dy: number) => {
+  safeOn('window:move', (event, dx: number, dy: number) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) return
     const [x, y] = win.getPosition()
     win.setPosition(x + dx, y + dy)
   })
 
-  ipcMain.on('chat:toggle', () => {
+  safeOn('chat:toggle', () => {
     toggleMainWindow()
   })
 
-  ipcMain.on('pet:context-menu', (_event, paused: boolean) => {
+  safeOn('pet:context-menu', (_event, paused: boolean) => {
     const petWin = getPetWindow()
     if (!petWin) return
     const menu = Menu.buildFromTemplate([
@@ -35,7 +36,7 @@ export function registerWindowIpcHandlers(deps: WindowIpcDeps): void {
     menu.popup({ window: petWin })
   })
 
-  ipcMain.on('app:quit', () => {
+  safeOn('app:quit', () => {
     app.quit()
   })
 }

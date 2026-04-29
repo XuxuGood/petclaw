@@ -10,74 +10,52 @@ import {
   Loader2,
   ChevronRight,
   Circle,
-  X
+  X,
+  Star
 } from 'lucide-react'
 
 import { useI18n } from '../../i18n'
+import type {
+  ModelApiFormat,
+  ModelDefinition,
+  ModelProviderConfig,
+  SelectedModel
+} from '../../../../shared/models/types'
+import {
+  getProviderAbbreviation,
+  getProviderColor
+} from '../../../../shared/models/provider-display'
 
 // ── 类型定义 ────────────────────────────────────────────────────────────────
-
-interface ModelDefinition {
-  id: string
-  name: string
-  reasoning: boolean
-  supportsImage: boolean
-  contextWindow: number
-  maxTokens: number
-}
-
-interface ModelProvider {
-  id: string
-  name: string
-  baseUrl: string
-  apiKey: string
-  apiFormat: 'openai-completions' | 'anthropic'
-  isPreset: boolean
-  models: ModelDefinition[]
-  enabled?: boolean
-}
 
 type TestStatus = 'idle' | 'testing' | 'ok' | 'fail'
 
 // ── 预设 Provider 图标（文字 Logo）───────────────────────────────────────────
 
-const PROVIDER_ABBR: Record<string, string> = {
-  petclaw: 'PC',
-  openai: 'OAI',
-  anthropic: 'ANT',
-  gemini: 'GGL',
-  deepseek: 'DS',
-  alibaba: 'ALI',
-  bytedance: 'ARK',
-  zhipu: 'GLM',
-  lingyiwanwu: '01',
-  mistral: 'MIS',
-  groq: 'GRQ'
-}
-
-// 每个 Provider 标识色，用于文字 Logo 背景
-const PROVIDER_COLOR: Record<string, string> = {
-  petclaw: 'bg-violet-500',
-  openai: 'bg-emerald-600',
-  anthropic: 'bg-amber-600',
-  gemini: 'bg-blue-500',
-  deepseek: 'bg-sky-600',
-  alibaba: 'bg-orange-500',
-  bytedance: 'bg-indigo-500',
-  zhipu: 'bg-teal-600',
-  lingyiwanwu: 'bg-rose-600',
-  mistral: 'bg-purple-600',
-  groq: 'bg-lime-600'
-}
-
-function ProviderLogo({ provider }: { provider: ModelProvider }) {
-  const abbr = PROVIDER_ABBR[provider.id] ?? provider.name.slice(0, 2).toUpperCase()
-  const color = PROVIDER_COLOR[provider.id] ?? 'bg-gray-500'
+function ProviderLogo({ provider }: { provider: ModelProviderConfig }) {
+  const abbr = getProviderAbbreviation(provider.id, provider.name)
+  const color = getProviderColor(provider.id)
   return (
     <div className={`w-8 h-8 rounded-[8px] ${color} flex items-center justify-center shrink-0`}>
       <span className="text-[10px] font-bold text-white leading-none">{abbr}</span>
     </div>
   )
+}
+
+function buildProviderId(name: string): string {
+  const normalized = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return normalized || `custom-${Date.now()}`
+}
+
+function parseSelectedModel(raw: unknown): SelectedModel | null {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null
+  const record = raw as Record<string, unknown>
+  if (typeof record.providerId !== 'string' || typeof record.modelId !== 'string') return null
+  return { providerId: record.providerId, modelId: record.modelId }
 }
 
 // ── 添加模型弹窗 ─────────────────────────────────────────────────────────────
@@ -110,7 +88,7 @@ function AddModelDialog({ onConfirm, onCancel }: AddModelDialogProps) {
 
   return (
     // 遮罩层
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay">
       <div className="w-[420px] rounded-[14px] bg-bg-card border border-border shadow-2xl">
         {/* 标题 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
@@ -129,7 +107,7 @@ function AddModelDialog({ onConfirm, onCancel }: AddModelDialogProps) {
           {/* 模型 ID */}
           <div>
             <label className="block text-[12px] text-text-tertiary mb-1.5 font-medium">
-              {t('modelSettings.modelId')} <span className="text-red-500">*</span>
+              {t('modelSettings.modelId')} <span className="text-error">*</span>
             </label>
             <input
               type="text"
@@ -143,7 +121,7 @@ function AddModelDialog({ onConfirm, onCancel }: AddModelDialogProps) {
           {/* 显示名称 */}
           <div>
             <label className="block text-[12px] text-text-tertiary mb-1.5 font-medium">
-              {t('modelSettings.displayName')} <span className="text-red-500">*</span>
+              {t('modelSettings.displayName')} <span className="text-error">*</span>
             </label>
             <input
               type="text"
@@ -253,7 +231,7 @@ function AddProviderDialog({ onConfirm, onCancel }: AddProviderDialogProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay">
       <div className="w-[420px] rounded-[14px] bg-bg-card border border-border shadow-2xl">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <span className="text-[14px] font-semibold text-text-primary">
@@ -270,7 +248,7 @@ function AddProviderDialog({ onConfirm, onCancel }: AddProviderDialogProps) {
         <div className="px-5 py-4 space-y-3">
           <div>
             <label className="block text-[12px] text-text-tertiary mb-1.5 font-medium">
-              {t('modelSettings.displayName')} <span className="text-red-500">*</span>
+              {t('modelSettings.displayName')} <span className="text-error">*</span>
             </label>
             <input
               type="text"
@@ -283,7 +261,7 @@ function AddProviderDialog({ onConfirm, onCancel }: AddProviderDialogProps) {
 
           <div>
             <label className="block text-[12px] text-text-tertiary mb-1.5 font-medium">
-              Base URL <span className="text-red-500">*</span>
+              Base URL <span className="text-error">*</span>
             </label>
             <input
               type="text"
@@ -341,11 +319,15 @@ function AddProviderDialog({ onConfirm, onCancel }: AddProviderDialogProps) {
 // ── 右侧配置面板 ─────────────────────────────────────────────────────────────
 
 interface ProviderPanelProps {
-  provider: ModelProvider
-  onUpdate: (patch: Partial<ModelProvider>) => Promise<void>
+  provider: ModelProviderConfig
+  onUpdate: (patch: Partial<ModelProviderConfig>) => Promise<void>
+  onSetApiKey: (apiKey: string) => Promise<void>
+  onClearApiKey: () => Promise<void>
+  onSetDefaultModel: (modelId: string) => Promise<void>
   onTest: () => Promise<void>
   onAddModel: (model: ModelDefinition) => Promise<void>
   onRemoveModel: (modelId: string) => Promise<void>
+  defaultModel: SelectedModel | null
   testStatus: TestStatus
   testError: string
 }
@@ -353,15 +335,20 @@ interface ProviderPanelProps {
 function ProviderPanel({
   provider,
   onUpdate,
+  onSetApiKey,
+  onClearApiKey,
+  onSetDefaultModel,
   onTest,
   onAddModel,
   onRemoveModel,
+  defaultModel,
   testStatus,
   testError
 }: ProviderPanelProps) {
   const { t } = useI18n()
   // API Key 本地草稿，失焦时保存
-  const [apiKeyDraft, setApiKeyDraft] = useState(provider.apiKey)
+  const [apiKeyDraft, setApiKeyDraft] = useState('')
+  const [apiKeyDirty, setApiKeyDirty] = useState(false)
   const [showApiKey, setShowApiKey] = useState(false)
   // Base URL 草稿
   const [baseUrlDraft, setBaseUrlDraft] = useState(provider.baseUrl)
@@ -370,14 +357,19 @@ function ProviderPanel({
 
   // 切换 Provider 时同步草稿
   useEffect(() => {
-    setApiKeyDraft(provider.apiKey)
+    setApiKeyDraft('')
+    setApiKeyDirty(false)
     setBaseUrlDraft(provider.baseUrl)
     setShowApiKey(false)
-  }, [provider.id, provider.apiKey, provider.baseUrl])
+  }, [provider.id, provider.baseUrl])
 
   const handleApiKeyBlur = () => {
-    if (apiKeyDraft !== provider.apiKey) {
-      onUpdate({ apiKey: apiKeyDraft })
+    if (!apiKeyDirty) return
+    const nextApiKey = apiKeyDraft.trim()
+    if (nextApiKey) {
+      void onSetApiKey(nextApiKey)
+      setApiKeyDraft('')
+      setApiKeyDirty(false)
     }
   }
 
@@ -387,7 +379,7 @@ function ProviderPanel({
     }
   }
 
-  const handleApiFormatChange = (fmt: 'openai-completions' | 'anthropic') => {
+  const handleApiFormatChange = (fmt: ModelApiFormat) => {
     onUpdate({ apiFormat: fmt })
   }
 
@@ -405,7 +397,7 @@ function ProviderPanel({
           <div>
             <h2 className="text-[16px] font-semibold text-text-primary">{provider.name}</h2>
             <p className="text-[12px] text-text-tertiary">
-              {provider.isPreset
+              {!provider.isCustom
                 ? t('modelSettings.presetProvider')
                 : t('modelSettings.customProvider')}
             </p>
@@ -423,9 +415,16 @@ function ProviderPanel({
               <input
                 type={showApiKey ? 'text' : 'password'}
                 value={apiKeyDraft}
-                onChange={(e) => setApiKeyDraft(e.target.value)}
+                onChange={(e) => {
+                  setApiKeyDraft(e.target.value)
+                  setApiKeyDirty(true)
+                }}
                 onBlur={handleApiKeyBlur}
-                placeholder={t('modelSettings.apiKeyPlaceholder')}
+                placeholder={
+                  provider.hasApiKey
+                    ? t('modelSettings.apiKeyConfigured')
+                    : t('modelSettings.apiKeyPlaceholder')
+                }
                 className="w-full px-3 py-2 pr-9 rounded-[10px] bg-bg-input border border-border-input text-[13px] text-text-primary outline-none focus:border-accent transition-all duration-[120ms] font-mono"
               />
               {/* 显示/隐藏 API Key 切换按钮 */}
@@ -436,6 +435,19 @@ function ProviderPanel({
                 {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
               </button>
             </div>
+            {provider.hasApiKey && (
+              <button
+                type="button"
+                onClick={() => {
+                  void onClearApiKey()
+                  setApiKeyDraft('')
+                  setApiKeyDirty(false)
+                }}
+                className="px-3 py-2 rounded-[10px] text-[12px] text-text-secondary hover:bg-bg-hover hover:text-error transition-all duration-[120ms] active:scale-[0.96]"
+              >
+                {t('modelSettings.clearApiKey')}
+              </button>
+            )}
           </div>
         </div>
 
@@ -457,7 +469,7 @@ function ProviderPanel({
             {t('modelSettings.apiFormat')}
           </label>
           <div className="flex gap-4">
-            {(['openai-completions', 'anthropic'] as const).map((fmt) => (
+            {(['openai-completions', 'anthropic', 'google-generative-ai'] as const).map((fmt) => (
               <label key={fmt} className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="radio"
@@ -468,7 +480,11 @@ function ProviderPanel({
                   className="accent-accent"
                 />
                 <span className="text-[13px] text-text-secondary">
-                  {fmt === 'openai-completions' ? t('modelSettings.openaiCompat') : 'Anthropic'}
+                  {fmt === 'openai-completions'
+                    ? t('modelSettings.openaiCompat')
+                    : fmt === 'anthropic'
+                      ? 'Anthropic'
+                      : t('modelSettings.googleGenerativeAi')}
                 </span>
               </label>
             ))}
@@ -495,13 +511,13 @@ function ProviderPanel({
 
             {/* 测试结果 */}
             {testStatus === 'ok' && (
-              <div className="flex items-center gap-1.5 text-green-500">
+              <div className="flex items-center gap-1.5 text-success">
                 <CheckCircle size={14} />
                 <span className="text-[13px]">{t('modelSettings.connected')}</span>
               </div>
             )}
             {testStatus === 'fail' && (
-              <div className="flex items-center gap-1.5 text-red-500">
+              <div className="flex items-center gap-1.5 text-error">
                 <XCircle size={14} />
                 <span className="text-[13px]">{testError || t('modelSettings.connectFailed')}</span>
               </div>
@@ -533,12 +549,30 @@ function ProviderPanel({
           ) : (
             <div className="divide-y divide-border">
               {provider.models.map((model) => (
-                <div key={model.id} className="flex items-center justify-between px-4 py-3 group">
+                <div key={model.id} className="flex items-center justify-between px-5 py-3.5 group">
                   <div>
                     <p className="text-[13px] text-text-primary font-medium">{model.name}</p>
                     <p className="text-[11px] text-text-tertiary font-mono mt-0.5">{model.id}</p>
                   </div>
                   <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => onSetDefaultModel(model.id)}
+                      className={`inline-flex items-center gap-1 rounded-[10px] px-2 py-1 text-[11px] transition-all duration-[120ms] active:scale-[0.96] ${
+                        defaultModel?.providerId === provider.id &&
+                        defaultModel.modelId === model.id
+                          ? 'text-accent bg-bg-input'
+                          : 'text-text-tertiary hover:bg-bg-hover hover:text-text-primary'
+                      }`}
+                    >
+                      <Star size={12} strokeWidth={2} />
+                      <span>
+                        {defaultModel?.providerId === provider.id &&
+                        defaultModel.modelId === model.id
+                          ? t('modelSettings.defaultModel')
+                          : t('modelSettings.setDefaultModel')}
+                      </span>
+                    </button>
                     {/* 能力标签 */}
                     <div className="flex gap-1.5">
                       {model.reasoning && (
@@ -555,7 +589,7 @@ function ProviderPanel({
                     {/* 删除按钮 — 鼠标悬浮显示 */}
                     <button
                       onClick={() => onRemoveModel(model.id)}
-                      className="opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-red-500 transition-all duration-[120ms]"
+                      className="opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-error transition-all duration-[120ms]"
                     >
                       <Trash2 size={13} />
                     </button>
@@ -579,8 +613,9 @@ function ProviderPanel({
 
 export function ModelSettings() {
   const { t } = useI18n()
-  const [providers, setProviders] = useState<ModelProvider[]>([])
+  const [providers, setProviders] = useState<ModelProviderConfig[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [defaultModel, setDefaultModel] = useState<SelectedModel | null>(null)
   const [loading, setLoading] = useState(true)
   // 每个 Provider 独立维护测试状态，key 为 provider id
   const [testStatusMap, setTestStatusMap] = useState<Record<string, TestStatus>>({})
@@ -592,9 +627,13 @@ export function ModelSettings() {
   useEffect(() => {
     const load = async () => {
       try {
-        const raw = await window.api.models.providers()
-        const list = raw as ModelProvider[]
+        const [raw, rawDefaultModel] = await Promise.all([
+          window.api.models.providers(),
+          window.api.models.defaultModel()
+        ])
+        const list = raw as ModelProviderConfig[]
         setProviders(list)
+        setDefaultModel(parseSelectedModel(rawDefaultModel))
         // 默认选中第一个
         if (list.length > 0) setSelectedId(list[0].id)
       } catch {
@@ -609,10 +648,38 @@ export function ModelSettings() {
   const selectedProvider = providers.find((p) => p.id === selectedId) ?? null
 
   // 更新 Provider 字段并同步到列表
-  const handleUpdate = async (id: string, patch: Partial<ModelProvider>) => {
+  const handleUpdate = async (id: string, patch: Partial<ModelProviderConfig>) => {
     try {
       await window.api.models.updateProvider(id, patch)
       setProviders((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)))
+    } catch {
+      // 忽略错误，后续可加 toast
+    }
+  }
+
+  const handleSetApiKey = async (id: string, apiKey: string) => {
+    try {
+      await window.api.models.setApiKey(id, apiKey)
+      setProviders((prev) => prev.map((p) => (p.id === id ? { ...p, hasApiKey: true } : p)))
+    } catch {
+      // 忽略错误，后续可加 toast
+    }
+  }
+
+  const handleClearApiKey = async (id: string) => {
+    try {
+      await window.api.models.clearApiKey(id)
+      setProviders((prev) => prev.map((p) => (p.id === id ? { ...p, hasApiKey: false } : p)))
+    } catch {
+      // 忽略错误，后续可加 toast
+    }
+  }
+
+  const handleSetDefaultModel = async (providerId: string, modelId: string) => {
+    try {
+      const next = { providerId, modelId }
+      await window.api.models.setDefaultModel(next)
+      setDefaultModel(next)
     } catch {
       // 忽略错误，后续可加 toast
     }
@@ -681,14 +748,25 @@ export function ModelSettings() {
   }) => {
     try {
       const raw = await window.api.models.addProvider({
+        id: buildProviderId(data.name),
         ...data,
-        apiKey: '',
-        isPreset: false,
+        enabled: true,
+        isCustom: true,
         models: []
       })
-      const newProvider = raw as ModelProvider
-      setProviders((prev) => [...prev, newProvider])
-      setSelectedId(newProvider.id)
+      const newProvider = raw as ModelProviderConfig | undefined
+      const provider = newProvider ?? {
+        id: buildProviderId(data.name),
+        name: data.name,
+        baseUrl: data.baseUrl,
+        apiFormat: data.apiFormat,
+        enabled: true,
+        isCustom: true,
+        hasApiKey: false,
+        models: []
+      }
+      setProviders((prev) => [...prev, provider])
+      setSelectedId(provider.id)
     } catch {
       // 忽略错误
     } finally {
@@ -720,78 +798,176 @@ export function ModelSettings() {
                   </span>
                 </div>
               ) : (
-                <div className="divide-y divide-border">
-                  {providers.map((provider) => {
-                    const isSelected = provider.id === selectedId
-                    const tStatus = testStatusMap[provider.id] ?? 'idle'
-                    const isEnabled = provider.enabled !== false // 默认启用
+                <div>
+                  {/* 预设 Provider */}
+                  {providers.filter((p) => !p.isCustom).length > 0 && (
+                    <div>
+                      <div className="px-3 py-2 border-b border-border">
+                        <span className="text-[10px] text-text-tertiary font-medium uppercase tracking-wider">
+                          {t('modelSettings.presetProvider')}
+                        </span>
+                      </div>
+                      <div className="divide-y divide-border">
+                        {providers
+                          .filter((p) => !p.isCustom)
+                          .map((provider) => {
+                            const isSelected = provider.id === selectedId
+                            const tStatus = testStatusMap[provider.id] ?? 'idle'
+                            const isEnabled = provider.enabled !== false
 
-                    return (
-                      <button
-                        key={provider.id}
-                        onClick={() => setSelectedId(provider.id)}
-                        className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all duration-[120ms] active:scale-[0.98] ${
-                          isSelected ? 'bg-bg-active' : 'hover:bg-bg-hover'
-                        }`}
-                      >
-                        <ProviderLogo provider={provider} />
-                        <div className="flex-1 min-w-0">
-                          <p
-                            className={`text-[12px] font-medium truncate ${
-                              isSelected ? 'text-text-primary' : 'text-text-secondary'
-                            }`}
-                          >
-                            {provider.name}
-                          </p>
-                          {/* 连接状态点 */}
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <Circle
-                              size={6}
-                              className={
-                                !isEnabled
-                                  ? 'text-text-tertiary fill-text-tertiary'
-                                  : tStatus === 'ok'
-                                    ? 'text-green-500 fill-green-500'
-                                    : tStatus === 'fail'
-                                      ? 'text-red-500 fill-red-500'
-                                      : 'text-text-tertiary fill-text-tertiary'
-                              }
-                            />
-                            <span className="text-[10px] text-text-tertiary">
-                              {!isEnabled
-                                ? t('modelSettings.disabled')
-                                : tStatus === 'ok'
-                                  ? t('modelSettings.connectedStatus')
-                                  : tStatus === 'fail'
-                                    ? t('modelSettings.failed')
-                                    : t('modelSettings.notTested')}
-                            </span>
-                          </div>
-                        </div>
+                            return (
+                              <button
+                                key={provider.id}
+                                onClick={() => setSelectedId(provider.id)}
+                                className={`w-full flex items-center gap-2.5 px-3 py-3 text-left transition-all duration-[120ms] active:scale-[0.98] ${
+                                  isSelected ? 'bg-bg-active' : 'hover:bg-bg-hover'
+                                }`}
+                              >
+                                <ProviderLogo provider={provider} />
+                                <div className="flex-1 min-w-0">
+                                  <p
+                                    className={`text-[12px] font-medium truncate ${
+                                      isSelected ? 'text-text-primary' : 'text-text-secondary'
+                                    }`}
+                                  >
+                                    {provider.name}
+                                  </p>
+                                  {/* 连接状态点 */}
+                                  <div className="flex items-center gap-1 mt-0.5">
+                                    <Circle
+                                      size={6}
+                                      className={
+                                        !isEnabled
+                                          ? 'text-text-tertiary fill-text-tertiary'
+                                          : tStatus === 'ok'
+                                            ? 'text-success fill-success'
+                                            : tStatus === 'fail'
+                                              ? 'text-error fill-error'
+                                              : 'text-text-tertiary fill-text-tertiary'
+                                      }
+                                    />
+                                    <span className="text-[10px] text-text-tertiary">
+                                      {!isEnabled
+                                        ? t('modelSettings.disabled')
+                                        : tStatus === 'ok'
+                                          ? t('modelSettings.connectedStatus')
+                                          : tStatus === 'fail'
+                                            ? t('modelSettings.failed')
+                                            : t('modelSettings.notTested')}
+                                    </span>
+                                  </div>
+                                </div>
 
-                        {/* 启用/禁用开关（点击不触发选中）*/}
-                        <div
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleToggle(provider.id, !isEnabled)
-                          }}
-                          className={`w-7 h-4 rounded-full transition-all duration-[120ms] cursor-pointer shrink-0 ${
-                            isEnabled ? 'bg-accent' : 'bg-border'
-                          }`}
-                        >
-                          <div
-                            className={`w-3 h-3 rounded-full bg-white mt-0.5 transition-all duration-[120ms] ${
-                              isEnabled ? 'translate-x-[13px]' : 'translate-x-0.5'
-                            }`}
-                          />
-                        </div>
+                                {/* 启用/禁用开关（点击不触发选中）*/}
+                                <div
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleToggle(provider.id, !isEnabled)
+                                  }}
+                                  className={`w-8 h-[18px] rounded-full transition-colors duration-[120ms] cursor-pointer shrink-0 ${
+                                    isEnabled ? 'bg-accent' : 'bg-border'
+                                  }`}
+                                >
+                                  <div
+                                    className={`w-3.5 h-3.5 rounded-full bg-white shadow-sm transition-transform duration-[120ms] mt-[2px] ${
+                                      isEnabled ? 'translate-x-[15px]' : 'translate-x-[3px]'
+                                    }`}
+                                  />
+                                </div>
 
-                        {isSelected && (
-                          <ChevronRight size={12} className="text-text-tertiary shrink-0" />
-                        )}
-                      </button>
-                    )
-                  })}
+                                {isSelected && (
+                                  <ChevronRight size={12} className="text-text-tertiary shrink-0" />
+                                )}
+                              </button>
+                            )
+                          })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 自定义 Provider */}
+                  {providers.filter((p) => p.isCustom).length > 0 && (
+                    <div>
+                      <div className="px-3 py-2 border-b border-border">
+                        <span className="text-[10px] text-text-tertiary font-medium uppercase tracking-wider">
+                          {t('modelSettings.customProvider')}
+                        </span>
+                      </div>
+                      <div className="divide-y divide-border">
+                        {providers
+                          .filter((p) => p.isCustom)
+                          .map((provider) => {
+                            const isSelected = provider.id === selectedId
+                            const tStatus = testStatusMap[provider.id] ?? 'idle'
+                            const isEnabled = provider.enabled !== false
+
+                            return (
+                              <button
+                                key={provider.id}
+                                onClick={() => setSelectedId(provider.id)}
+                                className={`w-full flex items-center gap-2.5 px-3 py-3 text-left transition-all duration-[120ms] active:scale-[0.98] ${
+                                  isSelected ? 'bg-bg-active' : 'hover:bg-bg-hover'
+                                }`}
+                              >
+                                <ProviderLogo provider={provider} />
+                                <div className="flex-1 min-w-0">
+                                  <p
+                                    className={`text-[12px] font-medium truncate ${
+                                      isSelected ? 'text-text-primary' : 'text-text-secondary'
+                                    }`}
+                                  >
+                                    {provider.name}
+                                  </p>
+                                  <div className="flex items-center gap-1 mt-0.5">
+                                    <Circle
+                                      size={6}
+                                      className={
+                                        !isEnabled
+                                          ? 'text-text-tertiary fill-text-tertiary'
+                                          : tStatus === 'ok'
+                                            ? 'text-success fill-success'
+                                            : tStatus === 'fail'
+                                              ? 'text-error fill-error'
+                                              : 'text-text-tertiary fill-text-tertiary'
+                                      }
+                                    />
+                                    <span className="text-[10px] text-text-tertiary">
+                                      {!isEnabled
+                                        ? t('modelSettings.disabled')
+                                        : tStatus === 'ok'
+                                          ? t('modelSettings.connectedStatus')
+                                          : tStatus === 'fail'
+                                            ? t('modelSettings.failed')
+                                            : t('modelSettings.notTested')}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <div
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleToggle(provider.id, !isEnabled)
+                                  }}
+                                  className={`w-8 h-[18px] rounded-full transition-colors duration-[120ms] cursor-pointer shrink-0 ${
+                                    isEnabled ? 'bg-accent' : 'bg-border'
+                                  }`}
+                                >
+                                  <div
+                                    className={`w-3.5 h-3.5 rounded-full bg-white shadow-sm transition-transform duration-[120ms] mt-[2px] ${
+                                      isEnabled ? 'translate-x-[15px]' : 'translate-x-[3px]'
+                                    }`}
+                                  />
+                                </div>
+
+                                {isSelected && (
+                                  <ChevronRight size={12} className="text-text-tertiary shrink-0" />
+                                )}
+                              </button>
+                            )
+                          })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -812,9 +988,13 @@ export function ModelSettings() {
               key={selectedProvider.id}
               provider={selectedProvider}
               onUpdate={(patch) => handleUpdate(selectedProvider.id, patch)}
+              onSetApiKey={(apiKey) => handleSetApiKey(selectedProvider.id, apiKey)}
+              onClearApiKey={() => handleClearApiKey(selectedProvider.id)}
+              onSetDefaultModel={(modelId) => handleSetDefaultModel(selectedProvider.id, modelId)}
               onTest={() => handleTest(selectedProvider.id)}
               onAddModel={(m) => handleAddModel(selectedProvider.id, m)}
               onRemoveModel={(mid) => handleRemoveModel(selectedProvider.id, mid)}
+              defaultModel={defaultModel}
               testStatus={testStatusMap[selectedProvider.id] ?? 'idle'}
               testError={testErrorMap[selectedProvider.id] ?? ''}
             />

@@ -1,4 +1,16 @@
-import { ArrowLeft } from 'lucide-react'
+import {
+  ArrowLeft,
+  Settings,
+  User,
+  Info,
+  Cpu,
+  Brain,
+  FolderOpen,
+  BookOpen,
+  Cable,
+  Wrench
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 import { useI18n } from '../../i18n'
 import { PreferenceSettings } from './PreferenceSettings'
@@ -21,29 +33,32 @@ export function SettingsPage({ activeTab, onTabChange, onBack }: SettingsPagePro
   const { t } = useI18n()
 
   // 菜单分组配置放在组件内，以便使用 t() 动态翻译
-  const MENU_SECTIONS = [
+  const MENU_SECTIONS: Array<{
+    label: string
+    items: Array<{ id: string; label: string; icon: LucideIcon }>
+  }> = [
     {
       label: t('settings.general'),
       items: [
-        { id: 'preferences', label: t('settings.preferences'), icon: '⚙️' },
-        { id: 'profile', label: t('settings.profile'), icon: '👤' },
-        { id: 'about', label: t('settings.about'), icon: 'ℹ️' }
+        { id: 'preferences', label: t('settings.preferences'), icon: Settings },
+        { id: 'profile', label: t('settings.profile'), icon: User },
+        { id: 'about', label: t('settings.about'), icon: Info }
       ]
     },
     {
       label: t('settings.aiConfig'),
       items: [
-        { id: 'engine', label: t('settings.engine'), icon: '⚙️' },
-        { id: 'models', label: t('settings.models'), icon: '🧠' },
-        { id: 'directories', label: t('settings.directories'), icon: '📂' },
-        { id: 'memory', label: t('settings.memory'), icon: '📝' }
+        { id: 'engine', label: t('settings.engine'), icon: Cpu },
+        { id: 'models', label: t('settings.models'), icon: Brain },
+        { id: 'directories', label: t('settings.directories'), icon: FolderOpen },
+        { id: 'memory', label: t('settings.memory'), icon: BookOpen }
       ]
     },
     {
       label: t('settings.extensions'),
       items: [
-        { id: 'connectors', label: t('settings.connectors'), icon: '🔌' },
-        { id: 'mcp', label: t('settings.mcp'), icon: '🔧' }
+        { id: 'connectors', label: t('settings.connectors'), icon: Cable },
+        { id: 'mcp', label: t('settings.mcp'), icon: Wrench }
       ]
     }
   ]
@@ -81,7 +96,7 @@ export function SettingsPage({ activeTab, onTabChange, onBack }: SettingsPagePro
                         : 'text-text-secondary hover:bg-bg-hover hover:text-text-primary'
                     }`}
                   >
-                    <span className="text-[14px]">{item.icon}</span>
+                    <item.icon size={15} strokeWidth={1.75} className="shrink-0" />
                     <span>{item.label}</span>
                   </button>
                 ))}

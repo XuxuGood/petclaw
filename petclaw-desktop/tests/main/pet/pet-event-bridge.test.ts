@@ -30,7 +30,7 @@ describe('PetEventBridge', () => {
     emitter = new EventEmitter()
     win = createMockWindow()
     send = win.webContents.send as ReturnType<typeof vi.fn>
-    // 构造 bridge 时绑定事件
+    // 构造 bridge 时绑定事件（无 hookServer、无 getMainWindow）
     new PetEventBridge(win, emitter as unknown as CoworkController)
   })
 
@@ -74,7 +74,7 @@ describe('PetEventBridge', () => {
   it('messageUpdate 发送气泡文本（截取末尾50字符）', () => {
     const longText = 'a'.repeat(100)
     emitter.emit('messageUpdate', 's1', 'msg1', longText)
-    // sendBubble 现在携带 source 字段标识消息来源
+    // sendBubble 携带 source 字段标识消息来源
     expect(send).toHaveBeenCalledWith('pet:bubble', { text: 'a'.repeat(50), source: 'chat' })
   })
 
@@ -141,5 +141,64 @@ describe('PetEventBridge', () => {
       text: '等待审批：unknown',
       source: 'approval'
     })
+  })
+})
+
+describe('PetEventBridge — HookServer 双窗口推送', () => {
+  it('hook 事件同时推送到 pet 和 main 窗口', () => {
+    const hookEmitter = new EventEmitter()
+    const coworkEmitter = new EventEmitter()
+    const petWin = createMockWindow()
+    const mainWin = createMockWindow()
+    const petSend = petWin.webContents.send as ReturnType<typeof vi.fn>
+    const mainSend = mainWin.webContents.send as ReturnType<typeof vi.fn>
+
+    // 模拟 HookServer 的 onEvent 方法
+    const mockHookServer = {
+      onEvent: (cb: (event: unknown) => void) => {
+        hookEmitter.on('hook', cb)
+      }
+    }
+
+    new PetEventBridge(
+      petWin,
+      coworkEmitter as unknown as CoworkController,
+      mockHookServer as never,
+      () => mainWin
+    )
+
+    // 触发 hook 事件
+    const hookEvent = { type: 'tool_use', tool: 'bash' }
+    hookEmitter.emit('hook', hookEvent)
+
+    // pet 窗口收到状态事件和 hook:event
+    expect(petSend).toHaveBeenCalledWith('pet:state-event', { event: 'HOOK_ACTIVE' })
+    expect(petSend).toHaveBeenCalledWith('hook:event', hookEvent)
+
+    // main 窗口也收到 hook:event
+    expect(mainSend).toHaveBeenCalledWith('hook:event', hookEvent)
+  })
+
+  it('session_end 触发 HOOK_IDLE', () => {
+    const hookEmitter = new EventEmitter()
+    const coworkEmitter = new EventEmitter()
+    const petWin = createMockWindow()
+    const petSend = petWin.webContents.send as ReturnType<typeof vi.fn>
+
+    const mockHookServer = {
+      onEvent: (cb: (event: unknown) => void) => {
+        hookEmitter.on('hook', cb)
+      }
+    }
+
+    new PetEventBridge(
+      petWin,
+      coworkEmitter as unknown as CoworkController,
+      mockHookServer as never
+    )
+
+    hookEmitter.emit('hook', { type: 'session_end' })
+
+    expect(petSend).toHaveBeenCalledWith('pet:state-event', { event: 'HOOK_IDLE' })
   })
 })

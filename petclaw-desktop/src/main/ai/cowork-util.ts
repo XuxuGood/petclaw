@@ -123,14 +123,21 @@ export function getElectronNodeRuntimePath(): string {
 }
 
 /**
- * Cached user shell PATH. Resolved once and reused across calls.
+ * 用户登录 shell 的 PATH 缓存。
+ *
+ * 解析 shell PATH 需要启动一次用户 shell，成本较高且可能触发用户 profile 中的脚本。
+ * 这里缓存第一次解析结果，后续构造 Cowork 子进程环境时直接复用，避免反复启动 shell。
  */
 let cachedUserShellPath: string | null | undefined
 
 /**
- * Resolve the user's login shell PATH on macOS/Linux.
- * Packaged Electron apps on macOS don't inherit the user's shell profile,
- * so node/npm and other tools won't be in PATH unless we resolve it.
+ * 解析 macOS/Linux 用户登录 shell 中真实可用的 PATH。
+ *
+ * macOS 上从 Finder/Dock 启动的打包版 Electron 不会继承用户终端里的 shell profile。
+ * 如果直接使用 `process.env.PATH`，用户通过 Homebrew、nvm、Volta 等安装的 node/npm
+ * 或其他命令行工具可能不可见，导致 Cowork 执行工具时找不到命令。
+ *
+ * 因此这里显式启动一次登录 shell，读取用户 shell 初始化后的 PATH，再注入给子进程。
  */
 function resolveUserShellPath(): string | null {
   if (cachedUserShellPath !== undefined) return cachedUserShellPath
@@ -142,8 +149,7 @@ function resolveUserShellPath(): string | null {
 
   try {
     const shell = process.env.SHELL || '/bin/bash'
-    // Prefer non-interactive login shell first to avoid potential side effects
-    // from interactive startup scripts (which may launch extra GUI processes).
+    // 优先使用非交互式登录 shell，避免交互式启动脚本弹 GUI、阻塞或产生额外副作用。
     const pathProbes = [`${shell} -lc 'echo __PATH__=$PATH'`]
 
     let resolved: string | null = null
@@ -160,7 +166,7 @@ function resolveUserShellPath(): string | null {
           break
         }
       } catch {
-        // Try next probe.
+        // 当前探测失败时继续尝试下一个策略；这里保持静默，由最终 fallback 兜底。
       }
     }
     cachedUserShellPath = resolved
@@ -173,7 +179,10 @@ function resolveUserShellPath(): string | null {
 }
 
 /**
- * Cached Windows registry PATH. Resolved once and reused.
+ * Windows 注册表 PATH 缓存。
+ *
+ * 注册表读取只需要做一次：同一次 App 生命周期内 PATH 不应频繁变化，缓存可以减少
+ * Cowork 会话启动时的同步命令开销。
  */
 let cachedWindowsRegistryPath: string | null | undefined
 
@@ -192,26 +201,24 @@ function readWindowsRegistryPathValue(registryKey: string): string {
       }
     }
   } catch {
-    // Ignore missing keys or access-denied errors.
+    // 注册表键不存在或权限不足都不应阻断启动，缺失值由调用方按空字符串处理。
   }
 
   return ''
 }
 
 /**
- * Resolve the latest PATH from the Windows registry (Machine + User).
+ * 从 Windows 注册表读取最新的 Machine PATH + User PATH。
  *
- * When a packaged Electron app is launched from the Start Menu, desktop shortcut,
- * or Explorer, its `process.env.PATH` is inherited from the Explorer shell process.
- * If the user installed tools (Python, Node.js, npm, etc.) after Explorer started
- * — or without restarting Explorer — those new PATH entries won't be in
- * `process.env.PATH`. This causes commands like `python`, `npm`, `pip` to be
- * missing from the cowork session even though they work fine in a freshly opened
- * terminal (which reads the latest registry values).
+ * 打包版 Electron 从开始菜单、桌面快捷方式或 Explorer 启动时，继承的是 Explorer
+ * 进程启动那一刻的 PATH。如果用户之后安装了 Python、Node.js、npm、pip 等工具，
+ * 但没有重启 Explorer，那么 `process.env.PATH` 仍是旧值。
  *
- * This function reads the current Machine and User PATH directly from the registry
- * to get the most up-to-date values, similar to how `resolveUserShellPath()` works
- * for macOS/Linux.
+ * 这会造成一个典型问题：用户在新开的终端里能运行 `python` / `npm`，但 Cowork
+ * 会话里找不到，因为终端读取了最新注册表，而 Electron 继承的是过期环境。
+ *
+ * 这里直接读注册表的 Machine/User PATH，得到和新终端更接近的最新值，再并入
+ * Cowork 子进程环境。
  */
 function resolveWindowsRegistryPath(): string | null {
   if (cachedWindowsRegistryPath !== undefined) return cachedWindowsRegistryPath
@@ -228,7 +235,7 @@ function resolveWindowsRegistryPath(): string | null {
     const userPath = readWindowsRegistryPathValue('HKCU\\Environment')
     const registryPath = [machinePath, userPath].filter(Boolean).join(';')
     if (registryPath.trim()) {
-      // Deduplicate and remove empty entries
+      // 去掉空项并保持去重，避免 PATH 过长或重复项影响命令解析顺序。
       const entries = registryPath
         .split(';')
         .map((entry) => entry.trim())
@@ -256,12 +263,11 @@ function resolveWindowsRegistryPath(): string | null {
 }
 
 /**
- * Merge the current process PATH with registry-resolved PATH on Windows.
+ * 将 Windows 注册表中的最新 PATH 项补充到当前环境。
  *
- * This ensures that any PATH entries the user has added (e.g. Python, Node.js,
- * npm, pip) are available even if the Electron app inherited a stale PATH from
- * Explorer. The registry PATH entries are appended after the current entries
- * so that any overrides already in the env (like Git toolchain, shims) take priority.
+ * 当前环境中可能已经有 PetClaw 自己注入的 Git 工具链、node shim 或其它覆盖项，
+ * 这些项必须优先于用户注册表 PATH。因此这里只追加当前 PATH 缺失的注册表项，
+ * 且追加在末尾，既补齐用户安装的 Python/Node/npm/pip，又不破坏前面已有优先级。
  */
 function ensureWindowsRegistryPathEntries(env: Record<string, string | undefined>): void {
   const registryPath = resolveWindowsRegistryPath()
@@ -276,16 +282,16 @@ function ensureWindowsRegistryPathEntries(env: Record<string, string | undefined
   for (const entry of registryPath.split(';')) {
     const trimmed = entry.trim()
     if (!trimmed) continue
-    // Normalize: remove trailing backslash for comparison
+    // 比较时去掉末尾反斜杠，避免 `C:\Foo` 与 `C:\Foo\` 被当成两个目录。
     const normalizedLower = trimmed.toLowerCase().replace(/\\$/, '')
     if (!currentEntriesLower.has(normalizedLower)) {
       missingEntries.push(trimmed)
-      currentEntriesLower.add(normalizedLower) // prevent duplicates within registry entries
+      currentEntriesLower.add(normalizedLower) // 同批注册表项内部也要去重，避免重复追加。
     }
   }
 
   if (missingEntries.length > 0) {
-    // Append registry entries at the END so existing overrides (Git, shims) take priority
+    // 追加到末尾，确保前面已经注入的 Git、shim 等覆盖项仍然优先。
     env.PATH = currentPath
       ? `${currentPath}${delimiter}${missingEntries.join(delimiter)}`
       : missingEntries.join(delimiter)
@@ -298,7 +304,10 @@ function ensureWindowsRegistryPathEntries(env: Record<string, string | undefined
 }
 
 /**
- * Cached git-bash path on Windows. Resolved once and reused.
+ * Windows git-bash 路径缓存。
+ *
+ * git-bash 探测会检查多个候选路径并执行健康检查，成本相对高；缓存后可避免每次
+ * 构造环境都重复扫描注册表、PATH 和常见安装目录。
  */
 let cachedGitBashPath: string | null | undefined
 let cachedGitBashResolutionError: string | null | undefined
@@ -350,7 +359,7 @@ function listGitInstallPathsFromRegistry(): string[] {
         }
       }
     } catch {
-      // registry key might not exist
+      // 某些机器没有安装 Git 或对应注册表键不存在，跳过即可。
     }
   }
 
@@ -367,7 +376,7 @@ function getBundledGitBashCandidates(): string[] {
 
   const candidates: string[] = []
   for (const root of bundledRoots) {
-    // Prefer bin/bash.exe on Windows; invoking usr/bin/bash.exe directly may miss Git toolchain PATH.
+    // Windows 下优先使用 bin/bash.exe；直接调用 usr/bin/bash.exe 可能缺少 Git 工具链 PATH。
     candidates.push(join(root, 'bin', 'bash.exe'))
     candidates.push(join(root, 'usr', 'bin', 'bash.exe'))
   }
@@ -381,18 +390,16 @@ function checkWindowsGitBashHealth(bashPath: string): { ok: boolean; reason?: st
       return { ok: false, reason: 'path does not exist' }
     }
 
-    // Use a minimal env for the health check to avoid interference from
-    // BASH_ENV, MSYS2_PATH_TYPE, or other env vars that could slow startup.
-    // Only pass PATH + SYSTEMROOT (required for Windows DLL loading) + HOME.
+    // 健康检查只传最小环境，避免 BASH_ENV、MSYS2_PATH_TYPE 等变量影响启动速度或行为。
+    // SYSTEMROOT 对 Windows DLL 加载是必要的，HOME 则避免部分 Git Bash 初始化脚本报错。
     const healthEnv: Record<string, string> = {
       PATH: process.env.PATH || '',
       SYSTEMROOT: process.env.SYSTEMROOT || process.env.SystemRoot || 'C:\\Windows',
       HOME: process.env.HOME || process.env.USERPROFILE || ''
     }
 
-    // Try non-login shell first (-c instead of -lc) for speed.
-    // Login shells source /etc/profile which can be slow on some systems.
-    // cygpath is a standalone binary and does not require a login shell.
+    // 先用非登录 shell，避免读取 /etc/profile 带来的慢启动。
+    // cygpath 通常是独立二进制，不需要登录 shell 初始化即可运行。
     const fastResult = spawnSync(bashPath, ['-c', 'cygpath -u "C:\\\\Windows"'], {
       encoding: 'utf-8',
       timeout: 5000,
@@ -402,8 +409,8 @@ function checkWindowsGitBashHealth(bashPath: string): { ok: boolean; reason?: st
 
     const result =
       fastResult.error || (typeof fastResult.status === 'number' && fastResult.status !== 0)
-        ? // Non-login shell failed — retry with login shell and a longer timeout.
-          // Some Git Bash builds require login shell to set up PATH for cygpath.
+        ? // 非登录 shell 失败时再退回登录 shell，并给更长超时时间。
+          // 部分 Git Bash 发行版需要 /etc/profile 初始化 PATH 后才能找到 cygpath。
           spawnSync(bashPath, ['-lc', 'cygpath -u "C:\\\\Windows"'], {
             encoding: 'utf-8',
             timeout: 15000,
@@ -433,9 +440,8 @@ function checkWindowsGitBashHealth(bashPath: string): { ok: boolean; reason?: st
       .filter(Boolean)
     const lastNonEmptyLine = lines.length > 0 ? lines[lines.length - 1] : ''
 
-    // Some Git Bash builds may print runtime warnings before the actual cygpath
-    // output (for example, missing /dev/shm or /dev/mqueue directories).
-    // Accept the check when the final non-empty line is a valid POSIX path.
+    // 某些 Git Bash 会先打印运行时警告，再输出真正的 cygpath 结果。
+    // 只要最后一个非空行是合法 POSIX 路径，就认为 bash 可用。
     if (!/^\/[a-zA-Z]\//.test(lastNonEmptyLine)) {
       const diagnosticStdout = truncateDiagnostic(stdout || '(empty)')
       const diagnosticStderr = stderr ? `, stderr: ${truncateDiagnostic(stderr)}` : ''
@@ -493,7 +499,8 @@ export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string)
     )
 
     // --- node shim ---
-    // Shell script (macOS/Linux/Windows git-bash)
+    // 生成 bash 版本的 node 包装器，供 macOS/Linux 以及 Windows git-bash 使用。
+    // 通过 ELECTRON_RUN_AS_NODE=1 让 Electron 可执行文件临时表现为 Node.js。
     const nodeSh = join(shimDir, 'node')
     const nodeShContent = [
       '#!/usr/bin/env bash',
@@ -509,11 +516,11 @@ export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string)
     try {
       chmodSync(nodeSh, 0o755)
     } catch {
-      // Ignore chmod errors on file systems that do not support POSIX modes.
+      // 某些文件系统不支持 POSIX 权限位，写入成功即可，不因 chmod 失败中断。
     }
     coworkLog('INFO', 'resolveNodeShim', `Created node bash shim: ${nodeSh}`)
 
-    // Windows .cmd wrapper (only needed on Windows)
+    // Windows cmd 包装器只在 Windows 原生命令环境中需要。
     if (process.platform === 'win32') {
       const nodeCmd = join(shimDir, 'node.cmd')
       const nodeCmdContent = [
@@ -531,14 +538,14 @@ export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string)
     }
 
     // --- npx / npm shims ---
-    // Create shims that invoke npx-cli.js / npm-cli.js from the bundled npm
-    // package via the node shim above. This avoids relying on symlinks in
-    // node_modules/.bin which do not work on Windows cross-platform builds.
+    // npx/npm 不直接依赖 node_modules/.bin 中的符号链接；跨平台打包时这些链接在
+    // Windows 上并不可靠。这里显式指向随应用打包的 npm cli 文件，并通过上面的
+    // node shim 执行，确保打包版没有系统 Node.js 时也能运行 npm/npx。
     if (npmBinDir && existsSync(npmBinDir)) {
       const npxCliJs = join(npmBinDir, 'npx-cli.js')
       const npmCliJs = join(npmBinDir, 'npm-cli.js')
 
-      // Convert to POSIX path for bash scripts on Windows (git-bash)
+      // bash 脚本在 Windows git-bash 下执行时需要 POSIX 风格路径。
       const npxCliJsPosix = npxCliJs.replace(/\\/g, '/')
       const npmCliJsPosix = npmCliJs.replace(/\\/g, '/')
 
@@ -549,7 +556,7 @@ export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string)
       )
 
       if (existsSync(npxCliJs)) {
-        // npx bash shim
+        // npx 的 bash 包装器，供 POSIX shell / git-bash 路径解析使用。
         const npxSh = join(shimDir, 'npx')
         const npxShContent = [
           '#!/usr/bin/env bash',
@@ -561,12 +568,12 @@ export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string)
         try {
           chmodSync(npxSh, 0o755)
         } catch {
-          /* ignore */
+          /* 忽略不支持 POSIX 权限位的文件系统 */
         }
         coworkLog('INFO', 'resolveNodeShim', `Created npx bash shim: ${npxSh} -> ${npxCliJsPosix}`)
 
-        // npx.cmd for Windows — uses %PETCLAW_NPM_BIN_DIR% env var to avoid
-        // hardcoding paths that may contain non-ASCII chars (breaks GBK cmd.exe).
+        // Windows .cmd 版本通过环境变量引用 npm bin 目录，避免把可能含中文的路径
+        // 直接写进批处理文件；GBK code page 下硬编码非 ASCII 路径容易被 cmd.exe 误解。
         if (process.platform === 'win32') {
           const npxCmd = join(shimDir, 'npx.cmd')
           const npxCmdContent = [
@@ -586,7 +593,7 @@ export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string)
       }
 
       if (existsSync(npmCliJs)) {
-        // npm bash shim
+        // npm 的 bash 包装器，逻辑与 npx 保持一致。
         const npmSh = join(shimDir, 'npm')
         const npmShContent = [
           '#!/usr/bin/env bash',
@@ -598,12 +605,11 @@ export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string)
         try {
           chmodSync(npmSh, 0o755)
         } catch {
-          /* ignore */
+          /* 忽略不支持 POSIX 权限位的文件系统 */
         }
         coworkLog('INFO', 'resolveNodeShim', `Created npm bash shim: ${npmSh} -> ${npmCliJsPosix}`)
 
-        // npm.cmd for Windows — uses %PETCLAW_NPM_BIN_DIR% env var to avoid
-        // hardcoding paths that may contain non-ASCII chars (breaks GBK cmd.exe).
+        // Windows .cmd 版本同样通过环境变量引用 npm bin 目录，避免非 ASCII 路径编码问题。
         if (process.platform === 'win32') {
           const npmCmd = join(shimDir, 'npm.cmd')
           const npmCmdContent = [
@@ -631,7 +637,8 @@ export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string)
       )
     }
 
-    // Verify shim files exist and are executable
+    // 写完后做一次轻量校验，日志里记录路径、权限和大小，方便定位用户机器上的
+    // 打包资源缺失或文件系统权限问题。
     const shimFiles = ['node', 'npx', 'npm']
     for (const name of shimFiles) {
       const shimPath = join(shimDir, name)
@@ -668,10 +675,12 @@ export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string)
 }
 
 /**
- * Resolve git-bash path on Windows.
- * Claude Code CLI requires git-bash for shell tool execution.
- * Priority: env var override > bundled PortableGit > installed Git > PATH lookup.
- * Every candidate must pass a health check (`cygpath -u`) before use.
+ * 解析 Windows 上可用的 git-bash 路径。
+ *
+ * Claude Code CLI 的 shell 工具依赖 git-bash 执行 Unix 风格命令。这里按确定优先级
+ * 查找：用户显式环境变量 > PetClaw 打包的 PortableGit > 系统安装的 Git > PATH 查询。
+ * 每个候选都必须通过 `cygpath -u` 健康检查，避免把损坏或初始化异常的 bash 注入
+ * 到 Cowork 会话。
  */
 function resolveWindowsGitBashPath(): string | null {
   if (cachedGitBashPath !== undefined) return cachedGitBashPath
@@ -696,15 +705,15 @@ function resolveWindowsGitBashPath(): string | null {
     candidates.push({ path: normalized, source })
   }
 
-  // 1. Explicit env var (user override)
+  // 1. 用户显式环境变量，优先级最高，便于高级用户或测试环境指定自定义 bash。
   pushCandidate(process.env.CLAUDE_CODE_GIT_BASH_PATH ?? null, 'env:CLAUDE_CODE_GIT_BASH_PATH')
 
-  // 2. Bundled PortableGit (preferred default in PetClaw package)
+  // 2. PetClaw 打包的 PortableGit，是生产环境最可控的默认来源。
   for (const bundledCandidate of getBundledGitBashCandidates()) {
     pushCandidate(bundledCandidate, 'bundled:resources/mingit')
   }
 
-  // 3. Common Git for Windows installation paths
+  // 3. Git for Windows 的常见安装位置，覆盖 Program Files、用户目录和 scoop。
   const programFiles = process.env.ProgramFiles || 'C:\\Program Files'
   const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)'
   const localAppData = process.env.LOCALAPPDATA || ''
@@ -727,7 +736,7 @@ function resolveWindowsGitBashPath(): string | null {
     pushCandidate(installCandidate, 'installed:common-paths')
   }
 
-  // 4. Query Git for Windows install root from registry
+  // 4. 从注册表读取 Git for Windows 安装根目录，覆盖用户自定义安装路径。
   const registryInstallRoots = listGitInstallPathsFromRegistry()
   for (const installRoot of registryInstallRoots) {
     const registryCandidates = [
@@ -739,7 +748,7 @@ function resolveWindowsGitBashPath(): string | null {
     }
   }
 
-  // 5. Try `where bash`
+  // 5. 查询 PATH 中可见的 bash.exe。
   const bashPaths = listWindowsCommandPaths('where bash')
   for (const bashPath of bashPaths) {
     if (bashPath.toLowerCase().endsWith('\\bash.exe')) {
@@ -747,7 +756,7 @@ function resolveWindowsGitBashPath(): string | null {
     }
   }
 
-  // 6. Try `where git` and derive bash from git location
+  // 6. 查询 PATH 中可见的 git.exe，并从 Git 安装根目录反推出 bash.exe。
   const gitPaths = listWindowsCommandPaths('where git')
   for (const gitPath of gitPaths) {
     const gitRoot = dirname(dirname(gitPath))
@@ -793,8 +802,10 @@ function resolveWindowsGitBashPath(): string | null {
 }
 
 /**
- * Windows system directories that must be in PATH for built-in commands
- * (ipconfig, systeminfo, netstat, ping, nslookup, etc.) to work.
+ * Windows 内置命令依赖的系统目录。
+ *
+ * ipconfig、systeminfo、netstat、ping、nslookup 等命令不在用户工具目录里，
+ * 如果 System32 等系统目录从 PATH 中丢失，shell 工具会表现为“命令不存在”。
  */
 const WINDOWS_SYSTEM_PATH_ENTRIES = [
   'System32',
@@ -804,8 +815,10 @@ const WINDOWS_SYSTEM_PATH_ENTRIES = [
 ]
 
 /**
- * Critical Windows environment variables that some system commands and DLLs depend on.
- * Without these, commands like ipconfig may fail even if System32 is in PATH.
+ * Windows 系统命令和 DLL 加载依赖的关键环境变量。
+ *
+ * 即使 System32 已在 PATH 中，缺少 SystemRoot、windir、COMSPEC 等变量时，
+ * cmd.exe 或部分系统命令仍可能启动失败。
  */
 const WINDOWS_CRITICAL_ENV_VARS: Record<string, () => string | undefined> = {
   SystemRoot: () => process.env.SystemRoot || process.env.SYSTEMROOT || 'C:\\windows',
@@ -820,23 +833,20 @@ const WINDOWS_CRITICAL_ENV_VARS: Record<string, () => string | undefined> = {
 }
 
 /**
- * Ensure critical Windows system environment variables are present in the env object.
+ * 确保 Cowork 子进程环境中存在 Windows 关键系统变量。
  *
- * Packaged Electron apps or certain launch contexts may strip environment variables
- * like SystemRoot, windir, COMSPEC, and SYSTEMDRIVE. Many Windows system commands
- * and DLLs depend on these variables to locate system resources.
+ * 打包版 Electron 或某些启动上下文可能会剥离 SystemRoot、windir、COMSPEC、
+ * SYSTEMDRIVE 等变量。很多 Windows 系统命令和 DLL 解析依赖这些变量定位系统资源。
  *
- * Additionally, the Claude Agent SDK's shell snapshot mechanism runs `echo $PATH`
- * via `shell: true`, which on Windows uses cmd.exe. The captured PATH is then
- * baked into the snapshot file. If these critical variables are missing, the shell
- * environment may be broken and commands fail silently.
+ * Claude Agent SDK 还会通过 `shell: true` 执行 shell snapshot，在 Windows 上这会走
+ * cmd.exe。如果关键系统变量缺失，snapshot 捕获到的 PATH 可能已经损坏，后续命令
+ * 可能静默失败或表现为命令不存在。
  */
 function ensureWindowsSystemEnvVars(env: Record<string, string | undefined>): void {
   const injected: string[] = []
 
   for (const [key, resolver] of Object.entries(WINDOWS_CRITICAL_ENV_VARS)) {
-    // Check both the exact case and common variants (Windows env vars are case-insensitive
-    // but Node.js process.env on Windows normalizes to the original casing)
+    // Windows 环境变量大小写不敏感，但 Node.js 会保留原始 casing；这里按目标键补齐。
     if (!env[key]) {
       const value = resolver()
       if (value) {
@@ -856,17 +866,15 @@ function ensureWindowsSystemEnvVars(env: Record<string, string | undefined>): vo
 }
 
 /**
- * Ensure Windows system directories (System32, etc.) are present in PATH.
+ * 确保 Windows 系统目录始终存在于 PATH。
  *
- * When the Electron app launches, process.env.PATH normally includes System32.
- * However, the Claude Agent SDK creates a "shell snapshot" by running git-bash
- * with `-c -l` (login shell). The git-bash `/etc/profile` rebuilds PATH based on
- * MSYS2_PATH_TYPE (default: "inherit"), which preserves ORIGINAL_PATH from the
- * inherited environment. If System32 entries are somehow missing from the inherited
- * PATH, they won't appear in the snapshot either.
+ * Electron 启动时 `process.env.PATH` 通常包含 System32，但 Claude Agent SDK 会通过
+ * git-bash 登录 shell 创建 shell snapshot。git-bash 的 `/etc/profile` 会基于
+ * MSYS2_PATH_TYPE 和 ORIGINAL_PATH 重建 PATH；如果继承环境里已经缺少 System32，
+ * snapshot 中也会继续缺失。
  *
- * This function ensures that essential Windows system directories are always
- * present in PATH before the environment is handed to the SDK.
+ * 在把环境交给 SDK 前主动补齐系统目录，可以保证 Windows 内置命令在 Cowork 会话里
+ * 稳定可用。
  */
 function ensureWindowsSystemPathEntries(env: Record<string, string | undefined>): void {
   const systemRoot = env.SystemRoot || env.SYSTEMROOT || 'C:\\windows'
@@ -881,13 +889,13 @@ function ensureWindowsSystemPathEntries(env: Record<string, string | undefined>)
     }
   }
 
-  // Also ensure the systemRoot itself (e.g. C:\windows) is in PATH
+  // 系统根目录自身也可能被部分内置命令或 DLL 搜索路径使用，和 System32 一起补齐。
   if (!currentEntries.includes(systemRoot.toLowerCase()) && existsSync(systemRoot)) {
     missingDirs.push(systemRoot)
   }
 
   if (missingDirs.length > 0) {
-    // Append system dirs at the END so they don't override user tools
+    // 追加到末尾，避免系统目录覆盖用户安装的同名工具。
     env.PATH = currentPath
       ? `${currentPath}${delimiter}${missingDirs.join(delimiter)}`
       : missingDirs.join(delimiter)
@@ -900,16 +908,15 @@ function ensureWindowsSystemPathEntries(env: Record<string, string | undefined>)
 }
 
 /**
- * Ensure non-login git-bash invocations can resolve core MSYS commands.
+ * 为非登录 git-bash 调用补上核心 MSYS 命令搜索路径。
  *
- * Claude Agent SDK invokes `cygpath` during Windows path normalization via
- * `execSync(..., { shell: bash.exe })`, which does NOT always run a login shell.
- * In that code path, bash may inherit Windows-format PATH directly, and command
- * lookup for `cygpath` can fail because PATH is semicolon-delimited.
+ * Claude Agent SDK 在 Windows 路径规范化时会通过 `execSync(..., { shell: bash.exe })`
+ * 调用 `cygpath`，这条路径不一定会启动登录 shell。此时 bash 可能直接继承 Windows
+ * 格式的 PATH，而 Windows PATH 使用分号分隔，bash 无法按冒号规则解析，进而找不到
+ * `cygpath`。
  *
- * Prefixing PATH with `/usr/bin:/bin` keeps Windows PATH semantics (semicolon
- * delimiter) while giving bash a valid colon-delimited segment at the beginning.
- * This prevents errors like: `/bin/bash: line 1: cygpath: command not found`.
+ * 在 PATH 前面放入 `/usr/bin:/bin`，给 bash 一个合法的冒号分隔起始段，同时保留后续
+ * Windows PATH 语义，避免 `/bin/bash: cygpath: command not found`。
  */
 function ensureWindowsBashBootstrapPath(env: Record<string, string | undefined>): void {
   const currentPath = env.PATH || ''
@@ -933,14 +940,12 @@ function ensureWindowsBashBootstrapPath(env: Record<string, string | undefined>)
 }
 
 /**
- * Convert a single Windows path to MSYS2/POSIX format.
+ * 将单个 Windows 路径转换成 MSYS2/POSIX 路径。
  *
- * When the Windows path contains non-ASCII characters (e.g. Chinese usernames
- * like C:\Users\中文用户\...), MSYS2's automatic Windows→POSIX conversion may
- * corrupt the path if it runs before LANG=C.UTF-8 takes effect. Pre-converting
- * to POSIX format (/c/Users/中文用户/...) bypasses this problematic conversion
- * because MSYS2 recognises the value as already POSIX and passes it through
- * directly to its internal wide-char file APIs.
+ * 当路径包含中文用户名等非 ASCII 字符时，如果 MSYS2 在 LANG=C.UTF-8 生效前执行
+ * 自动 Windows→POSIX 转换，路径可能被错误解码。提前转为 `/c/Users/...` 这种
+ * POSIX 形式后，MSYS2 会把它识别为已转换路径，并直接交给内部 wide-char 文件 API，
+ * 从而规避编码损坏。
  */
 function singleWindowsPathToPosix(windowsPath: string): string {
   if (!windowsPath) return windowsPath
@@ -954,18 +959,14 @@ function singleWindowsPathToPosix(windowsPath: string): string {
 }
 
 /**
- * Convert a Windows-format PATH string to MSYS2/POSIX format for git-bash.
+ * 将 Windows PATH 字符串转换成 git-bash 可解析的 MSYS2/POSIX PATH。
  *
- * Windows PATH uses semicolons (;) as delimiters and backslash paths (C:\...),
- * while MSYS2 bash expects colons (:) and forward-slash POSIX paths (/c/...).
+ * Windows PATH 用分号分隔，并使用 `C:\...` 形式；MSYS2 bash 需要冒号分隔和
+ * `/c/...` 形式。Node.js fork 子进程时不会自动转换 PATH，如果 CLI 再启动 git-bash，
+ * `/etc/profile` 会把 ORIGINAL_PATH 追加到 PATH。此时分号仍留在字符串里，bash 会把
+ * 多个 Windows 路径当成一个巨大的无效路径项。
  *
- * When Node.js passes env vars to a forked process, PATH stays in Windows format.
- * If the CLI later spawns git-bash, the /etc/profile uses ORIGINAL_PATH="${PATH}"
- * and appends it to the new PATH with a colon. But since the Windows PATH still
- * has semicolons inside, it becomes one giant invalid path entry.
- *
- * This function converts each semicolon-separated Windows path entry to its
- * POSIX equivalent so that git-bash can correctly parse all entries.
+ * 这里逐项转换分号分隔的 Windows 路径，保证 git-bash 能按冒号正确解析每个目录。
  */
 function convertWindowsPathToMsys(windowsPath: string): string {
   if (!windowsPath) return windowsPath
@@ -977,18 +978,17 @@ function convertWindowsPathToMsys(windowsPath: string): string {
     const trimmed = entry.trim()
     if (!trimmed) continue
 
-    // Convert Windows path to POSIX: C:\foo\bar → /c/foo/bar
-    // Drive letter pattern: X:\ or X:/
+    // 转换盘符路径：C:\foo\bar 或 C:/foo/bar → /c/foo/bar。
     const driveMatch = trimmed.match(/^([A-Za-z]):[/\\](.*)/)
     if (driveMatch) {
       const driveLetter = driveMatch[1].toLowerCase()
       const rest = driveMatch[2].replace(/\\/g, '/').replace(/\/+$/, '')
       converted.push(`/${driveLetter}${rest ? '/' + rest : ''}`)
     } else if (trimmed.startsWith('/')) {
-      // Already POSIX-style
+      // 已经是 POSIX 风格，保持原样。
       converted.push(trimmed)
     } else {
-      // Relative path or unknown format, convert backslashes
+      // 相对路径或未知格式只替换反斜杠，尽量保留原路径语义。
       converted.push(trimmed.replace(/\\/g, '/'))
     }
   }
@@ -997,16 +997,14 @@ function convertWindowsPathToMsys(windowsPath: string): string {
 }
 
 /**
- * Set ORIGINAL_PATH with POSIX-converted PATH for git-bash to inherit.
+ * 预先设置 git-bash 会继承的 ORIGINAL_PATH。
  *
- * Git-bash's /etc/profile (with MSYS2_PATH_TYPE=inherit) reads ORIGINAL_PATH
- * and appends it to the MSYS2 PATH. However, if ORIGINAL_PATH contains
- * Windows-format paths (semicolons, backslashes), bash treats them as a single
- * invalid entry because it uses colons as the PATH delimiter.
+ * git-bash 的 `/etc/profile` 在 MSYS2_PATH_TYPE=inherit 时会读取 ORIGINAL_PATH，
+ * 并把它追加到 MSYS2 PATH。若 ORIGINAL_PATH 仍是 Windows 格式（分号和反斜杠），
+ * bash 会把它当成一个无效的大路径项。
  *
- * By pre-setting ORIGINAL_PATH to the POSIX-converted version of our PATH,
- * we ensure that /etc/profile appends properly formatted, colon-separated
- * paths that bash can actually use.
+ * 因此这里用 POSIX 转换后的 PATH 覆盖 ORIGINAL_PATH，让 `/etc/profile` 后续追加的
+ * 是格式正确的冒号分隔路径。
  */
 function ensureWindowsOriginalPath(env: Record<string, string | undefined>): void {
   const currentPath = env.PATH || ''
@@ -1022,17 +1020,14 @@ function ensureWindowsOriginalPath(env: Record<string, string | undefined>): voi
 }
 
 /**
- * Create a bash init script that sets the Windows console code page to UTF-8 (65001).
+ * 创建 git-bash 非交互会话的 UTF-8 初始化脚本。
  *
- * On Chinese Windows, the default console code page is GBK (936). When git-bash
- * executes Windows native commands (dir, ipconfig, systeminfo, net, type, etc.),
- * they output text encoded in the active console code page. If the code page is GBK,
- * the output contains GBK-encoded bytes, but the Claude Agent SDK reads them as UTF-8,
- * producing garbled characters (mojibake).
+ * 中文 Windows 默认控制台 code page 常见为 GBK(936)。当 git-bash 执行 dir、
+ * ipconfig、systeminfo、net、type 等 Windows 原生命令时，这些命令会按当前控制台
+ * code page 输出字节；Claude Agent SDK 按 UTF-8 读取时就会乱码。
  *
- * By setting BASH_ENV to this script, every non-interactive bash session spawned by
- * the Claude Agent SDK will automatically switch the console code page to UTF-8
- * before executing any commands.
+ * 通过 BASH_ENV 指向该脚本，可以让 SDK 每次启动非交互 bash 前先执行 `chcp 65001`，
+ * 将 Windows 原生命令输出切到 UTF-8。
  */
 function ensureWindowsBashUtf8InitScript(): string | null {
   try {
@@ -1042,8 +1037,8 @@ function ensureWindowsBashUtf8InitScript(): string | null {
     const initScript = join(initDir, 'bash_utf8_init.sh')
     const content = [
       '#!/usr/bin/env bash',
-      '# Auto-generated by PetClaw – switch Windows console code page to UTF-8',
-      '# to prevent garbled output from Windows native commands.',
+      '# PetClaw 自动生成：将 Windows 控制台 code page 切换为 UTF-8',
+      '# 用于避免 Windows 原生命令输出被 SDK 按 UTF-8 读取时出现乱码。',
       'if command -v chcp.com >/dev/null 2>&1; then',
       '  chcp.com 65001 >/dev/null 2>&1',
       'fi',
@@ -1054,7 +1049,7 @@ function ensureWindowsBashUtf8InitScript(): string | null {
     try {
       chmodSync(initScript, 0o755)
     } catch {
-      // Ignore chmod errors on file systems that do not support POSIX modes.
+      // 某些文件系统不支持 POSIX 权限位，chmod 失败不影响脚本被 bash 读取。
     }
 
     return initScript
@@ -1075,20 +1070,18 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
     env.PETCLAW_ELECTRON_PATH = electronNodeRuntimePath
   }
 
-  // On Windows, resolve git-bash and ensure Git toolchain directories are available in PATH.
+  // Windows 需要先解析 git-bash，并把 Git 工具链目录补进 PATH，供 shell 工具执行。
   if (process.platform === 'win32') {
     env.PETCLAW_ELECTRON_PATH = electronNodeRuntimePath
 
-    // Force UTF-8 encoding for MSYS2/git-bash.
+    // 强制 MSYS2/git-bash 使用 UTF-8。
     //
-    // On Chinese (and other non-Latin) Windows systems, the default system locale
-    // uses GBK (code page 936) or similar legacy encodings. Without explicit locale
-    // settings, MSYS2 tools and the git-bash environment may output text in the
-    // system's legacy encoding, which the Claude Agent SDK misinterprets as UTF-8,
-    // producing garbled characters.
+    // 中文 Windows 等非拉丁系统区域设置下，默认编码通常是 GBK(936) 或类似 legacy
+    // code page。如果不显式设置 locale，MSYS2 工具和 git-bash 环境可能输出 legacy
+    // 编码，Claude Agent SDK 按 UTF-8 解读后会出现乱码。
     //
-    // Setting LANG and LC_ALL to C.UTF-8 tells the MSYS2 runtime to use UTF-8 for
-    // all text I/O, including output from coreutils (ls, cat, grep, etc.).
+    // LANG/LC_ALL=C.UTF-8 会要求 MSYS2 runtime 在 coreutils（ls/cat/grep 等）文本
+    // 输入输出中使用 UTF-8。
     if (!env.LANG) {
       env.LANG = 'C.UTF-8'
     }
@@ -1096,9 +1089,9 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
       env.LC_ALL = 'C.UTF-8'
     }
 
-    // Force Python to use UTF-8 mode (PEP 540, Python 3.7+).
-    // Without this, Python on Chinese Windows defaults to GBK for stdin/stdout/stderr
-    // and file I/O, causing garbled output when the SDK reads it as UTF-8.
+    // 强制 Python 使用 UTF-8 模式（PEP 540，Python 3.7+）。
+    // 否则中文 Windows 上 Python 的 stdin/stdout/stderr 和文件 I/O 可能默认 GBK，
+    // SDK 按 UTF-8 读取时会乱码。
     if (!env.PYTHONUTF8) {
       env.PYTHONUTF8 = '1'
     }
@@ -1106,23 +1099,19 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
       env.PYTHONIOENCODING = 'utf-8'
     }
 
-    // Force `less` and `git` pager output to use UTF-8.
+    // 强制 less 和 git pager 输出使用 UTF-8，避免分页器内容乱码。
     if (!env.LESSCHARSET) {
       env.LESSCHARSET = 'utf-8'
     }
 
-    // Create a bash init script that switches the Windows console code page to
-    // UTF-8 (65001). By setting BASH_ENV, every non-interactive bash session
-    // spawned by the Claude Agent SDK will source this script before executing
-    // commands, ensuring Windows native commands (dir, ipconfig, systeminfo,
-    // type, etc.) output UTF-8 instead of GBK.
+    // 通过 BASH_ENV 注入初始化脚本，让 SDK 创建的每个非交互 bash 会话在执行命令前
+    // 先把 Windows 控制台 code page 切到 UTF-8，保证 dir/ipconfig/systeminfo/type
+    // 等原生命令输出 UTF-8 而不是 GBK。
     if (!env.BASH_ENV) {
       const initScript = ensureWindowsBashUtf8InitScript()
       if (initScript) {
-        // Convert to MSYS2 POSIX format to avoid encoding issues when the
-        // path contains non-ASCII characters (e.g. Chinese Windows username).
-        // MSYS2's automatic Windows→POSIX conversion can corrupt non-ASCII
-        // chars if it runs before LANG=C.UTF-8 takes effect during DLL init.
+        // BASH_ENV 路径提前转换成 MSYS2 POSIX 格式，避免中文用户名等非 ASCII 路径在
+        // LANG=C.UTF-8 生效前被 MSYS2 自动转换逻辑错误解码。
         env.BASH_ENV = singleWindowsPathToPosix(initScript)
         coworkLog(
           'INFO',
@@ -1132,22 +1121,16 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
       }
     }
 
-    // Ensure critical Windows system environment variables are always present.
-    // Packaged Electron apps or certain launch contexts may lack these variables,
-    // which causes Windows built-in commands (ipconfig, systeminfo, netstat, etc.)
-    // to fail when executed inside git-bash via the Claude Agent SDK.
+    // 补齐 Windows 关键系统变量，避免打包版或特殊启动上下文缺少 SystemRoot 等变量，
+    // 导致 git-bash 内部执行 ipconfig、systeminfo、netstat 等系统命令失败。
     ensureWindowsSystemEnvVars(env)
 
-    // Ensure Windows system directories (System32, etc.) are always in PATH.
-    // The Claude Agent SDK's shell snapshot mechanism captures PATH and may lose
-    // system directories if they were missing from the inherited environment.
+    // 补齐 System32 等系统目录。SDK 的 shell snapshot 会固化 PATH；如果此时缺失系统
+    // 目录，后续会话中的内置命令也会一直不可见。
     ensureWindowsSystemPathEntries(env)
 
-    // Merge the latest PATH entries from the Windows registry (Machine + User).
-    // When the Electron app is launched from Explorer/Start Menu, process.env.PATH
-    // may be stale and missing tools installed after Explorer started (e.g. Python,
-    // Node.js, npm). Reading from the registry ensures we get the latest values,
-    // similar to how a freshly opened terminal would.
+    // 合并注册表里的最新 Machine/User PATH。Explorer 启动的 Electron 可能继承旧 PATH，
+    // 导致用户后来安装的 Python/Node/npm 不可见；注册表值更接近新打开终端看到的环境。
     ensureWindowsRegistryPathEntries(env)
 
     const configuredBashPath = normalizeWindowsPath(env.CLAUDE_CODE_GIT_BASH_PATH)
@@ -1198,12 +1181,9 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
 
     appendPythonRuntimeToEnv(env)
 
-    // Tell git-bash to inherit the PATH from the parent process instead of
-    // rebuilding it from scratch. Without this, git-bash's /etc/profile (login
-    // shell) defaults to constructing a minimal PATH containing only Windows
-    // system directories + MSYS2 tools, discarding user-installed tool paths
-    // like Python, Node.js, npm, pip, etc. Setting MSYS2_PATH_TYPE=inherit
-    // makes git-bash preserve the full PATH we've carefully constructed above.
+    // 要求 git-bash 继承父进程 PATH，而不是从头构造最小 PATH。
+    // 否则登录 shell 的 /etc/profile 可能只保留 Windows 系统目录和 MSYS2 工具，
+    // 丢掉上面补齐的 Python、Node.js、npm、pip 等用户工具路径。
     if (!env.MSYS2_PATH_TYPE) {
       env.MSYS2_PATH_TYPE = 'inherit'
       coworkLog(
@@ -1213,24 +1193,20 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
       )
     }
 
-    // Pre-set ORIGINAL_PATH in POSIX format so git-bash's /etc/profile can use it.
+    // 预先把 ORIGINAL_PATH 设置为 POSIX 格式，供 git-bash 的 /etc/profile 使用。
     //
-    // ROOT CAUSE: Node.js env PATH on Windows uses semicolons (;) and backslash
-    // paths (C:\...). When the Claude Agent SDK's CLI spawns git-bash with this env,
-    // /etc/profile reads ORIGINAL_PATH="${ORIGINAL_PATH:-${PATH}}" and appends it
-    // with a colon. But the semicolons in the Windows PATH are NOT converted to
-    // colons, so "C:\nodejs;C:\python" becomes one giant invalid entry instead of
-    // two separate paths. This causes `npm`, `python`, `pip` etc. to be unfindable.
+    // 根因：Windows 下 Node.js 环境里的 PATH 使用分号和反斜杠。SDK 启动 git-bash 后，
+    // /etc/profile 会读取 ORIGINAL_PATH="${ORIGINAL_PATH:-${PATH}}" 并用冒号追加。
+    // 如果仍是 `C:\nodejs;C:\python`，bash 会把它看成一个无效路径项，导致 npm、
+    // python、pip 等命令找不到。
     //
-    // By pre-setting ORIGINAL_PATH to the POSIX-converted version (/c/nodejs:/c/python),
-    // /etc/profile uses it directly and bash can correctly parse all PATH entries.
-    // This MUST be done AFTER all PATH modifications above so the full PATH is captured.
+    // 必须在所有 PATH 修改完成后再转换，确保 ORIGINAL_PATH 捕获的是完整最终 PATH。
     ensureWindowsOriginalPath(env)
   }
 
   if (!app.isPackaged) {
-    // In dev mode, prepend project's node_modules/.bin to PATH so bundled
-    // npx/npm are found even if the user has no global Node.js installation.
+    // 开发模式优先使用项目 node_modules/.bin，保证没有全局 Node.js/npm 的机器也能
+    // 解析到本项目依赖提供的命令。
     const devBinDir = join(app.getAppPath(), 'node_modules', '.bin')
     if (existsSync(devBinDir)) {
       env.PATH = [devBinDir, env.PATH].filter(Boolean).join(delimiter)
@@ -1241,8 +1217,8 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
       )
     }
 
-    // In dev mode, add openclaw runtime's node_modules to NODE_PATH so exec tool
-    // can access shared packages like sharp.
+    // 开发模式把 Openclaw runtime 的 node_modules 加到 NODE_PATH，使 exec 工具能访问
+    // sharp 等 runtime 共享依赖。
     const devRuntimeNodeModules = (() => {
       const runtimeCandidates = [
         join(app.getAppPath(), 'vendor', 'openclaw-runtime', 'current', 'node_modules'),
@@ -1253,7 +1229,7 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
           const resolved = realpathSync(c)
           if (existsSync(resolved)) return resolved
         } catch {
-          /* symlink target missing — skip */
+          /* symlink 目标不存在时跳过，继续检查下一个候选路径 */
         }
       }
       return null
@@ -1273,7 +1249,7 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
     env.HOME = app.getPath('home')
   }
 
-  // Resolve user's shell PATH so that node, npm, and other tools are findable
+  // 打包模式下解析用户 shell PATH，确保 node/npm 及用户安装的工具可被子进程找到。
   const userPath = resolveUserShellPath()
   if (userPath) {
     env.PATH = userPath
@@ -1290,7 +1266,7 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
       )
     }
   } else {
-    // Fallback: append common node installation paths
+    // shell PATH 解析失败时追加常见 Node.js 安装目录，作为弱兜底。
     const home = env.HOME || app.getPath('home')
     const commonPaths = [
       '/usr/local/bin',
@@ -1310,10 +1286,9 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
   const resourcesPath = process.resourcesPath
   coworkLog('INFO', 'applyPackagedEnvOverrides', `Packaged mode: resourcesPath=${resourcesPath}`)
 
-  // Create node/npx/npm shims that wrap Electron as a Node.js runtime via
-  // ELECTRON_RUN_AS_NODE=1 and point npx/npm to the bundled npm package.
-  // This avoids relying on node_modules/.bin symlinks which don't work on
-  // Windows cross-platform builds.
+  // 创建 node/npx/npm shim：用 ELECTRON_RUN_AS_NODE=1 让 Electron 充当 Node.js runtime，
+  // 并让 npx/npm 指向打包进来的 npm 包。这样无需依赖系统 Node.js，也规避 Windows
+  // 跨平台构建中 node_modules/.bin 符号链接不可用的问题。
   const npmBinDir = join(resourcesPath, 'app.asar.unpacked', 'node_modules', 'npm', 'bin')
   coworkLog(
     'INFO',
@@ -1321,8 +1296,8 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
     `npmBinDir=${npmBinDir}, exists=${existsSync(npmBinDir)}`
   )
 
-  // Set env var so .cmd shims can reference npmBinDir without hardcoding
-  // non-ASCII characters (which break on Windows when cmd.exe uses GBK code page).
+  // .cmd shim 通过环境变量引用 npmBinDir，避免把含中文的绝对路径硬编码进批处理文件。
+  // 在 GBK code page 下，硬编码非 ASCII 路径容易被 cmd.exe 误读。
   env.PETCLAW_NPM_BIN_DIR = npmBinDir
 
   const hasSystemNode = hasCommandInEnv('node', env)
@@ -1351,8 +1326,7 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
         )
       }
 
-      // Re-compute ORIGINAL_PATH after shim injection so that git-bash
-      // also sees the bundled node/npx/npm in its PATH.
+      // shim 注入后重新计算 ORIGINAL_PATH，确保 git-bash 也能看到内置 node/npx/npm。
       if (process.platform === 'win32') {
         ensureWindowsOriginalPath(env)
       }
@@ -1376,19 +1350,21 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
     env.NODE_PATH = appendEnvPath(env.NODE_PATH, nodePaths)
   }
 
-  // Verify node/npx resolution in the constructed environment
+  // 最后验证构造后的环境能解析 node/npx/npm，便于排查用户机器上的命令缺失。
   verifyNodeEnvironment(env)
 }
 
 /**
- * Verify that node/npx/npm can be resolved from the constructed environment PATH.
- * Logs diagnostic info for debugging MCP server startup issues on macOS.
+ * 验证构造后的 PATH 是否能解析 node/npx/npm。
+ *
+ * 该函数只输出诊断日志，不改变环境。主要用于定位打包版 macOS 或用户机器上 MCP
+ * 服务器启动失败时，到底是 PATH、shim 还是 npm 包路径出了问题。
  */
 function verifyNodeEnvironment(env: Record<string, string | undefined>): void {
   const tag = 'verifyNodeEnv'
   const pathValue = env.PATH || ''
 
-  // Log final PATH entries
+  // 逐项记录最终 PATH，方便从日志判断目录是否存在、顺序是否符合预期。
   const pathEntries = pathValue.split(delimiter)
   coworkLog('INFO', tag, `Final PATH has ${pathEntries.length} entries:`)
   for (let i = 0; i < pathEntries.length; i++) {
@@ -1397,7 +1373,7 @@ function verifyNodeEnvironment(env: Record<string, string | undefined>): void {
     coworkLog('INFO', tag, `  [${i}] ${entry} (exists: ${entryExists})`)
   }
 
-  // Try to resolve node, npx, npm using 'which' (macOS/Linux) or 'where' (Windows)
+  // 使用平台原生命令解析 node/npx/npm：macOS/Linux 用 which，Windows 用 where。
   const whichCmd = process.platform === 'win32' ? 'where' : 'which'
   for (const tool of ['node', 'npx', 'npm']) {
     try {
@@ -1420,7 +1396,7 @@ function verifyNodeEnvironment(env: Record<string, string | undefined>): void {
               resolvedCandidates[0]
             : resolvedCandidates[0]
 
-        // Try to get version
+        // node 能解析时进一步执行 --version，确认 shim 或真实 node 可以正常启动。
         if (tool === 'node' && resolvedForExec) {
           try {
             let execTarget = resolvedForExec
@@ -1468,7 +1444,7 @@ function verifyNodeEnvironment(env: Record<string, string | undefined>): void {
     }
   }
 
-  // Log key env vars
+  // 记录关键环境变量，便于和 PATH 解析结果一起排查。
   coworkLog('INFO', tag, `NODE_PATH=${env.NODE_PATH || '(not set)'}`)
   coworkLog('INFO', tag, `PETCLAW_ELECTRON_PATH=${env.PETCLAW_ELECTRON_PATH || '(not set)'}`)
   coworkLog('INFO', tag, `PETCLAW_NPM_BIN_DIR=${env.PETCLAW_NPM_BIN_DIR || '(not set)'}`)
@@ -1476,16 +1452,19 @@ function verifyNodeEnvironment(env: Record<string, string | undefined>): void {
 }
 
 /**
- * Get SKILLs directory path (handles both development and production)
+ * 获取 SKILLs 根目录。
+ *
+ * 生产环境的技能会复制到 userData，开发环境则优先从项目目录或显式环境变量查找，
+ * 以兼容 electron-vite 输出目录变化和本地调试场景。
  */
 export function getSkillsRoot(): string {
   if (app.isPackaged) {
-    // In production, SKILLs are copied to userData
+    // 生产环境运行时只读 Resources，用户可写的技能目录统一放在 userData。
     return join(app.getPath('userData'), 'SKILLs')
   }
 
-  // In development, __dirname can vary with bundling output (e.g. dist-electron/ or dist-electron/libs/).
-  // Resolve from several stable anchors and pick the first existing SKILLs directory.
+  // 开发环境下 __dirname 会随构建输出目录变化（例如 dist-electron/ 或 dist-electron/libs/）。
+  // 因此从环境变量、app path、cwd 和相对目录多个稳定锚点查找，选第一个存在的目录。
   const envRoots = [process.env.PETCLAW_SKILLS_ROOT, process.env.SKILLS_ROOT]
     .map((value) => value?.trim())
     .filter((value): value is string => Boolean(value))
@@ -1503,13 +1482,15 @@ export function getSkillsRoot(): string {
     }
   }
 
-  // Final fallback for first-run dev environments where SKILLs may not exist yet.
+  // 首次开发启动时 SKILLs 目录可能还没同步，最终回退到 app path 下的预期位置。
   return join(app.getAppPath(), 'SKILLs')
 }
 
 /**
- * Get enhanced environment variables (including proxy configuration)
- * Async function to fetch system proxy and inject into environment variables
+ * 构造 Cowork 子进程使用的增强环境变量。
+ *
+ * 这里会合并模型配置环境、打包/开发模式 PATH 修正、SKILLs 路径，以及系统代理。
+ * 代理解析是异步的，所以该函数保持 async。
  */
 export async function getEnhancedEnv(
   target: OpenAICompatProxyTarget = 'local'
@@ -1519,10 +1500,8 @@ export async function getEnhancedEnv(
 
   applyPackagedEnvOverrides(env)
 
-  // Inject SKILLs directory path for skill scripts.
-  // On Windows, normalise backslashes to forward slashes so the value is usable
-  // in both Node.js (which accepts forward slashes) and bash (which treats
-  // backslashes as escape characters).
+  // 注入技能目录路径，供 skill 脚本和 Openclaw 执行环境读取。
+  // Windows 下统一使用正斜杠：Node.js 可以识别，bash 也不会把反斜杠当转义字符。
   const skillsRoot = getSkillsRoot().replace(/\\/g, '/')
   env.SKILLS_ROOT = skillsRoot
   env.PETCLAW_SKILLS_ROOT = skillsRoot // Alternative name for clarity
@@ -1532,17 +1511,17 @@ export async function getEnhancedEnv(
     delete env.PETCLAW_ELECTRON_PATH
   }
 
-  // Skip system proxy resolution if proxy env vars already exist
+  // 如果模型配置或外部环境已经显式设置代理，则尊重现有值，不再覆盖。
   if (env.http_proxy || env.HTTP_PROXY || env.https_proxy || env.HTTPS_PROXY) {
     return env
   }
 
-  // User can disable system proxy from settings.
+  // 用户可在设置中关闭系统代理注入；关闭后 Cowork 子进程不继承系统代理。
   if (!isSystemProxyEnabled()) {
     return env
   }
 
-  // Resolve proxy from system settings
+  // 从系统网络设置解析代理，并同时写入大小写两套变量以兼容不同 CLI。
   const { proxyUrl, targetUrl } = await resolveSystemProxyUrlForTargets()
   if (proxyUrl) {
     env.http_proxy = proxyUrl
@@ -1556,9 +1535,13 @@ export async function getEnhancedEnv(
 }
 
 /**
- * Ensure the cowork temp directory exists in the given working directory
- * @param cwd Working directory path
- * @returns Path to the temp directory
+ * 确保工作目录下存在 Cowork 临时目录。
+ *
+ * Claude Agent SDK 会创建临时文件。把临时文件放在用户当前工作目录下的 `.cowork-temp`
+ * 可以避免写入系统临时目录带来的权限、沙盒或跨磁盘清理问题。
+ *
+ * @param cwd 用户当前工作目录
+ * @returns 可用的临时目录路径；创建失败时回退到 cwd
  */
 export function ensureCoworkTempDir(cwd: string): string {
   const tempDir = join(cwd, '.cowork-temp')
@@ -1568,7 +1551,7 @@ export function ensureCoworkTempDir(cwd: string): string {
       console.warn('Created cowork temp directory:', tempDir)
     } catch (error) {
       console.error('Failed to create cowork temp directory:', error)
-      // Fall back to cwd if we can't create the temp dir
+      // 临时目录创建失败时不阻断会话启动，回退到 cwd 让 SDK 仍有可写位置。
       return cwd
     }
   }
@@ -1576,9 +1559,12 @@ export function ensureCoworkTempDir(cwd: string): string {
 }
 
 /**
- * Get enhanced environment variables with TMPDIR set to the cowork temp directory
- * This ensures Claude Agent SDK creates temporary files in the user's working directory
- * @param cwd Working directory path
+ * 构造增强环境，并把各平台临时目录变量指向 `.cowork-temp`。
+ *
+ * macOS/Linux 使用 TMPDIR，Windows 常用 TMP/TEMP。三者都设置可以覆盖不同工具链的
+ * 读取习惯，确保 SDK 及其子进程都把临时文件落在当前工作目录内。
+ *
+ * @param cwd 用户当前工作目录
  */
 export async function getEnhancedEnvWithTmpdir(
   cwd: string,
@@ -1587,10 +1573,10 @@ export async function getEnhancedEnvWithTmpdir(
   const env = await getEnhancedEnv(target)
   const tempDir = ensureCoworkTempDir(cwd)
 
-  // Set temp directory environment variables for all platforms
-  env.TMPDIR = tempDir // macOS, Linux
-  env.TMP = tempDir // Windows
-  env.TEMP = tempDir // Windows
+  // 同时设置三套变量，覆盖 POSIX 工具、Windows 原生命令和 Node/Python 等运行时。
+  env.TMPDIR = tempDir
+  env.TMP = tempDir
+  env.TEMP = tempDir
 
   return env
 }
@@ -1600,6 +1586,12 @@ const SESSION_TITLE_MAX_CHARS = 50
 const SESSION_TITLE_TIMEOUT_MS = 8000
 const COWORK_MODEL_PROBE_TIMEOUT_MS = 20000
 
+/**
+ * 会话标题生成只走当前支持的直连协议。
+ *
+ * Anthropic 兼容协议和 Gemini 原生协议的请求体、鉴权头、响应解析都不同，
+ * 因此在类型层面拆成两个分支，避免后续调用处用字符串判断拼错字段。
+ */
 type SessionTitleApiConfig =
   | {
       protocol: typeof CoworkModelProtocol.Anthropic
@@ -1646,6 +1638,12 @@ function resolveSessionTitleApiConfig(): { config: SessionTitleApiConfig | null;
   }
 }
 
+/**
+ * 将模型返回的标题清洗成适合 UI 展示的纯文本。
+ *
+ * 标题生成模型可能会“不听话”地返回 Markdown、代码块、引用、列表或 `Title:` 前缀。
+ * 这里统一剥离这些格式，并限制最大长度，保证会话列表不会被异常标题撑破布局。
+ */
 function normalizeTitleToPlainText(value: string, fallback: string): string {
   if (!value.trim()) return fallback
 
@@ -1693,6 +1691,12 @@ function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === 'AbortError'
 }
 
+/**
+ * 根据用户第一条输入构造本地 fallback 标题。
+ *
+ * 标题生成依赖外部模型，可能因为网络、配置或限流失败。fallback 必须完全本地可用，
+ * 这样新会话创建不会被标题生成阻塞。
+ */
 function buildFallbackSessionTitle(userIntent: string | null): string {
   const normalizedInput = typeof userIntent === 'string' ? userIntent.trim() : ''
   if (!normalizedInput) {
@@ -1721,6 +1725,8 @@ export async function probeCoworkModelReadiness(
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
+    // 用最小 token 的请求验证模型配置、鉴权和网络连通性。
+    // 这里不关心模型具体回复内容，只要 API 返回 2xx 就认为当前配置可用于后续 Cowork 会话。
     const response = await fetch(
       config.protocol === CoworkModelProtocol.GeminiNative
         ? buildGeminiGenerateContentUrl(config.baseURL, config.model)
@@ -1859,6 +1865,8 @@ export async function generateSessionTitle(userIntent: string | null): Promise<s
 
     const payload = await response.json()
     console.warn('[cowork-title] Title response payload:', JSON.stringify(payload).slice(0, 500))
+    // 不同协议的响应结构不同，解析后仍统一经过 normalizeTitleToPlainText 清洗。
+    // 这样即使模型返回 Markdown 或超长文本，最终落到 UI 的标题也保持稳定。
     const llmTitle =
       config.protocol === CoworkModelProtocol.GeminiNative
         ? extractTextFromGeminiResponse(payload)

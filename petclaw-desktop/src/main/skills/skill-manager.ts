@@ -7,6 +7,9 @@ import type Database from 'better-sqlite3'
 import type { Skill } from '../ai/types'
 import { kvGet, kvSet } from '../data/db'
 
+const SKILL_FILE_NAME = 'SKILL.md'
+const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/
+
 export class SkillManager extends EventEmitter {
   private skills: Skill[] = []
   // enabledState 从 kv 表持久化，key 为 skill id，value 为是否启用
@@ -36,7 +39,7 @@ export class SkillManager extends EventEmitter {
     const entries = fs.readdirSync(this.skillsRoot, { withFileTypes: true })
     for (const entry of entries) {
       if (!entry.isDirectory()) continue
-      const skillMdPath = path.join(this.skillsRoot, entry.name, 'SKILL.md')
+      const skillMdPath = path.join(this.skillsRoot, entry.name, SKILL_FILE_NAME)
       if (!fs.existsSync(skillMdPath)) continue
 
       const content = fs.readFileSync(skillMdPath, 'utf8')
@@ -81,6 +84,24 @@ export class SkillManager extends EventEmitter {
     return this.skills.filter((s) => s.enabled)
   }
 
+  buildSelectedSkillPrompt(skillIds: string[]): string {
+    const uniqueIds = Array.from(new Set(skillIds.map((id) => id.trim()).filter(Boolean)))
+    if (uniqueIds.length === 0) return ''
+
+    const sections: string[] = []
+    for (const id of uniqueIds) {
+      const skill = this.skills.find((item) => item.id === id)
+      if (!skill?.enabled) continue
+
+      const prompt = this.readSkillPrompt(skill)
+      if (!prompt) continue
+
+      sections.push(this.buildInlinedSkillPrompt(skill, prompt))
+    }
+
+    return sections.join('\n\n')
+  }
+
   /**
    * 生成传给 Openclaw 运行时的 Skill 配置结构：
    * - entries：每个 skill 的启用状态
@@ -118,7 +139,7 @@ export class SkillManager extends EventEmitter {
    * 只做简单的行解析（key: value），不依赖 yaml 库
    */
   private parseFrontmatter(content: string): Record<string, string> {
-    const match = content.match(/^---\n([\s\S]*?)\n---/)
+    const match = content.match(FRONTMATTER_RE)
     if (!match) return {}
     const result: Record<string, string> = {}
     for (const line of match[1].split('\n')) {
@@ -129,5 +150,32 @@ export class SkillManager extends EventEmitter {
       result[key] = value
     }
     return result
+  }
+
+  private readSkillPrompt(skill: Skill): string {
+    const skillFilePath = path.join(skill.skillPath, SKILL_FILE_NAME)
+    try {
+      const content = fs.readFileSync(skillFilePath, 'utf8').replace(/^\uFEFF/, '')
+      return content.replace(FRONTMATTER_RE, '').trim()
+    } catch {
+      return ''
+    }
+  }
+
+  private buildInlinedSkillPrompt(skill: Skill, prompt: string): string {
+    const skillFilePath = path.join(skill.skillPath, SKILL_FILE_NAME)
+    return [
+      `## Skill: ${skill.name}`,
+      '<skill_context>',
+      `  <location>${skillFilePath}</location>`,
+      `  <directory>${skill.skillPath}</directory>`,
+      '  <path_rules>',
+      '    Resolve relative file references from this skill against <directory>.',
+      '    Do not assume skills are under the current workspace directory.',
+      '  </path_rules>',
+      '</skill_context>',
+      '',
+      prompt
+    ].join('\n')
   }
 }

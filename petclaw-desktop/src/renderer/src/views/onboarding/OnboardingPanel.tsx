@@ -389,7 +389,7 @@ function SkillsStep() {
                   </span>
                 )}
                 {skill.tag === 'needs-config' && (
-                  <span className="px-1.5 py-0.5 text-[11px] font-medium bg-[#fee2e2] text-error rounded">
+                  <span className="px-1.5 py-0.5 text-[11px] font-medium bg-danger-bg text-error rounded">
                     {t('onboarding.needsConfig')}
                   </span>
                 )}
@@ -581,7 +581,7 @@ export function OnboardingPanel({ onComplete }: { onComplete: () => void }) {
     async (message: string) => {
       await saveAndComplete()
       setTimeout(() => {
-        window.api.cowork.send(message, '')
+        window.api.cowork.startSession({ prompt: message, cwd: '' })
       }, 500)
     },
     [saveAndComplete]

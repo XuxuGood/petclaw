@@ -75,7 +75,7 @@ export function DirectoryConfigDialog({
   ]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay">
       <div className="bg-bg-root rounded-[14px] shadow-lg w-[560px] max-h-[80vh] flex flex-col overflow-hidden">
         {/* 标题栏：目录名称 + 路径 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">

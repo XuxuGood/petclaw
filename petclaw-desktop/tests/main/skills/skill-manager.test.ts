@@ -21,14 +21,14 @@ describe('SkillManager', () => {
     fs.mkdirSync(skill1)
     fs.writeFileSync(
       path.join(skill1, 'SKILL.md'),
-      '---\nname: web-search\ndescription: Search the web\nversion: 1.0.0\n---\n'
+      '---\nname: web-search\ndescription: Search the web\nversion: 1.0.0\n---\nUse web search for current information.\n'
     )
 
     const skill2 = path.join(tmpDir, 'code-analyzer')
     fs.mkdirSync(skill2)
     fs.writeFileSync(
       path.join(skill2, 'SKILL.md'),
-      '---\nname: code-analyzer\ndescription: Analyze code\n---\n'
+      '---\nname: code-analyzer\ndescription: Analyze code\n---\nAnalyze code structure.\n'
     )
 
     manager = new SkillManager(db, tmpDir)
@@ -76,5 +76,29 @@ describe('SkillManager', () => {
     expect(config.entries['web-search'].enabled).toBe(true)
     expect(config.entries['code-analyzer'].enabled).toBe(false)
     expect(config.load.extraDirs).toContain(tmpDir)
+  })
+
+  it('should build selected skill prompt from enabled SKILL.md content', async () => {
+    await manager.scan()
+
+    const prompt = manager.buildSelectedSkillPrompt(['web-search'])
+
+    expect(prompt).toContain('## Skill: web-search')
+    expect(prompt).toContain(`<location>${path.join(tmpDir, 'web-search', 'SKILL.md')}</location>`)
+    expect(prompt).toContain(`<directory>${path.join(tmpDir, 'web-search')}</directory>`)
+    expect(prompt).toContain(
+      'Resolve relative file references from this skill against <directory>.'
+    )
+    expect(prompt).toContain('Use web search for current information.')
+    expect(prompt).not.toContain('---')
+  })
+
+  it('should ignore disabled and unknown skills when building selected skill prompt', async () => {
+    await manager.scan()
+    manager.setEnabled('web-search', false)
+
+    const prompt = manager.buildSelectedSkillPrompt(['web-search', 'missing'])
+
+    expect(prompt).toBe('')
   })
 })

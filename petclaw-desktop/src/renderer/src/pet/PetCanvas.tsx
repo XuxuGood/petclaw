@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { PetState } from './state-machine'
 
 import beginVideo from '../assets/cat/begin.webm'
@@ -14,6 +14,8 @@ import taskLeaveVideo from '../assets/cat/task-leave.webm'
 interface PetCanvasProps {
   state: PetState
   paused?: boolean
+  /** 气泡文本，非空时显示气泡，清空后隐藏 */
+  bubbleText?: string
   onDragMove?: (dx: number, dy: number) => void
   onDragEnd?: () => void
   onClick?: () => void
@@ -29,12 +31,14 @@ type VideoStep = { src: string; loop: boolean }
 /**
  * Double-buffered video player to avoid flicker on source switch.
  * Two <video> elements swap: the back one loads while the front one keeps showing.
+ * 每轮 playSequence 使用 AbortController 管理所有监听器生命周期，
+ * abort 时自动清除 canplay/ended 监听器，避免快速切换时旧 handler 执行导致动画混乱。
  */
 class VideoPlayer {
   private videos: [HTMLVideoElement, HTMLVideoElement]
   private activeIdx = 0
   private queue: VideoStep[] = []
-  private endedHandler: (() => void) | null = null
+  private abortController: AbortController | null = null
 
   constructor(v0: HTMLVideoElement, v1: HTMLVideoElement) {
     this.videos = [v0, v1]
@@ -51,7 +55,9 @@ class VideoPlayer {
   }
 
   playSequence(steps: VideoStep[]): void {
-    this.clearEnded()
+    // abort 上一轮所有监听器，确保 canplay/ended 不会在新序列中执行
+    this.abortController?.abort()
+    this.abortController = new AbortController()
     this.queue = []
 
     if (steps.length === 0) return
@@ -61,40 +67,36 @@ class VideoPlayer {
   }
 
   private loadAndPlay(step: VideoStep): void {
-    this.clearEnded()
+    const signal = this.abortController!.signal
     const back = this.back
 
     back.loop = step.loop
     back.src = step.src
     back.load()
 
-    const onCanPlay = (): void => {
-      back.removeEventListener('canplay', onCanPlay)
-      this.activeIdx = 1 - this.activeIdx
-      this.active.style.visibility = 'visible'
-      this.back.style.visibility = 'hidden'
-      this.back.pause()
+    back.addEventListener(
+      'canplay',
+      () => {
+        this.activeIdx = 1 - this.activeIdx
+        this.active.style.visibility = 'visible'
+        this.back.style.visibility = 'hidden'
+        this.back.pause()
 
-      this.active.play().catch(() => {})
+        this.active.play().catch(() => {})
 
-      if (!step.loop && this.queue.length > 0) {
-        const next = this.queue.shift()!
-        this.endedHandler = () => {
-          this.active.removeEventListener('ended', this.endedHandler!)
-          this.endedHandler = null
-          this.loadAndPlay(next)
+        if (!step.loop && this.queue.length > 0) {
+          const next = this.queue.shift()!
+          this.active.addEventListener(
+            'ended',
+            () => {
+              this.loadAndPlay(next)
+            },
+            { once: true, signal }
+          )
         }
-        this.active.addEventListener('ended', this.endedHandler)
-      }
-    }
-    back.addEventListener('canplay', onCanPlay)
-  }
-
-  private clearEnded(): void {
-    if (this.endedHandler) {
-      this.active.removeEventListener('ended', this.endedHandler)
-      this.endedHandler = null
-    }
+      },
+      { once: true, signal }
+    )
   }
 
   pause(): void {
@@ -109,6 +111,7 @@ class VideoPlayer {
 export function PetCanvas({
   state,
   paused,
+  bubbleText: externalBubbleText,
   onDragMove,
   onDragEnd,
   onClick,
@@ -200,43 +203,13 @@ export function PetCanvas({
       return
     }
 
-    if (state === PetState.Idle || state === PetState.Dragging) {
+    if (state === PetState.Idle) {
       player.playSequence([...wakePrefix, { src: staticVideo, loop: true }])
       return
     }
   }, [state])
 
-  // Speech bubble
-  const [bubbleText, setBubbleText] = useState('')
-  const [bubbleVisible, setBubbleVisible] = useState(false)
-  const bubbleTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
-
-  useEffect(() => {
-    let fullText = ''
-    const unsub1 = window.api.onChatChunk((chunk) => {
-      fullText += chunk
-      const display = fullText.length > 30 ? fullText.slice(-30) + '...' : fullText
-      setBubbleText(display)
-      setBubbleVisible(true)
-      if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current)
-      bubbleTimerRef.current = setTimeout(() => setBubbleVisible(false), 3000)
-    })
-    const unsub2 = window.api.onChatDone(() => {
-      fullText = ''
-      if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current)
-      bubbleTimerRef.current = setTimeout(() => setBubbleVisible(false), 3000)
-    })
-    const unsub3 = window.api.onChatError(() => {
-      fullText = ''
-      setBubbleVisible(false)
-    })
-    return () => {
-      unsub1()
-      unsub2()
-      unsub3()
-      if (bubbleTimerRef.current) clearTimeout(bubbleTimerRef.current)
-    }
-  }, [])
+  // 气泡显示由 PetApp 管理，通过 bubbleText prop 传入
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     isMouseDown.current = true
@@ -306,12 +279,12 @@ export function PetCanvas({
         style={{ background: 'transparent' }}
       />
 
-      {bubbleVisible && bubbleText && (
+      {externalBubbleText && (
         <div
           className="absolute left-1/2 -translate-x-1/2 top-1 z-10 max-w-50 px-3 py-1.5 rounded-xl bg-white/95 text-[11px] text-[#4A4A4A] shadow-md animate-bubble-in pointer-events-none"
           style={{ fontFamily: '-apple-system, PingFang SC, sans-serif' }}
         >
-          {bubbleText}
+          {externalBubbleText}
           <div className="absolute left-1/2 -translate-x-1/2 -bottom-1.5 w-3 h-3 bg-white/95 rotate-45" />
         </div>
       )}

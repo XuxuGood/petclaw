@@ -41,12 +41,10 @@ export function EngineSettings() {
             <Circle
               size={8}
               className={
-                isRunning
-                  ? 'text-green-500 fill-green-500'
-                  : 'text-text-tertiary fill-text-tertiary'
+                isRunning ? 'text-success fill-success' : 'text-text-tertiary fill-text-tertiary'
               }
             />
-            <span className={`text-[14px] ${isRunning ? 'text-green-500' : 'text-text-tertiary'}`}>
+            <span className={`text-[14px] ${isRunning ? 'text-success' : 'text-text-tertiary'}`}>
               {status === null
                 ? t('engineSettings.loading')
                 : isRunning

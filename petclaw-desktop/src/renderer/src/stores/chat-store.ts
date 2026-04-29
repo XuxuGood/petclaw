@@ -13,6 +13,7 @@ interface ChatState {
   isLoading: boolean
   addMessage: (msg: Omit<ChatMessage, 'id'>) => void
   appendToLastMessage: (text: string) => void
+  replaceLastAssistantMessage: (text: string) => void
   setLoading: (loading: boolean) => void
   loadHistory: (messages: Omit<ChatMessage, 'id'>[]) => void
 }
@@ -30,6 +31,16 @@ export const useChatStore = create<ChatState>()((set) => ({
       const last = messages[messages.length - 1]
       if (last && last.role === 'assistant') {
         messages[messages.length - 1] = { ...last, content: last.content + text }
+      }
+      return { messages }
+    }),
+
+  replaceLastAssistantMessage: (text) =>
+    set((state) => {
+      const messages = [...state.messages]
+      const last = messages[messages.length - 1]
+      if (last && last.role === 'assistant') {
+        messages[messages.length - 1] = { ...last, content: text }
       }
       return { messages }
     }),

@@ -2,7 +2,7 @@
 
 **日期**: 2026-04-26
 **状态**: 设计完成，待实现
-**前置**: 基于 `2026-04-22-petclaw-architecture-v3.md` 重构，将 Agent-centric 模型改为 Directory-centric 模型
+**前置**: 基于 `docs/架构设计/PetClaw总体架构设计.md` 重构，将 Agent-centric 模型改为 Directory-centric 模型
 **参考**: LobsterAI 源码、OpenClaw runtime 机制、PetClaw 设计稿
 
 ---

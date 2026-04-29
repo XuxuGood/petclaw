@@ -126,7 +126,7 @@ export function CronEditDialog({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay">
       <div className="bg-bg-root rounded-[14px] shadow-lg w-[540px] max-h-[85vh] flex flex-col overflow-hidden">
         {/* 标题 */}
         <div className="flex items-center justify-between px-6 py-5">

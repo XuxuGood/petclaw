@@ -8,6 +8,7 @@ import os from 'os'
 import path from 'path'
 
 import type { EnginePhase, EngineStatus, GatewayConnectionInfo, RuntimeMetadata } from './types'
+import { t } from '../i18n'
 import { ensureElectronNodeShim, getElectronNodeRuntimePath, getSkillsRoot } from './cowork-util'
 import {
   cleanupStaleThirdPartyPluginsFromBundledDir,
@@ -175,13 +176,13 @@ export class OpenclawEngineManager extends EventEmitter {
       ? {
           phase: 'ready' as EnginePhase,
           version: this.desiredVersion,
-          message: 'OpenClaw 运行时就绪。',
+          message: t('engine.runtimeReady'),
           canRetry: false
         }
       : {
           phase: 'not_installed',
           version: null,
-          message: `未找到 OpenClaw 运行时，预期路径：${runtime.expectedPathHint}`,
+          message: t('engine.runtimeNotFound', { path: runtime.expectedPathHint }),
           canRetry: true
         }
   }
@@ -312,7 +313,7 @@ export class OpenclawEngineManager extends EventEmitter {
       this.setStatus({
         phase: 'not_installed',
         version: null,
-        message: `未找到 OpenClaw 运行时，预期路径：${runtime.expectedPathHint}`,
+        message: t('engine.runtimeNotFound', { path: runtime.expectedPathHint }),
         canRetry: true
       })
       return this.getStatus()
@@ -349,7 +350,7 @@ export class OpenclawEngineManager extends EventEmitter {
     this.setStatus({
       phase: 'ready',
       version: this.desiredVersion,
-      message: 'OpenClaw 运行时就绪。',
+      message: t('engine.runtimeReady'),
       canRetry: false
     })
     return this.getStatus()
@@ -388,8 +389,8 @@ export class OpenclawEngineManager extends EventEmitter {
       phase: runtime.root ? 'ready' : 'not_installed',
       version: runtime.version,
       message: runtime.root
-        ? 'OpenClaw 运行时就绪，Gateway 已停止。'
-        : `未找到 OpenClaw 运行时，预期路径：${runtime.expectedPathHint}`,
+        ? t('engine.runtimeReadyGatewayStopped')
+        : t('engine.runtimeNotFound', { path: runtime.expectedPathHint }),
       canRetry: !runtime.root
     })
   }
@@ -429,7 +430,7 @@ export class OpenclawEngineManager extends EventEmitter {
               phase: 'running',
               version: this.desiredVersion,
               progressPercent: 100,
-              message: `OpenClaw gateway 运行中，端口 ${port}。`,
+              message: t('engine.gatewayRunning', { port: String(port) }),
               canRetry: false
             })
           }
@@ -448,7 +449,7 @@ export class OpenclawEngineManager extends EventEmitter {
       this.setStatus({
         phase: 'not_installed',
         version: null,
-        message: `未找到 OpenClaw 运行时，预期路径：${runtime.expectedPathHint}`,
+        message: t('engine.runtimeNotFound', { path: runtime.expectedPathHint }),
         canRetry: true
       })
       return this.getStatus()
@@ -464,7 +465,7 @@ export class OpenclawEngineManager extends EventEmitter {
       this.setStatus({
         phase: 'error',
         version: runtime.version,
-        message: `运行时中缺少入口文件：${runtime.root}`,
+        message: t('engine.entryMissing', { root: runtime.root }),
         canRetry: true
       })
       return this.getStatus()
@@ -482,7 +483,7 @@ export class OpenclawEngineManager extends EventEmitter {
       phase: 'starting',
       version: runtime.version,
       progressPercent: 10,
-      message: '正在启动 OpenClaw gateway...',
+      message: t('engine.gatewayStarting'),
       canRetry: false
     })
 
@@ -611,7 +612,7 @@ export class OpenclawEngineManager extends EventEmitter {
       this.setStatus({
         phase: 'error',
         version: runtime.version,
-        message: 'OpenClaw gateway 未能在超时时间内就绪。',
+        message: t('engine.gatewayTimeout'),
         canRetry: true
       })
       this.stopGatewayProcess(child)
@@ -623,7 +624,7 @@ export class OpenclawEngineManager extends EventEmitter {
       phase: 'running',
       version: runtime.version,
       progressPercent: 100,
-      message: `OpenClaw gateway 运行中，端口 ${port}。`,
+      message: t('engine.gatewayRunning', { port: String(port) }),
       canRetry: false
     })
 
@@ -1146,7 +1147,7 @@ export class OpenclawEngineManager extends EventEmitter {
       if (available != null) return available
     }
 
-    throw new Error('没有可用的回环端口用于 OpenClaw gateway。')
+    throw new Error(t('engine.noAvailablePort'))
   }
 
   private writeGatewayPort(port: number): void {
@@ -1265,7 +1266,9 @@ export class OpenclawEngineManager extends EventEmitter {
           phase: 'starting',
           version: this.status.version,
           progressPercent: progress,
-          message: `正在启动 OpenClaw gateway...（${Math.round(elapsedMs / 1000)}s）`,
+          message: t('engine.gatewayStartingProgress', {
+            seconds: String(Math.round(elapsedMs / 1000))
+          }),
           canRetry: false
         })
 
@@ -1396,7 +1399,7 @@ export class OpenclawEngineManager extends EventEmitter {
       this.setStatus({
         phase: 'error',
         version: this.status.version,
-        message: `OpenClaw gateway 进程错误: ${errorMsg}`,
+        message: t('engine.gatewayProcessError', { error: errorMsg }),
         canRetry: true
       })
     })
@@ -1415,7 +1418,7 @@ export class OpenclawEngineManager extends EventEmitter {
       this.setStatus({
         phase: 'error',
         version: this.status.version,
-        message: `OpenClaw gateway 意外退出（code=${code ?? 'null'}）。`,
+        message: t('engine.gatewayExited', { code: String(code ?? 'null') }),
         canRetry: true
       })
       this.scheduleGatewayRestart()
@@ -1432,7 +1435,7 @@ export class OpenclawEngineManager extends EventEmitter {
       this.setStatus({
         phase: 'error',
         version: this.status.version,
-        message: `OpenClaw gateway 在 ${GATEWAY_MAX_RESTART_ATTEMPTS} 次尝试后仍无法启动，请检查配置或手动重启。`,
+        message: t('engine.gatewayMaxRetries', { attempts: String(GATEWAY_MAX_RESTART_ATTEMPTS) }),
         canRetry: true
       })
       return

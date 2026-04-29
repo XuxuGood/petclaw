@@ -8,6 +8,7 @@ import { ChatInputBox } from './ChatInputBox'
 import { CoworkPermissionModal } from './CoworkPermissionModal'
 import { WelcomePage } from '../../components/WelcomePage'
 import { TaskMonitorPanel } from '../../components/TaskMonitorPanel'
+import type { SelectedModel } from '../../components/ModelSelector'
 
 interface ChatViewProps {
   activeSessionId?: string | null
@@ -24,7 +25,8 @@ export function ChatView({
   taskMonitorOpen,
   onToggleMonitor
 }: ChatViewProps) {
-  const { messages, isLoading, addMessage, appendToLastMessage, setLoading } = useChatStore()
+  const { messages, isLoading, addMessage, replaceLastAssistantMessage, setLoading } =
+    useChatStore()
   const { t } = useI18n()
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -43,20 +45,20 @@ export function ChatView({
   useEffect(() => {
     // 收到助手新消息块时追加到最后一条 assistant 消息
     const unsubMessage = window.api.cowork.onMessage((data) => {
-      // data 结构: { sessionId, role, content, ... }
       const d = data as Record<string, unknown>
-      if (d.role === 'assistant') {
+      const message = d.message as Record<string, unknown> | undefined
+      if (message?.type === 'assistant') {
         // 首次收到时表示新一轮响应开始
         setLoading(true)
-        addMessage({ role: 'assistant', content: String(d.content ?? '') })
+        addMessage({ role: 'assistant', content: String(message.content ?? '') })
       }
     })
 
-    // 流式 chunk 更新
+    // 主进程发送的是当前消息快照 content，不是 delta，因此这里替换最后一条 assistant 内容
     const unsubUpdate = window.api.cowork.onMessageUpdate((data) => {
       const d = data as Record<string, unknown>
-      if (typeof d.delta === 'string') {
-        appendToLastMessage(d.delta)
+      if (typeof d.content === 'string') {
+        replaceLastAssistantMessage(d.content)
       }
     })
 
@@ -68,8 +70,8 @@ export function ChatView({
     // 错误
     const unsubError = window.api.cowork.onError((data) => {
       const d = data as Record<string, unknown>
-      const msg = typeof d.message === 'string' ? d.message : t('chat.unknownError')
-      appendToLastMessage(t('chat.errorPrefix', { msg }))
+      const msg = typeof d.error === 'string' ? d.error : t('chat.unknownError')
+      addMessage({ role: 'assistant', content: t('chat.errorPrefix', { msg }) })
       setLoading(false)
     })
 
@@ -81,14 +83,25 @@ export function ChatView({
       }
     })
 
+    const unsubPermissionDismiss = window.api.cowork.onPermissionDismiss((data) => {
+      const d = data as Record<string, unknown>
+      setPendingPermission((current) => (current?.requestId === d.requestId ? null : current))
+    })
+
+    const unsubSessionStopped = window.api.cowork.onSessionStopped(() => {
+      setLoading(false)
+    })
+
     return () => {
       unsubMessage()
       unsubUpdate()
       unsubComplete()
       unsubError()
       unsubPermission()
+      unsubPermissionDismiss()
+      unsubSessionStopped()
     }
-  }, [addMessage, appendToLastMessage, setLoading, t])
+  }, [addMessage, replaceLastAssistantMessage, setLoading, t])
 
   // 消息列表更新时自动滚动到底部
   useEffect(() => {
@@ -97,25 +110,52 @@ export function ChatView({
 
   /**
    * 发送消息主逻辑：
-   * - 无 activeSessionId 时调用 cowork.send 创建新会话，主进程返回 sessionId 后通知父组件
-   * - 有 activeSessionId 时调用 cowork.continue 追加消息
+   * - 无 activeSessionId 时调用 cowork.startSession 创建新会话，主进程返回 sessionId 后通知父组件
+   * - 有 activeSessionId 时调用 cowork.continueSession 追加消息
    */
-  const handleSend = async (message: string, cwd: string) => {
+  const handleSend = async (
+    message: string,
+    cwd: string,
+    skillIds?: string[],
+    selectedModel?: SelectedModel | null
+  ) => {
     if (!message || isLoading) return
     addMessage({ role: 'user', content: message })
 
-    if (!activeSessionId) {
-      // 新建会话
-      const result = await window.api.cowork.send(message, cwd)
-      const r = result as Record<string, unknown>
-      // 主进程返回的 sessionId 通知父组件（Sidebar 侧边栏渲染任务列表）
-      if (typeof r.sessionId === 'string') {
-        onSessionCreated?.(r.sessionId)
-        setSessionTitle(message.slice(0, 30) || t('chat.newConversation'))
+    try {
+      if (!activeSessionId) {
+        // 新建会话：主进程可能因未配置工作目录返回结构化错误，前端负责显式展示。
+        const result = await window.api.cowork.startSession({
+          prompt: message,
+          cwd,
+          skillIds,
+          selectedModel: selectedModel ?? undefined
+        })
+        const r = result as Record<string, unknown>
+        if (r.success === false) {
+          const msg = typeof r.error === 'string' ? r.error : t('chat.unknownError')
+          addMessage({ role: 'assistant', content: t('chat.errorPrefix', { msg }) })
+          setLoading(false)
+          return
+        }
+        // 主进程返回的 sessionId 通知父组件（Sidebar 侧边栏渲染任务列表）
+        if (typeof r.sessionId === 'string') {
+          onSessionCreated?.(r.sessionId)
+          setSessionTitle(message.slice(0, 30) || t('chat.newConversation'))
+        }
+      } else {
+        // 继续已有会话
+        await window.api.cowork.continueSession({
+          sessionId: activeSessionId,
+          prompt: message,
+          skillIds,
+          selectedModel: selectedModel ?? undefined
+        })
       }
-    } else {
-      // 继续已有会话
-      await window.api.cowork.continue(activeSessionId, message)
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : t('chat.unknownError')
+      addMessage({ role: 'assistant', content: t('chat.errorPrefix', { msg }) })
+      setLoading(false)
     }
   }
 

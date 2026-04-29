@@ -2,7 +2,7 @@ import fs from 'fs'
 
 import type { CoworkStore } from '../data/cowork-store'
 import type { CoworkController } from './cowork-controller'
-import type { CoworkSession, CoworkStartOptions } from './types'
+import type { CoworkContinueOptions, CoworkSession, CoworkStartOptions } from './types'
 import { deriveAgentId } from './types'
 import type { DirectoryManager } from './directory-manager'
 import { t } from '../i18n'
@@ -24,11 +24,30 @@ export class CoworkSessionManager {
     if (!fs.existsSync(cwd)) {
       throw new Error(t('error.dirNotFound', { path: cwd }))
     }
-    // 幂等注册目录，确保 directories 表有记录
-    this.directoryManager.ensureRegistered(cwd)
-    // 由目录路径确定性派生 agentId，不再依赖用户传入
-    const agentId = deriveAgentId(cwd)
-    const session = this.store.createSession(title, cwd, agentId)
+    // main workspace 是 OpenClaw 默认 agent 的私有工作区，不注册为目录 agent。
+    const agentId = options?.useMainAgent ? 'main' : deriveAgentId(cwd)
+    if (!options?.useMainAgent) {
+      // 幂等注册目录，确保 directories 表有记录
+      this.directoryManager.ensureRegistered(cwd)
+    }
+    const origin = options?.origin ?? 'chat'
+    const session = options?.selectedModel
+      ? this.store.createSession(
+          title,
+          cwd,
+          agentId,
+          options?.systemPrompt ?? '',
+          options.selectedModel,
+          origin
+        )
+      : this.store.createSession(
+          title,
+          cwd,
+          agentId,
+          options?.systemPrompt ?? '',
+          undefined,
+          origin
+        )
     // fire-and-forget: session-manager 不阻塞到 turn 完成
     // 错误通过 controller 的 error 事件传递到 UI 层
     void this.controller.startSession(session.id, prompt, options).catch(() => {
@@ -37,13 +56,16 @@ export class CoworkSessionManager {
     return session
   }
 
-  continueSession(sessionId: string, prompt: string): void {
+  continueSession(sessionId: string, prompt: string, options?: CoworkContinueOptions): void {
     // 校验会话工作目录是否仍然存在
     const session = this.store.getSession(sessionId)
     if (session && !fs.existsSync(session.directoryPath)) {
       throw new Error(t('error.dirDeleted', { path: session.directoryPath }))
     }
-    void this.controller.continueSession(sessionId, prompt).catch(() => {})
+    if (options?.selectedModel) {
+      this.store.updateSession(sessionId, { selectedModel: options.selectedModel })
+    }
+    void this.controller.continueSession(sessionId, prompt, options).catch(() => {})
   }
 
   stopSession(sessionId: string): void {

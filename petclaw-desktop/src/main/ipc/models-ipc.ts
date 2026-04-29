@@ -1,9 +1,15 @@
-// models-ipc.ts: 模型 Provider 和活跃模型管理的 IPC 处理层
+// models-ipc.ts: 模型 Provider 和默认模型管理的 IPC 处理层
 // API Key 在返回给渲染进程时自动脱敏，真实 Key 永不传出主进程
-import { ipcMain } from 'electron'
-
+import { safeHandle } from './ipc-registry'
 import type { ModelRegistry } from '../models/model-registry'
-import type { ModelProvider, ModelDefinition } from '../ai/types'
+import type { ModelDefinition, ModelProviderConfig, SelectedModel } from '../ai/types'
+
+type ModelProviderPayload = Omit<ModelProviderConfig, 'hasApiKey'> & {
+  apiKey?: string
+  hasApiKey?: boolean
+}
+
+type ModelProviderPatch = Partial<ModelProviderPayload>
 
 export interface ModelsIpcDeps {
   modelRegistry: ModelRegistry
@@ -12,64 +18,70 @@ export interface ModelsIpcDeps {
 export function registerModelsIpcHandlers(deps: ModelsIpcDeps): void {
   const { modelRegistry } = deps
 
-  // 返回 Provider 列表，API Key 脱敏为前5位 + "****"，防止 Key 泄露到渲染进程
-  ipcMain.handle('models:providers', async () => {
-    return modelRegistry.listProviders().map((p) => ({
-      ...p,
-      apiKey: p.apiKey ? `${p.apiKey.slice(0, 5)}****` : ''
-    }))
+  safeHandle('models:providers', async () => {
+    return modelRegistry.listProviders()
   })
 
-  // 按 id 查询单个 Provider，API Key 同样脱敏
-  ipcMain.handle('models:provider', async (_event, id: string) => {
-    const p = modelRegistry.getProvider(id)
-    if (!p) return null
-    return { ...p, apiKey: p.apiKey ? `${p.apiKey.slice(0, 5)}****` : '' }
+  safeHandle('models:provider', async (_event, id: string) => {
+    return modelRegistry.getProvider(id) ?? null
   })
 
-  // 添加新 Provider（渲染进程传入含明文 apiKey 的完整 ModelProvider）
-  ipcMain.handle('models:add-provider', async (_event, data: ModelProvider) => {
+  // 添加新 Provider 时单独处理 apiKey，避免明文进入 Provider 配置对象。
+  safeHandle('models:add-provider', async (_event, data: ModelProviderPayload) => {
     modelRegistry.addProvider(data)
+    if (data.apiKey) {
+      modelRegistry.setApiKey(data.id, data.apiKey)
+    }
   })
 
-  // 局部更新 Provider 字段（如 apiKey、enabled 等）
-  ipcMain.handle(
-    'models:update-provider',
-    async (_event, id: string, patch: Partial<ModelProvider>) => {
-      modelRegistry.updateProvider(id, patch)
+  safeHandle('models:update-provider', async (_event, id: string, patch: ModelProviderPatch) => {
+    const { apiKey, ...providerPatch } = patch
+    modelRegistry.updateProvider(id, providerPatch)
+    if (apiKey !== undefined) {
+      if (apiKey) {
+        modelRegistry.setApiKey(id, apiKey)
+      } else {
+        modelRegistry.clearApiKey(id)
+      }
     }
-  )
+  })
 
   // 删除自定义 Provider；预设 Provider 不可删除，manager 会抛出错误
-  ipcMain.handle('models:remove-provider', async (_event, id: string) => {
+  safeHandle('models:remove-provider', async (_event, id: string) => {
     modelRegistry.removeProvider(id)
   })
 
   // 快捷切换 Provider 启用/禁用状态，触发 change 事件以刷新 openclaw 配置
-  ipcMain.handle('models:toggle-provider', async (_event, id: string, enabled: boolean) => {
+  safeHandle('models:toggle-provider', async (_event, id: string, enabled: boolean) => {
     modelRegistry.toggleProvider(id, enabled)
   })
 
-  // 返回当前活跃模型（含 Provider 信息），未配置时返回 null
-  ipcMain.handle('models:active', async () => modelRegistry.getActiveModel())
+  safeHandle('models:default', async () => modelRegistry.getDefaultModel())
 
-  // 设置活跃模型，格式为 "providerId/modelId"
-  ipcMain.handle('models:set-active', async (_event, id: string) => {
-    modelRegistry.setActiveModel(id)
+  safeHandle('models:set-default', async (_event, selected: SelectedModel) => {
+    modelRegistry.setDefaultModel(selected)
+  })
+
+  safeHandle('models:set-api-key', async (_event, providerId: string, apiKey: string) => {
+    modelRegistry.setApiKey(providerId, apiKey)
+  })
+
+  safeHandle('models:clear-api-key', async (_event, providerId: string) => {
+    modelRegistry.clearApiKey(providerId)
   })
 
   // 测试 Provider 连通性，返回 { ok, latencyMs?, error? }
-  ipcMain.handle('models:test-connection', async (_event, id: string) => {
+  safeHandle('models:test-connection', async (_event, id: string) => {
     return modelRegistry.testConnection(id)
   })
 
   // 为指定 Provider 添加自定义模型定义
-  ipcMain.handle('models:add-model', async (_event, providerId: string, model: ModelDefinition) => {
+  safeHandle('models:add-model', async (_event, providerId: string, model: ModelDefinition) => {
     modelRegistry.addModel(providerId, model)
   })
 
   // 从指定 Provider 删除模型
-  ipcMain.handle('models:remove-model', async (_event, providerId: string, modelId: string) => {
+  safeHandle('models:remove-model', async (_event, providerId: string, modelId: string) => {
     modelRegistry.removeModel(providerId, modelId)
   })
 }

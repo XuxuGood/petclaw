@@ -120,7 +120,6 @@ export interface ScheduledTaskRunWithName extends ScheduledTaskRun {
 
 export const SchedulerIpcChannel = {
   List: 'scheduler:list',
-  Get: 'scheduler:get',
   Create: 'scheduler:create',
   Update: 'scheduler:update',
   Delete: 'scheduler:delete',
@@ -130,6 +129,5 @@ export const SchedulerIpcChannel = {
   ListAllRuns: 'scheduler:list-all-runs',
   // Push events (main → renderer)
   StatusUpdate: 'scheduler:status-update',
-  RunUpdate: 'scheduler:run-update',
   Refresh: 'scheduler:refresh'
 } as const

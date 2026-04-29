@@ -2,18 +2,17 @@ import { BrowserWindow } from 'electron'
 
 import type { CoworkController } from '../ai/cowork-controller'
 import type { CoworkMessage } from '../ai/types'
-import type { ImGatewayManager } from '../im/im-gateway-manager'
-import type { CronJobService } from '../scheduler/cron-job-service'
 import type { HookServer } from '../hooks/server'
 
 /**
  * PetEventBridge: 聚合多源事件，向宠物窗口发送统一的状态事件和气泡消息。
  *
  * 事件源：
- * - CoworkController: 聊天消息/流式更新/完成/错误/权限审批
- * - ImGatewayManager: IM 消息到达创建会话
- * - CronJobService: 定时任务触发
+ * - CoworkController: 聊天消息/流式更新/完成/错误/权限审批（覆盖 chat/im/scheduler 全部来源）
  * - HookServer: Claude Code hook 活跃/空闲
+ *
+ * 计数器完全由 CoworkController 事件驱动（message(user) +1，complete/error/sessionStopped -1），
+ * 会话来源信息通过 CoworkSession.origin 字段获取，不需要独立的 IM/Scheduler 通知方法。
  *
  * 维护 activeSessionCount 计数器，确保多会话并行时正确触发动画：
  * - 任何会话开始 → ChatSent（仅首个）
@@ -26,14 +25,11 @@ export class PetEventBridge {
   constructor(
     private petWindow: BrowserWindow,
     private coworkController: CoworkController,
-    private imGateway?: ImGatewayManager,
-    private cronService?: CronJobService,
-    private hookServer?: HookServer
+    private hookServer?: HookServer,
+    private getMainWindow?: () => BrowserWindow | null
   ) {
     this.bindCoworkEvents()
     if (this.hookServer) this.bindHookEvents()
-    // IM 和 Scheduler 事件通过主动调用触发（不是 EventEmitter），
-    // 需要在 index.ts 中将回调注入。这里提供 public 方法供外部调用。
   }
 
   // ── CoworkController 事件 ──
@@ -84,32 +80,17 @@ export class PetEventBridge {
   // ── HookServer 事件 ──
 
   private bindHookEvents(): void {
-    // hook 事件透传到 Pet 窗口，同时触发对应宠物动画状态
+    // hook 事件透传到 Pet + Main 窗口，同时触发对应宠物动画状态
     this.hookServer!.onEvent((event) => {
       if (event.type === 'session_end') {
         this.sendPetEvent('HOOK_IDLE')
       } else {
         this.sendPetEvent('HOOK_ACTIVE')
       }
-      // 透传 hook:event 到 Pet 窗口，渲染层订阅以更新 MonitorView
+      // 透传 hook:event 到 Pet 窗口和 Main 窗口，渲染层订阅以更新 MonitorView
       this.petWindow.webContents.send('hook:event', event)
+      this.getMainWindow?.()?.webContents.send('hook:event', event)
     })
-  }
-
-  // ── IM 消息触发（由 index.ts 在收到 IM 消息时调用） ──
-
-  /** IM 平台新会话到达时由主进程调用，触发宠物动画和气泡 */
-  notifyImSessionCreated(sessionId: string, platform: string): void {
-    this.sessionStarted()
-    this.sendBubble(`[${platform}] 收到新任务`, 'im')
-  }
-
-  // ── 定时任务触发（由 index.ts 在 cron 任务执行时调用） ──
-
-  /** 定时任务执行时由主进程调用，触发宠物动画和气泡 */
-  notifySchedulerTaskFired(sessionId: string, taskName: string): void {
-    this.sessionStarted()
-    this.sendBubble(`[定时] ${taskName}`, 'scheduler')
   }
 
   // ── 会话计数 ──

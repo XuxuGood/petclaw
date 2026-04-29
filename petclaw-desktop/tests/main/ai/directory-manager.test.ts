@@ -13,7 +13,7 @@ describe('DirectoryManager', () => {
     const db = new Database(':memory:')
     initDatabase(db)
     const store = new DirectoryStore(db)
-    dm = new DirectoryManager(store, '/default/workspace')
+    dm = new DirectoryManager(store)
   })
 
   describe('ensureRegistered', () => {
@@ -90,10 +90,9 @@ describe('DirectoryManager', () => {
   })
 
   describe('toOpenclawConfig', () => {
-    it('should generate config with main default and directory agents', () => {
+    it('should generate directory agent list without global defaults', () => {
       dm.ensureRegistered('/tmp/proj-a')
       const config = dm.toOpenclawConfig()
-      expect(config.defaults.workspace).toBe('/default/workspace')
       expect(config.list[0]).toEqual({ id: 'main', default: true })
       expect(config.list).toHaveLength(2) // main + proj-a
       expect(config.list[1].id).toMatch(/^ws-/)

@@ -4,6 +4,7 @@ import { join } from 'path'
 
 import type { ConfigSync } from './ai/config-sync'
 import type { OpenclawEngineManager } from './ai/engine-manager'
+import { getSkillsRoot } from './ai/cowork-util'
 import { t } from './i18n'
 
 // ── 类型 ──
@@ -74,7 +75,8 @@ export async function runBootCheck(
   try {
     const baseDir = engineManager.getBaseDir()
     mkdirSync(join(baseDir, 'workspace'), { recursive: true })
-    mkdirSync(join(baseDir, 'skills'), { recursive: true })
+    mkdirSync(join(baseDir, 'workspace', 'memory'), { recursive: true })
+    mkdirSync(getSkillsRoot(), { recursive: true })
 
     await ensureMinDuration(stepStart, MIN_STEP_MS)
     updateStep(steps, 'env', 'done')
@@ -95,6 +97,10 @@ export async function runBootCheck(
     if (!syncResult.ok) {
       throw new Error(syncResult.error ?? 'ConfigSync failed')
     }
+
+    // 把最新的 secretEnvVars 推送给 engineManager，
+    // 确保 gateway 进程 spawn 时能拿到 API Key 等明文值
+    engineManager.setSecretEnvVars(configSync.collectSecretEnvVars())
 
     // EngineManager 启动 gateway 进程并等待就绪
     const status = await engineManager.startGateway()

@@ -1,6 +1,5 @@
 // src/main/ipc/im-ipc.ts
-import { ipcMain } from 'electron'
-
+import { safeHandle } from './ipc-registry'
 import type { ImGatewayManager } from '../im/im-gateway-manager'
 import type { Platform } from '../im/types'
 
@@ -12,12 +11,12 @@ export function registerImIpcHandlers(deps: ImIpcDeps): void {
   const { imGatewayManager } = deps
 
   // 列出所有 IM 实例
-  ipcMain.handle('im:load-config', async () => {
+  safeHandle('im:load-config', async () => {
     return { instances: imGatewayManager.listInstances() }
   })
 
   // 创建实例
-  ipcMain.handle(
+  safeHandle(
     'im:create-instance',
     async (_event, platform: Platform, credentials: Record<string, unknown>, name?: string) => {
       return imGatewayManager.createInstance(platform, credentials, name)
@@ -25,17 +24,17 @@ export function registerImIpcHandlers(deps: ImIpcDeps): void {
   )
 
   // 更新实例
-  ipcMain.handle('im:save-config', async (_event, id: string, patch: Record<string, unknown>) => {
+  safeHandle('im:save-config', async (_event, id: string, patch: Record<string, unknown>) => {
     imGatewayManager.updateInstance(id, patch)
   })
 
   // 删除实例
-  ipcMain.handle('im:delete-instance', async (_event, id: string) => {
+  safeHandle('im:delete-instance', async (_event, id: string) => {
     imGatewayManager.deleteInstance(id)
   })
 
   // 获取状态（enabled 列表）
-  ipcMain.handle('im:get-status', async () => {
+  safeHandle('im:get-status', async () => {
     const instances = imGatewayManager.listInstances()
     const result: Record<string, { enabled: boolean; platform: string }> = {}
     for (const inst of instances) {
@@ -45,7 +44,7 @@ export function registerImIpcHandlers(deps: ImIpcDeps): void {
   })
 
   // 对话绑定
-  ipcMain.handle(
+  safeHandle(
     'im:set-binding',
     async (
       _event,
@@ -65,7 +64,7 @@ export function registerImIpcHandlers(deps: ImIpcDeps): void {
     }
   )
 
-  // 兼容旧 settings handlers（返回空对象避免 preload 引用报错）
-  ipcMain.handle('im:load-settings', async () => ({}))
-  ipcMain.handle('im:save-settings', async () => {})
+  // IM 设置的独立 load/save — 前端尚未适配，预留 channel
+  safeHandle('im:load-settings', async () => ({}))
+  safeHandle('im:save-settings', async () => {})
 }

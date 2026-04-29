@@ -1,155 +1,211 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { Zap, Brain, ChevronDown, Check } from 'lucide-react'
+import { Brain, Check, ChevronDown, Server, Zap } from 'lucide-react'
 
 import { useI18n } from '../i18n'
+import type { SelectedModel } from '../../../shared/models/types'
 
-// 模型数据形状（来自 window.api.models.active() 和 providers()）
+// re-export 给依赖方（ChatInputBox、ChatView）继续通过此文件获取
+export type { SelectedModel }
+
 interface ModelItem {
   id: string
   name: string
-  /** 简单将 claude/gpt 等区分为 standard / reasoning */
-  tier: 'standard' | 'reasoning' | 'other'
+  reasoning: boolean
 }
 
-// 从 API 返回的 unknown 数据中提取模型列表
-function extractModels(raw: unknown): ModelItem[] {
+interface ProviderItem {
+  id: string
+  name: string
+  enabled: boolean
+  hasApiKey: boolean
+  models: ModelItem[]
+}
+
+interface ModelOption {
+  providerId: string
+  providerName: string
+  model: ModelItem
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function parseSelectedModel(raw: unknown): SelectedModel | null {
+  if (!isRecord(raw)) return null
+  if (typeof raw.providerId !== 'string' || typeof raw.modelId !== 'string') return null
+  if (!raw.providerId || !raw.modelId) return null
+  return { providerId: raw.providerId, modelId: raw.modelId }
+}
+
+function extractProviders(raw: unknown): ProviderItem[] {
   if (!Array.isArray(raw)) return []
-  const result: ModelItem[] = []
-  for (const p of raw) {
-    if (p === null || typeof p !== 'object') continue
-    const provider = p as Record<string, unknown>
-    if (!Array.isArray(provider.models)) continue
-    for (const m of provider.models) {
-      if (m === null || typeof m !== 'object') continue
-      const model = m as Record<string, unknown>
-      const id = String(model.id ?? '')
-      const name = String(model.name ?? model.id ?? '')
-      // 简单判断推理模型：名字含 o3/o1/reasoning/think 等关键词
-      const isReasoning = /o3|o1|reasoning|think/i.test(name) || /o3|o1|reasoning|think/i.test(id)
-      result.push({ id, name, tier: isReasoning ? 'reasoning' : 'standard' })
-    }
-  }
-  return result
+  return raw.flatMap((item): ProviderItem[] => {
+    if (!isRecord(item)) return []
+    const id = String(item.id ?? '')
+    const name = String(item.name ?? id)
+    if (!id || !Array.isArray(item.models)) return []
+    const models = item.models.flatMap((model): ModelItem[] => {
+      if (!isRecord(model)) return []
+      const modelId = String(model.id ?? '')
+      if (!modelId) return []
+      return [
+        {
+          id: modelId,
+          name: String(model.name ?? modelId),
+          reasoning: model.reasoning === true
+        }
+      ]
+    })
+    if (models.length === 0) return []
+    return [
+      {
+        id,
+        name,
+        enabled: item.enabled === true,
+        hasApiKey: item.hasApiKey === true,
+        models
+      }
+    ]
+  })
+}
+
+function sameSelectedModel(left: SelectedModel | null, right: SelectedModel | null): boolean {
+  return left?.providerId === right?.providerId && left?.modelId === right?.modelId
 }
 
 interface ModelSelectorProps {
-  /** 当前选中的模型 id（空串表示使用默认） */
-  value: string
-  onChange: (modelId: string) => void
+  value: SelectedModel | null
+  onChange: (selected: SelectedModel | null) => void
 }
 
 export function ModelSelector({ value, onChange }: ModelSelectorProps) {
   const { t } = useI18n()
   const [open, setOpen] = useState(false)
-  const [models, setModels] = useState<ModelItem[]>([])
-  const [loading, setLoading] = useState(false)
+  const [providers, setProviders] = useState<ProviderItem[]>([])
+  const [loading, setLoading] = useState(true)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // 点击外部关闭
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    Promise.all([window.api.models.providers(), window.api.models.defaultModel()])
+      .then(([rawProviders, rawDefault]) => {
+        if (cancelled) return
+        const nextProviders = extractProviders(rawProviders)
+        const defaultModel = parseSelectedModel(rawDefault)
+        setProviders(nextProviders)
+        const stillExists =
+          value &&
+          nextProviders.some(
+            (provider) =>
+              provider.id === value.providerId &&
+              provider.models.some((model) => model.id === value.modelId)
+          )
+        if (!stillExists && defaultModel && !sameSelectedModel(value, defaultModel)) {
+          onChange(defaultModel)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setProviders([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [onChange, value])
+
   useEffect(() => {
     if (!open) return
-    const handle = (e: MouseEvent) => {
-      if (!containerRef.current?.contains(e.target as Node)) setOpen(false)
+    const handle = (event: MouseEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) setOpen(false)
     }
     document.addEventListener('mousedown', handle)
     return () => document.removeEventListener('mousedown', handle)
   }, [open])
 
-  // 打开时加载模型列表
-  useEffect(() => {
-    if (!open) return
-    setLoading(true)
-    window.api.models
-      .providers()
-      .then((raw) => {
-        setModels(extractModels(raw))
-      })
-      .catch(() => setModels([]))
-      .finally(() => setLoading(false))
-  }, [open])
+  const groupedOptions = useMemo(
+    () =>
+      providers
+        .filter((provider) => provider.enabled)
+        .map((provider) => ({
+          provider,
+          options: provider.models.map((model) => ({
+            providerId: provider.id,
+            providerName: provider.name,
+            model
+          }))
+        }))
+        .filter((group) => group.options.length > 0),
+    [providers]
+  )
 
-  // 当前模型展示名
-  const currentModel = models.find((m) => m.id === value)
-  const displayName = currentModel?.name ?? (value || t('modelSelector.default'))
-  const isReasoning = currentModel?.tier === 'reasoning'
+  const currentOption = groupedOptions
+    .flatMap((group) => group.options)
+    .find((option) => option.providerId === value?.providerId && option.model.id === value?.modelId)
+
+  const displayName = currentOption
+    ? `${currentOption.providerName} / ${currentOption.model.name}`
+    : t('modelSelector.default')
 
   return (
     <div ref={containerRef} className="relative">
-      {/* 触发按钮：显示当前模型 + 类型图标 */}
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 px-2 py-1.5 rounded-[10px] text-[12px] text-text-secondary hover:bg-bg-card hover:text-text-primary transition-all duration-[120ms] max-w-[140px]"
+        onClick={() => setOpen((next) => !next)}
+        className="flex max-w-[170px] items-center gap-1.5 rounded-[10px] px-2 py-1.5 text-[12px] text-text-secondary transition-all duration-[120ms] hover:bg-bg-card hover:text-text-primary active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
         title={displayName}
+        aria-label={displayName}
+        aria-expanded={open}
       >
-        {/* ⚡标准 / 🧠推理 图标 */}
-        {isReasoning ? (
-          <Brain size={13} strokeWidth={1.75} className="text-accent shrink-0" />
+        {currentOption?.model.reasoning ? (
+          <Brain size={13} strokeWidth={1.75} className="shrink-0 text-accent" />
         ) : (
-          <Zap size={13} strokeWidth={1.75} className="text-text-secondary shrink-0" />
+          <Zap size={13} strokeWidth={1.75} className="shrink-0 text-text-secondary" />
         )}
-        <span className="truncate">{displayName}</span>
-        <ChevronDown size={11} strokeWidth={2} className="text-text-tertiary shrink-0" />
+        <span className="truncate">{loading ? t('common.loading') : displayName}</span>
+        <ChevronDown size={11} strokeWidth={2} className="shrink-0 text-text-tertiary" />
       </button>
 
-      {/* 模型下拉列表（向上弹出） */}
       {open && (
-        <div className="absolute bottom-full left-0 mb-2 w-56 rounded-[14px] bg-bg-card border border-border shadow-[var(--shadow-dropdown)] z-50 overflow-hidden">
+        <div className="absolute bottom-full left-0 z-50 mb-2 w-72 overflow-hidden rounded-[14px] border border-border bg-bg-card shadow-[var(--shadow-dropdown)]">
           {loading ? (
-            <div className="px-3 py-3 text-[12px] text-text-tertiary text-center">
+            <div className="px-3 py-3 text-center text-[12px] text-text-tertiary">
               {t('common.loading')}
             </div>
-          ) : models.length === 0 ? (
-            <div className="px-3 py-3 text-[12px] text-text-tertiary text-center">
+          ) : groupedOptions.length === 0 ? (
+            <div className="px-3 py-3 text-center text-[12px] text-text-tertiary">
               {t('modelSelector.noModels')}
             </div>
           ) : (
-            <div className="max-h-64 overflow-y-auto py-1">
-              {/* 标准模型组 */}
-              {models.filter((m) => m.tier !== 'reasoning').length > 0 && (
-                <>
-                  <div className="px-3 pt-2 pb-1 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1">
-                    <Zap size={10} strokeWidth={2} />
-                    <span>{t('modelSettings.standard')}</span>
+            <div className="max-h-72 overflow-y-auto py-1">
+              {groupedOptions.map((group, index) => (
+                <div
+                  key={group.provider.id}
+                  className={index === 0 ? '' : 'mt-1 border-t border-border pt-1'}
+                >
+                  <div className="flex items-center gap-1.5 px-3 pb-1 pt-2 text-[10px] font-semibold uppercase text-text-tertiary">
+                    <Server size={10} strokeWidth={2} />
+                    <span className="truncate">{group.provider.name}</span>
                   </div>
-                  {models
-                    .filter((m) => m.tier !== 'reasoning')
-                    .map((m) => (
-                      <ModelOption
-                        key={m.id}
-                        model={m}
-                        selected={value === m.id}
-                        onSelect={() => {
-                          onChange(m.id)
-                          setOpen(false)
-                        }}
-                      />
-                    ))}
-                </>
-              )}
-              {/* 推理模型组 */}
-              {models.filter((m) => m.tier === 'reasoning').length > 0 && (
-                <>
-                  <div className="px-3 pt-3 pb-1 text-[10px] font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-1 border-t border-border mt-1">
-                    <Brain size={10} strokeWidth={2} />
-                    <span>{t('modelSettings.reasoning')}</span>
-                  </div>
-                  {models
-                    .filter((m) => m.tier === 'reasoning')
-                    .map((m) => (
-                      <ModelOption
-                        key={m.id}
-                        model={m}
-                        selected={value === m.id}
-                        onSelect={() => {
-                          onChange(m.id)
-                          setOpen(false)
-                        }}
-                      />
-                    ))}
-                </>
-              )}
+                  {group.options.map((option) => (
+                    <ModelOption
+                      key={`${option.providerId}/${option.model.id}`}
+                      option={option}
+                      selected={
+                        option.providerId === value?.providerId && option.model.id === value.modelId
+                      }
+                      onSelect={() => {
+                        onChange({ providerId: option.providerId, modelId: option.model.id })
+                        setOpen(false)
+                      }}
+                    />
+                  ))}
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -159,25 +215,27 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
 }
 
 interface ModelOptionProps {
-  model: ModelItem
+  option: ModelOption
   selected: boolean
   onSelect: () => void
 }
 
-function ModelOption({ model, selected, onSelect }: ModelOptionProps) {
+function ModelOption({ option, selected, onSelect }: ModelOptionProps) {
   return (
     <button
       type="button"
       onClick={onSelect}
-      className={`w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-left hover:bg-bg-input transition-colors duration-[120ms] ${selected ? 'text-accent' : 'text-text-primary'}`}
+      className={`flex min-h-11 w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] transition-colors duration-[120ms] hover:bg-bg-input active:scale-[0.96] ${
+        selected ? 'text-accent' : 'text-text-primary'
+      }`}
     >
-      {model.tier === 'reasoning' ? (
-        <Brain size={13} strokeWidth={1.75} className="text-accent shrink-0" />
+      {option.model.reasoning ? (
+        <Brain size={13} strokeWidth={1.75} className="shrink-0 text-accent" />
       ) : (
-        <Zap size={13} strokeWidth={1.75} className="text-text-secondary shrink-0" />
+        <Zap size={13} strokeWidth={1.75} className="shrink-0 text-text-secondary" />
       )}
-      <span className="flex-1 truncate">{model.name}</span>
-      {selected && <Check size={13} strokeWidth={2.5} className="text-accent shrink-0" />}
+      <span className="flex-1 truncate">{option.model.name}</span>
+      {selected && <Check size={13} strokeWidth={2.5} className="shrink-0 text-accent" />}
     </button>
   )
 }

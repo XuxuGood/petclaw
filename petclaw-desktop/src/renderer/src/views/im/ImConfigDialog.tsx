@@ -91,7 +91,7 @@ export function ImConfigDialog({ isOpen, initialPlatform, onClose, onSaved }: Im
 
   // 从后端加载指定平台的配置，并写入表单；无配置时填充字段默认值
   const loadPlatformConfig = (key: PlatformKey) => {
-    window.api.im.loadConfig().then((data: unknown) => {
+    window.api.im.listInstances().then((data: unknown) => {
       const result = data as { platforms: Array<{ key: string; config: Record<string, unknown> }> }
       const existing = result.platforms.find((p) => p.key === key)
       if (existing) {
@@ -127,7 +127,7 @@ export function ImConfigDialog({ isOpen, initialPlatform, onClose, onSaved }: Im
         allowFrom: [],
         debug: false
       }
-      await window.api.im.saveConfig(selectedPlatform, config)
+      await window.api.im.updateInstance(selectedPlatform, config)
       onSaved()
       onClose()
     } finally {
@@ -146,7 +146,7 @@ export function ImConfigDialog({ isOpen, initialPlatform, onClose, onSaved }: Im
   const currentPlatformInfo = PLATFORMS.find((p) => p.key === selectedPlatform)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay">
       <div className="bg-bg-root rounded-[14px] shadow-lg w-[680px] h-[520px] flex flex-col overflow-hidden">
         {/* 标题栏 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">

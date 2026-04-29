@@ -28,10 +28,12 @@ function makeMockSession(overrides?: Partial<CoworkSession>): CoworkSession {
     title: '测试会话',
     engineSessionId: null,
     status: 'idle',
+    origin: 'chat',
     pinned: false,
     directoryPath: '/workspace',
     agentId: deriveAgentId('/workspace'),
-    modelOverride: '',
+    selectedModel: null,
+    systemPrompt: '',
     messages: [],
     createdAt: Date.now(),
     updatedAt: Date.now(),
@@ -45,6 +47,7 @@ function createMocks() {
     createSession: vi.fn(),
     getSession: vi.fn(),
     getSessions: vi.fn(),
+    updateSession: vi.fn(),
     deleteSession: vi.fn(),
     getRecentDirectories: vi.fn()
   } as unknown as CoworkStore
@@ -95,8 +98,50 @@ describe('CoworkSessionManager', () => {
 
       // 验证 ensureRegistered 被调用
       expect(mockDirectoryManager.ensureRegistered).toHaveBeenCalledWith(cwd)
-      // 验证 store.createSession 用 3 参数调用（title, directoryPath, agentId）
-      expect(mockStore.createSession).toHaveBeenCalledWith('测试', cwd, expectedAgentId)
+      // 验证 store.createSession 固化 systemPrompt，默认空字符串，origin 默认 chat
+      expect(mockStore.createSession).toHaveBeenCalledWith(
+        '测试',
+        cwd,
+        expectedAgentId,
+        '',
+        undefined,
+        'chat'
+      )
+    })
+
+    it('main workspace fallback 使用固定 main agent 且不注册目录', () => {
+      const cwd = '/user-data/openclaw/workspace'
+      const session = makeMockSession({ directoryPath: cwd, agentId: 'main' })
+      vi.mocked(mockStore.createSession).mockReturnValue(session)
+
+      manager.createAndStart('测试', cwd, 'hello', { useMainAgent: true })
+
+      expect(mockDirectoryManager.ensureRegistered).not.toHaveBeenCalled()
+      expect(mockStore.createSession).toHaveBeenCalledWith(
+        '测试',
+        cwd,
+        'main',
+        '',
+        undefined,
+        'chat'
+      )
+    })
+
+    it('创建会话时将 systemPrompt 固化到 store', () => {
+      const cwd = '/workspace'
+      const session = makeMockSession({ directoryPath: cwd })
+      vi.mocked(mockStore.createSession).mockReturnValue(session)
+
+      manager.createAndStart('测试', cwd, 'hello', { systemPrompt: 'fixed prompt' })
+
+      expect(mockStore.createSession).toHaveBeenCalledWith(
+        '测试',
+        cwd,
+        deriveAgentId(cwd),
+        'fixed prompt',
+        undefined,
+        'chat'
+      )
     })
 
     it('controller.startSession 不再传递 workspaceRoot 和 agentId', () => {
@@ -136,6 +181,38 @@ describe('CoworkSessionManager', () => {
         '工作目录不存在'
       )
     })
+
+    it('传入 selectedModel 时创建会话即固化到 store', () => {
+      const cwd = '/workspace'
+      const session = makeMockSession({ directoryPath: cwd })
+      vi.mocked(mockStore.createSession).mockReturnValue(session)
+
+      manager.createAndStart('测试', cwd, 'hello', {
+        selectedModel: { providerId: 'openai', modelId: 'gpt-4o' }
+      })
+
+      expect(mockStore.createSession).toHaveBeenCalledWith(
+        '测试',
+        cwd,
+        deriveAgentId(cwd),
+        '',
+        {
+          providerId: 'openai',
+          modelId: 'gpt-4o'
+        },
+        'chat'
+      )
+    })
+
+    it('未传 selectedModel 时不调用 updateSession', () => {
+      const cwd = '/workspace'
+      const session = makeMockSession({ directoryPath: cwd })
+      vi.mocked(mockStore.createSession).mockReturnValue(session)
+
+      manager.createAndStart('测试', cwd, 'hello')
+
+      expect(mockStore.updateSession).not.toHaveBeenCalled()
+    })
   })
 
   // ── getSessionsByDirectory ──
@@ -172,8 +249,36 @@ describe('CoworkSessionManager', () => {
   describe('continueSession', () => {
     it('转发给 controller.continueSession', () => {
       vi.mocked(mockStore.getSession).mockReturnValue(makeMockSession())
-      manager.continueSession('sess-001', 'follow-up')
-      expect(mockController.continueSession).toHaveBeenCalledWith('sess-001', 'follow-up')
+      manager.continueSession('sess-001', 'follow-up', { systemPrompt: 'fixed prompt' })
+      expect(mockController.continueSession).toHaveBeenCalledWith('sess-001', 'follow-up', {
+        systemPrompt: 'fixed prompt'
+      })
+    })
+
+    it('继续会话时转发本轮 skillIds 和 skillPrompt', () => {
+      vi.mocked(mockStore.getSession).mockReturnValue(makeMockSession())
+      manager.continueSession('sess-001', 'follow-up', {
+        skillIds: ['docx'],
+        skillPrompt: '## Skill: docx'
+      })
+      expect(mockController.continueSession).toHaveBeenCalledWith('sess-001', 'follow-up', {
+        skillIds: ['docx'],
+        skillPrompt: '## Skill: docx'
+      })
+    })
+
+    it('继续会话时传入 selectedModel 会先更新 session', () => {
+      vi.mocked(mockStore.getSession).mockReturnValue(makeMockSession())
+      manager.continueSession('sess-001', 'follow-up', {
+        selectedModel: { providerId: 'gemini', modelId: 'gemini-2.0-flash' }
+      })
+
+      expect(mockStore.updateSession).toHaveBeenCalledWith('sess-001', {
+        selectedModel: { providerId: 'gemini', modelId: 'gemini-2.0-flash' }
+      })
+      expect(mockController.continueSession).toHaveBeenCalledWith('sess-001', 'follow-up', {
+        selectedModel: { providerId: 'gemini', modelId: 'gemini-2.0-flash' }
+      })
     })
 
     it('工作目录不存在时抛出错误', () => {

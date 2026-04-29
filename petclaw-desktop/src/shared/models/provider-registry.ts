@@ -1,17 +1,16 @@
-// 16 个内置预设 Provider，不含用户运行时字段（apiKey / enabled / isCustom）
-import type { ModelProvider } from '../ai/types'
+import type { ProviderDefinition } from './types'
 
-type PresetProvider = Omit<ModelProvider, 'apiKey' | 'enabled' | 'isCustom'>
-
-export const PRESET_PROVIDERS: PresetProvider[] = [
+const BUILT_IN_PROVIDERS: ProviderDefinition[] = [
   {
     id: 'petclaw',
+    openClawProviderId: 'petclaw',
     name: 'PetClaw',
     logo: 'petclaw',
-    baseUrl: 'https://petclaw.ai/api/v1',
+    defaultBaseUrl: 'https://petclaw.ai/api/v1',
     apiFormat: 'openai-completions',
+    auth: 'none',
     isPreset: true,
-    models: [
+    defaultModels: [
       {
         id: 'petclaw-fast',
         name: 'PetClaw Fast',
@@ -32,12 +31,14 @@ export const PRESET_PROVIDERS: PresetProvider[] = [
   },
   {
     id: 'openai',
+    openClawProviderId: 'openai',
     name: 'OpenAI',
     logo: 'openai',
-    baseUrl: 'https://api.openai.com/v1',
+    defaultBaseUrl: 'https://api.openai.com/v1',
     apiFormat: 'openai-completions',
+    auth: 'api-key',
     isPreset: true,
-    models: [
+    defaultModels: [
       {
         id: 'gpt-4o',
         name: 'GPT-4o',
@@ -66,12 +67,14 @@ export const PRESET_PROVIDERS: PresetProvider[] = [
   },
   {
     id: 'anthropic',
+    openClawProviderId: 'anthropic',
     name: 'Anthropic',
     logo: 'anthropic',
-    baseUrl: 'https://api.anthropic.com',
+    defaultBaseUrl: 'https://api.anthropic.com',
     apiFormat: 'anthropic',
+    auth: 'api-key',
     isPreset: true,
-    models: [
+    defaultModels: [
       {
         id: 'claude-sonnet-4-6',
         name: 'Claude Sonnet 4.6',
@@ -92,12 +95,14 @@ export const PRESET_PROVIDERS: PresetProvider[] = [
   },
   {
     id: 'deepseek',
+    openClawProviderId: 'deepseek',
     name: 'DeepSeek',
     logo: 'deepseek',
-    baseUrl: 'https://api.deepseek.com/v1',
+    defaultBaseUrl: 'https://api.deepseek.com/v1',
     apiFormat: 'openai-completions',
+    auth: 'api-key',
     isPreset: true,
-    models: [
+    defaultModels: [
       {
         id: 'deepseek-chat',
         name: 'DeepSeek Chat',
@@ -118,12 +123,14 @@ export const PRESET_PROVIDERS: PresetProvider[] = [
   },
   {
     id: 'zhipu',
-    name: '智谱 Zhipu',
+    openClawProviderId: 'zai',
+    name: 'Zhipu',
     logo: 'zhipu',
-    baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    defaultBaseUrl: 'https://open.bigmodel.cn/api/paas/v4',
     apiFormat: 'openai-completions',
+    auth: 'api-key',
     isPreset: true,
-    models: [
+    defaultModels: [
       {
         id: 'glm-4-plus',
         name: 'GLM-4 Plus',
@@ -136,12 +143,14 @@ export const PRESET_PROVIDERS: PresetProvider[] = [
   },
   {
     id: 'minimax',
+    openClawProviderId: 'minimax',
     name: 'MiniMax',
     logo: 'minimax',
-    baseUrl: 'https://api.minimax.chat/v1',
+    defaultBaseUrl: 'https://api.minimax.chat/v1',
     apiFormat: 'openai-completions',
+    auth: 'api-key',
     isPreset: true,
-    models: [
+    defaultModels: [
       {
         id: 'abab6.5s-chat',
         name: 'ABAB 6.5s',
@@ -154,66 +163,80 @@ export const PRESET_PROVIDERS: PresetProvider[] = [
   },
   {
     id: 'volcengine',
-    name: '火山引擎',
+    openClawProviderId: 'volcengine',
+    name: 'Volcengine',
     logo: 'volcengine',
-    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+    defaultBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
     apiFormat: 'openai-completions',
+    auth: 'api-key',
     isPreset: true,
-    models: []
+    defaultModels: []
   },
   {
     id: 'youdao',
-    name: '有道 Youdao',
+    openClawProviderId: 'youdaozhiyun',
+    name: 'Youdao',
     logo: 'youdao',
-    baseUrl: 'https://api.youdao.com/v1',
+    defaultBaseUrl: 'https://api.youdao.com/v1',
     apiFormat: 'openai-completions',
+    auth: 'api-key',
     isPreset: true,
-    models: []
+    defaultModels: []
   },
   {
     id: 'qianfan',
-    name: '百度千帆',
+    openClawProviderId: 'qianfan',
+    name: 'Qianfan',
     logo: 'qianfan',
-    baseUrl: 'https://aip.baidubce.com/rpc/2.0/ai_custom/v1',
+    defaultBaseUrl: 'https://aip.baidubce.com/rpc/2.0/ai_custom/v1',
     apiFormat: 'openai-completions',
+    auth: 'api-key',
     isPreset: true,
-    models: []
+    defaultModels: []
   },
   {
     id: 'stepfun',
-    name: '阶跃星辰',
+    openClawProviderId: 'stepfun',
+    name: 'Stepfun',
     logo: 'stepfun',
-    baseUrl: 'https://api.stepfun.com/v1',
+    defaultBaseUrl: 'https://api.stepfun.com/v1',
     apiFormat: 'openai-completions',
+    auth: 'api-key',
     isPreset: true,
-    models: []
+    defaultModels: []
   },
   {
     id: 'xiaomi',
-    name: '小米 Xiaomi',
+    openClawProviderId: 'xiaomi',
+    name: 'Xiaomi',
     logo: 'xiaomi',
-    baseUrl: 'https://api.xiaomi.com/v1',
+    defaultBaseUrl: 'https://api.xiaomi.com/v1',
     apiFormat: 'openai-completions',
+    auth: 'api-key',
     isPreset: true,
-    models: []
+    defaultModels: []
   },
   {
     id: 'ollama',
+    openClawProviderId: 'ollama',
     name: 'Ollama',
     logo: 'ollama',
-    baseUrl: 'http://localhost:11434/v1',
+    defaultBaseUrl: 'http://localhost:11434/v1',
     apiFormat: 'openai-completions',
+    auth: 'none',
     isPreset: true,
-    models: []
+    defaultModels: []
   },
   {
     id: 'gemini',
+    openClawProviderId: 'google',
     name: 'Google Gemini',
     logo: 'gemini',
-    baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
-    apiFormat: 'openai-completions',
+    defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    apiFormat: 'google-generative-ai',
+    auth: 'api-key',
     isPreset: true,
-    models: [
+    defaultModels: [
       {
         id: 'gemini-2.0-flash',
         name: 'Gemini 2.0 Flash',
@@ -226,12 +249,14 @@ export const PRESET_PROVIDERS: PresetProvider[] = [
   },
   {
     id: 'alibaba',
-    name: '阿里百炼',
+    openClawProviderId: 'qwen-portal',
+    name: 'Alibaba Bailian',
     logo: 'alibaba',
-    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    defaultBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     apiFormat: 'openai-completions',
+    auth: 'api-key',
     isPreset: true,
-    models: [
+    defaultModels: [
       {
         id: 'qwen-max',
         name: 'Qwen Max',
@@ -244,12 +269,14 @@ export const PRESET_PROVIDERS: PresetProvider[] = [
   },
   {
     id: 'mistral',
+    openClawProviderId: 'mistral',
     name: 'Mistral',
     logo: 'mistral',
-    baseUrl: 'https://api.mistral.ai/v1',
+    defaultBaseUrl: 'https://api.mistral.ai/v1',
     apiFormat: 'openai-completions',
+    auth: 'api-key',
     isPreset: true,
-    models: [
+    defaultModels: [
       {
         id: 'mistral-large-latest',
         name: 'Mistral Large',
@@ -262,12 +289,14 @@ export const PRESET_PROVIDERS: PresetProvider[] = [
   },
   {
     id: 'groq',
+    openClawProviderId: 'groq',
     name: 'Groq',
     logo: 'groq',
-    baseUrl: 'https://api.groq.com/openai/v1',
+    defaultBaseUrl: 'https://api.groq.com/openai/v1',
     apiFormat: 'openai-completions',
+    auth: 'api-key',
     isPreset: true,
-    models: [
+    defaultModels: [
       {
         id: 'llama-3.3-70b-versatile',
         name: 'Llama 3.3 70B',
@@ -279,3 +308,31 @@ export const PRESET_PROVIDERS: PresetProvider[] = [
     ]
   }
 ]
+
+export class ProviderRegistry {
+  private providersById = new Map(BUILT_IN_PROVIDERS.map((provider) => [provider.id, provider]))
+
+  list(): ProviderDefinition[] {
+    return [...this.providersById.values()].map((provider) => ({
+      ...provider,
+      defaultModels: provider.defaultModels.map((model) => ({ ...model }))
+    }))
+  }
+
+  get(id: string): ProviderDefinition | undefined {
+    const provider = this.providersById.get(id)
+    if (!provider) return undefined
+    return {
+      ...provider,
+      defaultModels: provider.defaultModels.map((model) => ({ ...model }))
+    }
+  }
+
+  isBuiltIn(id: string): boolean {
+    return this.providersById.has(id)
+  }
+
+  toOpenClawProviderId(id: string): string {
+    return this.providersById.get(id)?.openClawProviderId ?? id
+  }
+}

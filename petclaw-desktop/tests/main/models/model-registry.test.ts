@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
 import { initDatabase } from '../../../src/main/data/db'
+import { ProviderRegistry } from '../../../src/shared/models/provider-registry'
+import { ModelConfigStore } from '../../../src/main/models/model-config-store'
 import { ModelRegistry } from '../../../src/main/models/model-registry'
 
 describe('ModelRegistry', () => {
@@ -10,7 +12,9 @@ describe('ModelRegistry', () => {
   beforeEach(() => {
     db = new Database(':memory:')
     initDatabase(db)
-    registry = new ModelRegistry(db)
+    const store = new ModelConfigStore(db)
+    const providerRegistry = new ProviderRegistry()
+    registry = new ModelRegistry(store, providerRegistry)
     registry.load()
   })
 
@@ -32,7 +36,8 @@ describe('ModelRegistry', () => {
   })
 
   it('should update provider API key without leaking to openclaw config', () => {
-    registry.updateProvider('openai', { apiKey: 'sk-test-key' })
+    registry.toggleProvider('openai', true)
+    registry.setApiKey('openai', 'sk-test-key')
     const config = registry.toOpenclawConfig()
     // openclaw.json 中不包含明文 key，只有占位符
     const openaiConfig = config.providers['openai'] as Record<string, unknown>
@@ -46,15 +51,13 @@ describe('ModelRegistry', () => {
     registry.addProvider({
       id: 'custom-1',
       name: 'My Provider',
-      logo: '',
       baseUrl: 'https://my-api.com/v1',
-      apiKey: 'my-key',
       apiFormat: 'openai-completions',
       enabled: true,
-      isPreset: false,
       isCustom: true,
       models: []
     })
+    registry.setApiKey('custom-1', 'my-key')
     expect(registry.getProvider('custom-1')?.name).toBe('My Provider')
   })
 
@@ -66,24 +69,14 @@ describe('ModelRegistry', () => {
     registry.addProvider({
       id: 'custom-del',
       name: 'Del',
-      logo: '',
       baseUrl: '',
-      apiKey: '',
       apiFormat: 'openai-completions',
       enabled: true,
-      isPreset: false,
       isCustom: true,
       models: []
     })
     registry.removeProvider('custom-del')
     expect(registry.getProvider('custom-del')).toBeUndefined()
-  })
-
-  it('should set and get active model', () => {
-    registry.setActiveModel('openai/gpt-4o')
-    const active = registry.getActiveModel()
-    expect(active?.provider.id).toBe('openai')
-    expect(active?.model.id).toBe('gpt-4o')
   })
 
   it('should add a model to a provider', () => {
@@ -115,13 +108,42 @@ describe('ModelRegistry', () => {
   })
 
   it('should persist and reload', () => {
-    registry.updateProvider('openai', { apiKey: 'sk-persist' })
-    registry.setActiveModel('openai/gpt-4o')
-    registry.save()
+    registry.toggleProvider('openai', true)
+    registry.setApiKey('openai', 'sk-persist')
+    registry.setDefaultModel({ providerId: 'openai', modelId: 'gpt-4o' })
 
-    const registry2 = new ModelRegistry(db)
+    const registry2 = new ModelRegistry(new ModelConfigStore(db), new ProviderRegistry())
     registry2.load()
-    expect(registry2.getProvider('openai')?.apiKey).toBe('sk-persist')
-    expect(registry2.getActiveModel()?.model.id).toBe('gpt-4o')
+    expect(registry2.getProvider('openai')?.hasApiKey).toBe(true)
+    expect(registry2.getDefaultModel()).toEqual({ providerId: 'openai', modelId: 'gpt-4o' })
+  })
+
+  it('maps PetClaw provider ids to OpenClaw provider ids', () => {
+    registry.load()
+    registry.updateProvider('zhipu', { enabled: true })
+    registry.setApiKey('zhipu', 'sk-zhipu')
+    registry.updateProvider('youdao', { enabled: true })
+    registry.setApiKey('youdao', 'sk-youdao')
+    const config = registry.toOpenclawConfig()
+
+    expect(config.providers.zai).toBeDefined()
+    expect(config.providers.zhipu).toBeUndefined()
+    expect(config.providers.youdaozhiyun).toBeDefined()
+    expect(config.providers.youdao).toBeUndefined()
+  })
+
+  it('does not sync disabled providers even when an api key exists', () => {
+    registry.load()
+    registry.updateProvider('openai', { enabled: false })
+    registry.setApiKey('openai', 'sk-openai')
+
+    expect(registry.toOpenclawConfig().providers.openai).toBeUndefined()
+  })
+
+  it('converts selected model to OpenClaw ref', () => {
+    registry.load()
+    expect(registry.toOpenClawModelRef({ providerId: 'gemini', modelId: 'gemini-2.0-flash' })).toBe(
+      'google/gemini-2.0-flash'
+    )
   })
 })

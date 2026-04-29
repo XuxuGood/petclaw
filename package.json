@@ -1,6 +1,10 @@
 {
   "name": "petclaw",
   "private": true,
+  "engines": {
+    "node": ">=24.0.0 <25.0.0",
+    "pnpm": ">=9.0.0"
+  },
   "scripts": {
     "dev:desktop": "pnpm --filter petclaw-desktop dev",
     "build:desktop": "pnpm --filter petclaw-desktop build",
@@ -21,5 +25,10 @@
     "@commitlint/config-conventional": "^19.0.0",
     "husky": "^9.0.0",
     "lint-staged": "^15.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3"
+    ]
   }
 }

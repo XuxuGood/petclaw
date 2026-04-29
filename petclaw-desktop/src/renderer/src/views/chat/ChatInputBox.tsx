@@ -3,12 +3,17 @@ import { useRef, useState } from 'react'
 import { Send } from 'lucide-react'
 
 import { CwdSelector } from '../../components/CwdSelector'
-import { ModelSelector } from '../../components/ModelSelector'
+import { ModelSelector, type SelectedModel } from '../../components/ModelSelector'
 import { useI18n } from '../../i18n'
 import { SkillSelector } from '../../views/skills/SkillSelector'
 
 interface ChatInputBoxProps {
-  onSend: (message: string, cwd: string, skillIds: string[], modelOverride: string) => void
+  onSend: (
+    message: string,
+    cwd: string,
+    skillIds: string[],
+    selectedModel: SelectedModel | null
+  ) => void
   disabled?: boolean
 }
 
@@ -17,15 +22,16 @@ export function ChatInputBox({ onSend, disabled = false }: ChatInputBoxProps) {
   const [input, setInput] = useState('')
   const [cwd, setCwd] = useState('')
   const [selectedSkills, setSelectedSkills] = useState<string[]>([])
-  const [activeModel, setActiveModel] = useState('')
+  const [selectedModel, setSelectedModel] = useState<SelectedModel | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const canSend = !disabled && input.trim().length > 0
 
   const handleSend = () => {
     if (!canSend) return
-    onSend(input.trim(), cwd, selectedSkills, activeModel)
+    onSend(input.trim(), cwd, selectedSkills, selectedModel)
     setInput('')
+    setSelectedSkills([])
     // 重置 textarea 高度
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
   }
@@ -71,7 +77,7 @@ export function ChatInputBox({ onSend, disabled = false }: ChatInputBoxProps) {
 
           <div className="w-px h-3.5 bg-border mx-0.5" />
 
-          <ModelSelector value={activeModel} onChange={setActiveModel} />
+          <ModelSelector value={selectedModel} onChange={setSelectedModel} />
 
           {/* 弹性空间 */}
           <div className="flex-1" />

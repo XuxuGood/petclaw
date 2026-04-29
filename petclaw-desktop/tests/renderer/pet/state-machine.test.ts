@@ -37,19 +37,6 @@ describe('PetStateMachine', () => {
     expect(sm.current).toBe(PetState.Idle)
   })
 
-  it('transitions to dragging on DRAG_START', () => {
-    const sm = new PetStateMachine()
-    sm.send(PetEvent.DragStart)
-    expect(sm.current).toBe(PetState.Dragging)
-  })
-
-  it('transitions back to idle on DRAG_END', () => {
-    const sm = new PetStateMachine()
-    sm.send(PetEvent.DragStart)
-    sm.send(PetEvent.DragEnd)
-    expect(sm.current).toBe(PetState.Idle)
-  })
-
   it('transitions to working on HOOK_ACTIVE', () => {
     const sm = new PetStateMachine()
     sm.send(PetEvent.HookActive)
@@ -74,5 +61,34 @@ describe('PetStateMachine', () => {
     const sm = new PetStateMachine((from, to) => transitions.push({ from, to }))
     sm.send(PetEvent.ChatSent)
     expect(transitions).toEqual([{ from: PetState.Idle, to: PetState.Thinking }])
+  })
+
+  // Issue-5: AI 极快返回时 Thinking 直接收到 AIDone
+  it('transitions from thinking to happy on AI_DONE (fast AI response)', () => {
+    const sm = new PetStateMachine()
+    sm.send(PetEvent.ChatSent)
+    expect(sm.current).toBe(PetState.Thinking)
+    sm.send(PetEvent.AIDone)
+    expect(sm.current).toBe(PetState.Happy)
+  })
+
+  // Issue-6: Happy 期间新 hook 事件不被丢弃
+  it('transitions from happy to working on HOOK_ACTIVE', () => {
+    const sm = new PetStateMachine()
+    sm.send(PetEvent.ChatSent)
+    sm.send(PetEvent.AIResponding)
+    sm.send(PetEvent.AIDone)
+    expect(sm.current).toBe(PetState.Happy)
+    sm.send(PetEvent.HookActive)
+    expect(sm.current).toBe(PetState.Working)
+  })
+
+  // Sleep 状态下 hook 事件唤醒宠物
+  it('transitions from sleep to working on HOOK_ACTIVE', () => {
+    const sm = new PetStateMachine()
+    sm.send(PetEvent.SleepStart)
+    expect(sm.current).toBe(PetState.Sleep)
+    sm.send(PetEvent.HookActive)
+    expect(sm.current).toBe(PetState.Working)
   })
 })

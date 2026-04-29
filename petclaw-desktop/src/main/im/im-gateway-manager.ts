@@ -6,6 +6,26 @@ import { EventEmitter } from 'events'
 import type { ImStore } from '../data/im-store'
 import type { ImConversationBinding, ImInstance, Platform } from './types'
 
+function normalizeEnvToken(value: string): string {
+  return value.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()
+}
+
+function buildImSecretEnvName(
+  platform: Platform,
+  instanceId: string,
+  credentialKey: string
+): string {
+  return `PETCLAW_IM_${normalizeEnvToken(platform)}_${normalizeEnvToken(instanceId)}_${normalizeEnvToken(credentialKey)}`
+}
+
+function buildEnvPlaceholder(envName: string): string {
+  return `\${${envName}}`
+}
+
+function isSecretCredentialKey(key: string): boolean {
+  return /(?:token|secret|password|api_?key|key)/i.test(key)
+}
+
 export class ImGatewayManager extends EventEmitter {
   constructor(private store: ImStore) {
     super()
@@ -105,18 +125,78 @@ export class ImGatewayManager extends EventEmitter {
 
   // ── OpenClaw 配置序列化（供 ConfigSync 使用，纯业务逻辑） ──
 
-  // 只导出已启用的实例配置，用于推送给 OpenClaw runtime
-  toOpenclawConfig(): Record<string, unknown> {
+  toOpenclawChannelsConfig(): Record<string, unknown> {
     const instances = this.store.listInstances()
     const result: Record<string, unknown> = {}
     for (const inst of instances) {
-      if (inst.enabled) {
-        result[`${inst.platform}:${inst.id}`] = {
-          ...inst.config,
-          credentials: inst.credentials
-        }
+      if (!inst.enabled) continue
+
+      result[this.buildChannelKey(inst)] = {
+        enabled: true,
+        platform: inst.platform,
+        ...(inst.name ? { name: inst.name } : {}),
+        ...inst.config,
+        credentials: this.buildOpenclawCredentials(inst)
       }
     }
     return result
+  }
+
+  toOpenclawBindingsConfig(): { bindings?: Array<Record<string, unknown>> } {
+    const bindings: Array<Record<string, unknown>> = []
+    for (const inst of this.store.listInstances()) {
+      if (!inst.enabled || !inst.agentId) continue
+
+      bindings.push({
+        agentId: inst.agentId,
+        match: { channel: this.buildChannelKey(inst) }
+      })
+    }
+
+    return bindings.length > 0 ? { bindings } : {}
+  }
+
+  toOpenclawPluginEntries(): Record<string, { enabled: boolean }> {
+    const result: Record<string, { enabled: boolean }> = {}
+    for (const inst of this.store.listInstances()) {
+      result[inst.platform] = {
+        enabled: Boolean(result[inst.platform]?.enabled || inst.enabled)
+      }
+    }
+    return result
+  }
+
+  collectSecretEnvVars(): Record<string, string> {
+    const result: Record<string, string> = {}
+    for (const inst of this.store.listInstances()) {
+      if (!inst.enabled) continue
+
+      for (const [key, value] of Object.entries(inst.credentials)) {
+        if (typeof value !== 'string' || !isSecretCredentialKey(key)) continue
+
+        result[buildImSecretEnvName(inst.platform, inst.id, key)] = value
+      }
+    }
+    return result
+  }
+
+  // 只导出已启用的实例配置，用于推送给 OpenClaw runtime
+  toOpenclawConfig(): Record<string, unknown> {
+    return this.toOpenclawChannelsConfig()
+  }
+
+  private buildChannelKey(inst: ImInstance): string {
+    return `${inst.platform}:${inst.id}`
+  }
+
+  private buildOpenclawCredentials(inst: ImInstance): Record<string, unknown> {
+    const credentials: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(inst.credentials)) {
+      credentials[key] =
+        typeof value === 'string' && isSecretCredentialKey(key)
+          ? buildEnvPlaceholder(buildImSecretEnvName(inst.platform, inst.id, key))
+          : value
+    }
+    return credentials
   }
 }

@@ -356,13 +356,13 @@ describe('OpenclawGateway 事件分发', () => {
 
   describe('chatAbort', () => {
     it('未连接时抛错', async () => {
-      await expect(gw.chatAbort('key', 'run-1')).rejects.toThrow('Gateway not connected')
+      await expect(gw.chatAbort('key', 'run-1')).rejects.toThrow('EngineManager not set')
     })
   })
 
   describe('chatSend', () => {
     it('未连接时抛错', async () => {
-      await expect(gw.chatSend('key', 'msg')).rejects.toThrow('Gateway not connected')
+      await expect(gw.chatSend('key', 'msg')).rejects.toThrow('EngineManager not set')
     })
   })
 

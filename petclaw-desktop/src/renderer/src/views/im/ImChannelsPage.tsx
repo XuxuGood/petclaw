@@ -45,7 +45,7 @@ export function ImChannelsPage() {
 
   // toggle 开关：加载当前配置并更新 enabled 字段后保存
   const handleToggle = async (key: string, enabled: boolean) => {
-    const existing = await window.api.im.loadConfig()
+    const existing = await window.api.im.listInstances()
     const platforms = (
       existing as { platforms: Array<{ key: string; config: Record<string, unknown> }> }
     ).platforms
@@ -57,7 +57,7 @@ export function ImChannelsPage() {
       allowFrom: [],
       debug: false
     }
-    await window.api.im.saveConfig(key, { ...config, enabled })
+    await window.api.im.updateInstance(key, { ...config, enabled })
     loadStatuses()
   }
 
@@ -116,7 +116,7 @@ export function ImChannelsPage() {
 
                   {/* 已连接徽标 */}
                   {connected && (
-                    <span className="px-2 py-0.5 text-[11px] font-medium text-green-600 bg-green-50 rounded-full">
+                    <span className="px-2 py-0.5 text-[11px] font-medium text-success bg-safe-bg rounded-full">
                       {t('im.connected')}
                     </span>
                   )}
@@ -134,7 +134,7 @@ export function ImChannelsPage() {
                   <button
                     onClick={() => handleToggle(key, !enabled)}
                     className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-200 ${
-                      enabled ? 'bg-accent' : 'bg-gray-300'
+                      enabled ? 'bg-accent' : 'bg-border'
                     }`}
                   >
                     <div

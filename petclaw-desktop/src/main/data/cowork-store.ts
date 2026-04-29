@@ -4,26 +4,46 @@ import type Database from 'better-sqlite3'
 
 import type {
   CoworkSession,
+  CoworkSessionOrigin,
   CoworkMessage,
   CoworkSessionStatus,
   CoworkMessageType,
-  CoworkMessageMetadata
-} from './types'
+  CoworkMessageMetadata,
+  SelectedModel
+} from '../ai/types'
 
 export class CoworkStore {
   constructor(private db: Database.Database) {}
 
-  createSession(title: string, directoryPath: string, agentId: string): CoworkSession {
+  createSession(
+    title: string,
+    directoryPath: string,
+    agentId: string,
+    systemPrompt = '',
+    selectedModel?: SelectedModel,
+    origin: CoworkSessionOrigin = 'chat'
+  ): CoworkSession {
     const id = crypto.randomUUID()
     const now = Date.now()
     this.db
       .prepare(
         `
-      INSERT INTO cowork_sessions (id, title, directory_path, agent_id, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO cowork_sessions
+        (id, title, directory_path, agent_id, system_prompt, selected_model_json, origin, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `
       )
-      .run(id, title, directoryPath, agentId, now, now)
+      .run(
+        id,
+        title,
+        directoryPath,
+        agentId,
+        systemPrompt,
+        selectedModel ? JSON.stringify(selectedModel) : null,
+        origin,
+        now,
+        now
+      )
     return this.getSession(id)!
   }
 
@@ -48,7 +68,7 @@ export class CoworkStore {
     updates: Partial<
       Pick<
         CoworkSession,
-        'title' | 'engineSessionId' | 'status' | 'directoryPath' | 'modelOverride'
+        'title' | 'engineSessionId' | 'status' | 'directoryPath' | 'selectedModel' | 'systemPrompt'
       >
     >
   ): void {
@@ -71,9 +91,13 @@ export class CoworkStore {
       fields.push('directory_path = ?')
       values.push(updates.directoryPath)
     }
-    if (updates.modelOverride !== undefined) {
-      fields.push('model_override = ?')
-      values.push(updates.modelOverride)
+    if (updates.selectedModel !== undefined) {
+      fields.push('selected_model_json = ?')
+      values.push(updates.selectedModel ? JSON.stringify(updates.selectedModel) : null)
+    }
+    if (updates.systemPrompt !== undefined) {
+      fields.push('system_prompt = ?')
+      values.push(updates.systemPrompt)
     }
 
     if (fields.length === 0) return
@@ -153,13 +177,35 @@ export class CoworkStore {
       title: row.title as string,
       engineSessionId: (row.engine_session_id as string | null) ?? null,
       status: row.status as CoworkSessionStatus,
+      origin: (row.origin as CoworkSessionOrigin) ?? 'chat',
       pinned: (row.pinned as number) === 1,
       directoryPath: row.directory_path as string,
-      modelOverride: row.model_override as string,
+      selectedModel: this.parseSelectedModel(row.selected_model_json),
+      systemPrompt: (row.system_prompt as string) ?? '',
       agentId: row.agent_id as string,
       messages,
       createdAt: row.created_at as number,
       updatedAt: row.updated_at as number
     }
+  }
+
+  private parseSelectedModel(value: unknown): SelectedModel | null {
+    if (typeof value !== 'string' || !value.trim()) return null
+    try {
+      const parsed = JSON.parse(value) as unknown
+      if (
+        typeof parsed === 'object' &&
+        parsed !== null &&
+        !Array.isArray(parsed) &&
+        typeof (parsed as Record<string, unknown>).providerId === 'string' &&
+        typeof (parsed as Record<string, unknown>).modelId === 'string'
+      ) {
+        const record = parsed as Record<string, string>
+        return { providerId: record.providerId, modelId: record.modelId }
+      }
+    } catch {
+      return null
+    }
+    return null
   }
 }

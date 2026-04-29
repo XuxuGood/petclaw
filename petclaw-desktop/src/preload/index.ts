@@ -5,35 +5,6 @@ const api = {
   moveWindow: (dx: number, dy: number) => ipcRenderer.send('window:move', dx, dy),
   toggleMainWindow: () => ipcRenderer.send('chat:toggle'),
 
-  // Chat
-  sendChat: (message: string): Promise<void> => ipcRenderer.invoke('chat:send', message),
-  loadHistory: (limit: number): Promise<Array<{ role: string; content: string }>> =>
-    ipcRenderer.invoke('chat:history', limit),
-  onChatChunk: (callback: (chunk: string) => void) => {
-    const handler = (_e: Electron.IpcRendererEvent, chunk: string) => callback(chunk)
-    ipcRenderer.on('chat:chunk', handler)
-    return () => ipcRenderer.removeListener('chat:chunk', handler)
-  },
-  onChatDone: (callback: () => void) => {
-    const handler = () => callback()
-    ipcRenderer.on('chat:done', handler)
-    return () => ipcRenderer.removeListener('chat:done', handler)
-  },
-  onChatError: (callback: (error: string) => void) => {
-    const handler = (_e: Electron.IpcRendererEvent, error: string) => callback(error)
-    ipcRenderer.on('chat:error', handler)
-    return () => ipcRenderer.removeListener('chat:error', handler)
-  },
-  onAIResponding: (callback: () => void) => {
-    const handler = () => callback()
-    ipcRenderer.on('chat:ai-responding', handler)
-    return () => ipcRenderer.removeListener('chat:ai-responding', handler)
-  },
-  onChatSent: (callback: () => void) => {
-    const handler = () => callback()
-    ipcRenderer.on('pet:chat-sent', handler)
-    return () => ipcRenderer.removeListener('pet:chat-sent', handler)
-  },
   onHookEvent: (
     callback: (event: {
       type: string
@@ -132,13 +103,31 @@ const api = {
 
   // ── Cowork ──
   cowork: {
-    send: (message: string, cwd: string) => ipcRenderer.invoke('chat:send', message, cwd),
-    continue: (sessionId: string, message: string) =>
-      ipcRenderer.invoke('chat:continue', sessionId, message),
-    stop: (sessionId: string) => ipcRenderer.invoke('chat:stop', sessionId),
-    sessions: () => ipcRenderer.invoke('chat:sessions'),
-    session: (id: string) => ipcRenderer.invoke('chat:session', id),
-    deleteSession: (id: string) => ipcRenderer.invoke('chat:delete-session', id),
+    startSession: (options: {
+      prompt: string
+      cwd?: string
+      systemPrompt?: string
+      skillIds?: string[]
+      selectedModel?: { providerId: string; modelId: string }
+    }) => ipcRenderer.invoke('cowork:session:start', options),
+    continueSession: (options: {
+      sessionId: string
+      prompt: string
+      systemPrompt?: string
+      skillIds?: string[]
+      selectedModel?: { providerId: string; modelId: string }
+    }) => ipcRenderer.invoke('cowork:session:continue', options),
+    getConfig: () => ipcRenderer.invoke('cowork:config:get'),
+    setConfig: (patch: {
+      defaultDirectory?: string
+      systemPrompt?: string
+      memoryEnabled?: boolean
+      skipMissedJobs?: boolean
+    }) => ipcRenderer.invoke('cowork:config:set', patch),
+    stopSession: (sessionId: string) => ipcRenderer.invoke('cowork:session:stop', sessionId),
+    listSessions: () => ipcRenderer.invoke('cowork:session:list'),
+    getSession: (id: string) => ipcRenderer.invoke('cowork:session:get', id),
+    deleteSession: (id: string) => ipcRenderer.invoke('cowork:session:delete', id),
     respondPermission: (requestId: string, result: unknown) =>
       ipcRenderer.invoke('cowork:permission:respond', requestId, result),
     onMessage: (cb: (data: unknown) => void) => {
@@ -156,6 +145,11 @@ const api = {
       ipcRenderer.on('cowork:stream:permission', handler)
       return () => ipcRenderer.removeListener('cowork:stream:permission', handler)
     },
+    onPermissionDismiss: (cb: (data: unknown) => void) => {
+      const handler = (_e: Electron.IpcRendererEvent, data: unknown) => cb(data)
+      ipcRenderer.on('cowork:stream:permission-dismiss', handler)
+      return () => ipcRenderer.removeListener('cowork:stream:permission-dismiss', handler)
+    },
     onComplete: (cb: (data: unknown) => void) => {
       const handler = (_e: Electron.IpcRendererEvent, data: unknown) => cb(data)
       ipcRenderer.on('cowork:stream:complete', handler)
@@ -165,6 +159,11 @@ const api = {
       const handler = (_e: Electron.IpcRendererEvent, data: unknown) => cb(data)
       ipcRenderer.on('cowork:stream:error', handler)
       return () => ipcRenderer.removeListener('cowork:stream:error', handler)
+    },
+    onSessionStopped: (cb: (data: unknown) => void) => {
+      const handler = (_e: Electron.IpcRendererEvent, data: unknown) => cb(data)
+      ipcRenderer.on('cowork:stream:session-stopped', handler)
+      return () => ipcRenderer.removeListener('cowork:stream:session-stopped', handler)
     }
   },
 
@@ -224,8 +223,11 @@ const api = {
     removeProvider: (id: string) => ipcRenderer.invoke('models:remove-provider', id),
     toggleProvider: (id: string, enabled: boolean) =>
       ipcRenderer.invoke('models:toggle-provider', id, enabled),
-    active: () => ipcRenderer.invoke('models:active'),
-    setActive: (id: string) => ipcRenderer.invoke('models:set-active', id),
+    defaultModel: () => ipcRenderer.invoke('models:default'),
+    setDefaultModel: (selected: unknown) => ipcRenderer.invoke('models:set-default', selected),
+    setApiKey: (providerId: string, apiKey: string) =>
+      ipcRenderer.invoke('models:set-api-key', providerId, apiKey),
+    clearApiKey: (providerId: string) => ipcRenderer.invoke('models:clear-api-key', providerId),
     testConnection: (id: string) => ipcRenderer.invoke('models:test-connection', id),
     addModel: (providerId: string, model: unknown) =>
       ipcRenderer.invoke('models:add-model', providerId, model),
@@ -242,7 +244,21 @@ const api = {
     create: (data: unknown) => ipcRenderer.invoke('mcp:create', data),
     update: (id: string, patch: unknown) => ipcRenderer.invoke('mcp:update', id, patch),
     delete: (id: string) => ipcRenderer.invoke('mcp:delete', id),
-    setEnabled: (id: string, enabled: boolean) => ipcRenderer.invoke('mcp:set-enabled', id, enabled)
+    setEnabled: (id: string, enabled: boolean) =>
+      ipcRenderer.invoke('mcp:set-enabled', id, enabled),
+    refreshBridge: () => ipcRenderer.invoke('mcp:bridge:refresh'),
+    // MCP Bridge 同步状态事件
+    onBridgeSyncStart: (cb: () => void) => {
+      const handler = () => cb()
+      ipcRenderer.on('mcp:bridge:syncStart', handler)
+      return () => ipcRenderer.removeListener('mcp:bridge:syncStart', handler)
+    },
+    onBridgeSyncDone: (cb: (data: { tools: number; error?: string }) => void) => {
+      const handler = (_e: Electron.IpcRendererEvent, data: { tools: number; error?: string }) =>
+        cb(data)
+      ipcRenderer.on('mcp:bridge:syncDone', handler)
+      return () => ipcRenderer.removeListener('mcp:bridge:syncDone', handler)
+    }
   },
   memory: {
     read: (workspace: string) => ipcRenderer.invoke('memory:read', workspace),
@@ -285,13 +301,29 @@ const api = {
 
   // ── IM ──
   im: {
-    loadConfig: () => ipcRenderer.invoke('im:load-config'),
-    saveConfig: (key: string, config: unknown) => ipcRenderer.invoke('im:save-config', key, config),
+    listInstances: () => ipcRenderer.invoke('im:load-config'),
+    createInstance: (platform: string, credentials: Record<string, unknown>, name?: string) =>
+      ipcRenderer.invoke('im:create-instance', platform, credentials, name),
+    updateInstance: (id: string, patch: Record<string, unknown>) =>
+      ipcRenderer.invoke('im:save-config', id, patch),
+    deleteInstance: (id: string) => ipcRenderer.invoke('im:delete-instance', id),
     getStatus: () => ipcRenderer.invoke('im:get-status'),
-    loadSettings: () => ipcRenderer.invoke('im:load-settings'),
-    saveSettings: (settings: unknown) => ipcRenderer.invoke('im:save-settings', settings),
+    setBinding: (
+      conversationId: string,
+      instanceId: string,
+      peerKind: 'dm' | 'group',
+      directoryPath: string,
+      agentId: string
+    ) =>
+      ipcRenderer.invoke(
+        'im:set-binding',
+        conversationId,
+        instanceId,
+        peerKind,
+        directoryPath,
+        agentId
+      ),
     onStatusUpdate: (cb: (data: unknown) => void) => {
-      // 监听 IM 连接状态变更推送，返回取消订阅函数
       const handler = (_e: Electron.IpcRendererEvent, data: unknown) => cb(data)
       ipcRenderer.on('im:status-update', handler)
       return () => ipcRenderer.removeListener('im:status-update', handler)

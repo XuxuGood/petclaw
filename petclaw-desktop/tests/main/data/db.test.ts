@@ -12,7 +12,7 @@ describe('initDatabase', () => {
     initDatabase(db)
   })
 
-  it('should create all 9 tables', () => {
+  it('should create core tables', () => {
     const tables = db
       .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
       .all() as Array<{ name: string }>
@@ -26,6 +26,31 @@ describe('initDatabase', () => {
     expect(names).toContain('im_session_mappings')
     expect(names).toContain('scheduled_task_meta')
     expect(names).toContain('mcp_servers')
+  })
+
+  it('creates model provider tables', () => {
+    const tables = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table'")
+      .all() as Array<{ name: string }>
+    const names = new Set(tables.map((row) => row.name))
+
+    expect(names.has('model_providers')).toBe(true)
+    expect(names.has('model_provider_secrets')).toBe(true)
+  })
+
+  it('creates model provider secrets foreign key', () => {
+    const foreignKeys = db
+      .prepare('PRAGMA foreign_key_list(model_provider_secrets)')
+      .all() as Array<{ table: string; from: string; to: string; on_delete: string }>
+
+    expect(foreignKeys).toContainEqual(
+      expect.objectContaining({
+        table: 'model_providers',
+        from: 'provider_id',
+        to: 'id',
+        on_delete: 'CASCADE'
+      })
+    )
   })
 
   it('should create indexes', () => {

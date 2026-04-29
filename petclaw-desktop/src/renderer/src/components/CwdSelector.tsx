@@ -55,9 +55,9 @@ export function CwdSelector({ value, onChange }: CwdSelectorProps) {
   useEffect(() => {
     if (!open) return
     setLoading(true)
-    // cowork.sessions() 返回 unknown[]，向下收窄取 cwd 字段
+    // cowork.listSessions() 返回 unknown[]，向下收窄取 cwd 字段
     window.api.cowork
-      .sessions()
+      .listSessions()
       .then((sessions) => {
         const cwdSet = new Set<string>()
         const dirs: string[] = []
@@ -201,7 +201,7 @@ interface RecentSubmenuProps {
   onSelect: (dir: string) => void
   onMouseEnter: () => void
   onMouseLeave: () => void
-  ref: React.RefObject<HTMLDivElement>
+  ref: React.RefObject<HTMLDivElement | null>
 }
 
 function RecentSubmenu({

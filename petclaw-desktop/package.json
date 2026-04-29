@@ -1,8 +1,15 @@
 {
   "name": "petclaw-desktop",
+  "author": {
+    "name": "xiaoxuxuy",
+    "email": "xiaoxuxuy@gmail.com"
+  },
   "version": "0.1.0",
   "description": "AI Desktop Pet Assistant",
   "main": "./out/main/index.js",
+  "engines": {
+    "node": ">=24.0.0 <25.0.0"
+  },
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
@@ -17,14 +24,18 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
+    "pretest": "npm rebuild better-sqlite3",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "openclaw:ensure": "node scripts/ensure-openclaw-version.cjs",
+    "openclaw:patch": "node scripts/apply-openclaw-patches.cjs",
     "openclaw:runtime:host": "node scripts/openclaw-runtime-host.cjs",
-    "openclaw:runtime:mac-arm64": "node scripts/run-build-openclaw-runtime.cjs --target=mac-arm64",
-    "openclaw:runtime:mac-x64": "node scripts/run-build-openclaw-runtime.cjs --target=mac-x64",
-    "openclaw:runtime:win-x64": "node scripts/run-build-openclaw-runtime.cjs --target=win-x64",
-    "openclaw:runtime:linux-x64": "node scripts/run-build-openclaw-runtime.cjs --target=linux-x64",
+    "openclaw:runtime:mac-arm64": "npm run openclaw:ensure && npm run openclaw:patch && node scripts/run-build-openclaw-runtime.cjs --target=mac-arm64 && node scripts/sync-openclaw-runtime-current.cjs mac-arm64 && npm run openclaw:bundle && npm run openclaw:plugins && npm run openclaw:extensions && npm run openclaw:precompile && npm run openclaw:channel-deps && npm run openclaw:prune && npm run openclaw:finalize",
+    "openclaw:runtime:mac-x64": "npm run openclaw:ensure && npm run openclaw:patch && node scripts/run-build-openclaw-runtime.cjs --target=mac-x64 && node scripts/sync-openclaw-runtime-current.cjs mac-x64 && npm run openclaw:bundle && npm run openclaw:plugins && npm run openclaw:extensions && npm run openclaw:precompile && npm run openclaw:channel-deps && npm run openclaw:prune && npm run openclaw:finalize",
+    "openclaw:runtime:win-x64": "npm run openclaw:ensure && npm run openclaw:patch && node scripts/run-build-openclaw-runtime.cjs --target=win-x64 && node scripts/sync-openclaw-runtime-current.cjs win-x64 && npm run openclaw:bundle && npm run openclaw:plugins && npm run openclaw:extensions && npm run openclaw:precompile && npm run openclaw:channel-deps && npm run openclaw:prune && npm run openclaw:finalize",
+    "openclaw:runtime:win-arm64": "npm run openclaw:ensure && npm run openclaw:patch && node scripts/run-build-openclaw-runtime.cjs --target=win-arm64 && node scripts/sync-openclaw-runtime-current.cjs win-arm64 && npm run openclaw:bundle && npm run openclaw:plugins && npm run openclaw:extensions && npm run openclaw:precompile && npm run openclaw:channel-deps && npm run openclaw:prune && npm run openclaw:finalize",
+    "openclaw:runtime:linux-x64": "npm run openclaw:ensure && npm run openclaw:patch && node scripts/run-build-openclaw-runtime.cjs --target=linux-x64 && node scripts/sync-openclaw-runtime-current.cjs linux-x64 && npm run openclaw:bundle && npm run openclaw:plugins && npm run openclaw:extensions && npm run openclaw:precompile && npm run openclaw:channel-deps && npm run openclaw:prune && npm run openclaw:finalize",
+    "openclaw:runtime:linux-arm64": "npm run openclaw:ensure && npm run openclaw:patch && node scripts/run-build-openclaw-runtime.cjs --target=linux-arm64 && node scripts/sync-openclaw-runtime-current.cjs linux-arm64 && npm run openclaw:bundle && npm run openclaw:plugins && npm run openclaw:extensions && npm run openclaw:precompile && npm run openclaw:channel-deps && npm run openclaw:prune && npm run openclaw:finalize",
     "openclaw:bundle": "node scripts/bundle-openclaw-gateway.cjs",
     "openclaw:plugins": "node scripts/ensure-openclaw-plugins.cjs",
     "openclaw:extensions": "node scripts/sync-local-openclaw-extensions.cjs",
@@ -33,12 +44,13 @@
     "openclaw:prune": "node scripts/prune-openclaw-runtime.cjs",
     "openclaw:finalize": "node scripts/finalize-openclaw-runtime.cjs",
     "electron:dev": "electron-vite dev",
-    "electron:dev:openclaw": "npm run openclaw:ensure && npm run openclaw:runtime:host && electron-vite dev"
+    "electron:dev:openclaw": "npm run openclaw:ensure && npm run openclaw:patch && npm run openclaw:runtime:host && electron-vite dev"
   },
   "dependencies": {
+    "@electron-toolkit/utils": "^4.0.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@petclaw/shared": "workspace:*",
-    "@electron-toolkit/utils": "^3.0.0",
-    "better-sqlite3": "^11.0.0",
+    "better-sqlite3": "^12.0.0",
     "electron-log": "^5.4.3",
     "electron-updater": "^6.0.0",
     "lucide-react": "^1.8.0",
@@ -49,16 +61,16 @@
   },
   "devDependencies": {
     "@electron/notarize": "^3.1.1",
-    "@electron/rebuild": "^3.0.0",
+    "@electron/rebuild": "^4.0.0",
     "@eslint/js": "^9.0.0",
     "@tailwindcss/vite": "^4.0.0",
     "@types/better-sqlite3": "^7.0.0",
-    "@types/node": "^22.0.0",
+    "@types/node": "^24.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.0.0",
-    "electron": "^33.0.0",
-    "electron-builder": "^25.0.0",
+    "electron": "^41.0.0",
+    "electron-builder": "^26.0.0",
     "electron-vite": "^3.0.0",
     "esbuild": "^0.25.12",
     "eslint": "^9.0.0",
@@ -85,7 +97,7 @@
     ]
   },
   "openclaw": {
-    "version": "v2026.3.2",
+    "version": "v2026.4.26",
     "repo": "https://github.com/openclaw/openclaw.git",
     "plugins": [
       {
@@ -101,7 +113,7 @@
       {
         "id": "wecom-openclaw-plugin",
         "npm": "@wecom/wecom-openclaw-plugin",
-        "version": "2026.4.3"
+        "version": "2026.4.22"
       },
       {
         "id": "openclaw-weixin",
@@ -110,7 +122,7 @@
       },
       {
         "id": "openclaw-nim-channel",
-        "npm": "openclaw-nim-channel",
+        "npm": "git+https://github.com/netease-im/openclaw-nim-channel.git#1.1.1",
         "version": "1.1.1"
       },
       {
