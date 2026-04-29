@@ -2720,33 +2720,340 @@ PetClaw 维护 2 个**本地扩展**，它们是 Openclaw 插件（遵循 `openc
 
 #### ask-user-question
 
-**职责**：让 Agent 在执行危险操作前弹出结构化确认弹窗。
+**职责**：让 Agent 在执行危险操作前弹出结构化确认弹窗，或在需要用户做选择时提供多选/单选交互。
 
-**工作原理**：
-1. Agent 调用 `AskUserQuestion` 工具，传入问题 + 选项（2-4 个）
-2. 插件通过 HTTP POST 回调 App（`callbackUrl`），携带 `x-ask-user-secret` 头
-3. App 在 Renderer 显示审批弹窗，用户选择后返回 `{ behavior: 'allow'|'deny', answers }`
-4. 120s 超时自动 deny
+**端到端完整数据流**：
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│ [1] Agent 决定调用 AskUserQuestion（由 MANAGED_EXEC_SAFETY prompt 引导） │
+│     通过 OpenClaw Gateway 调用工具                                       │
+└────────────────────────────┬─────────────────────────────────────────────┘
+                             │ plugin execute() 被调用
+                             ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│ [2] openclaw-extensions/ask-user-question/index.ts                       │
+│     askUser() → HTTP POST http://127.0.0.1:{port}/askuser               │
+│     Header: x-ask-user-secret: {shared-secret}                          │
+│     Body: { questions: [{ question, header?, options, multiSelect? }] }  │
+│     HTTP 连接挂起等待（120s AbortController 超时）                        │
+└────────────────────────────┬─────────────────────────────────────────────┘
+                             │ HTTP POST /askuser
+                             ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│ [3] McpBridgeServer.handleAskUser()                                      │
+│     • 验证 x-ask-user-secret header                                     │
+│     • requestId = crypto.randomUUID()                                    │
+│     • pendingAskUser.set(requestId, { resolve, timer(120s) })            │
+│     • 调用 onAskUserCallback({ requestId, questions })                   │
+│     • await Promise（HTTP 连接挂起直到 resolveAskUser()）                │
+└────────────────────────────┬─────────────────────────────────────────────┘
+                             │ onAskUser callback 触发
+                             ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│ [4] index.ts (Main Process)                                              │
+│     mainWindow.webContents.send('cowork:stream:permission', {            │
+│       sessionId: '__askuser__',                                          │
+│       request: { requestId, toolName: 'AskUserQuestion', toolInput }     │
+│     })                                                                   │
+└────────────────────────────┬─────────────────────────────────────────────┘
+                             │ IPC (main → renderer)
+                             ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│ [5] usePermissionListener (App.tsx 全局 hook)                            │
+│     window.api.cowork.onPermission → usePermissionStore.enqueue()        │
+│     权限请求进入 FIFO 队列（按 requestId 去重）                           │
+└────────────────────────────┬─────────────────────────────────────────────┘
+                             │ Zustand state 变更触发重渲染
+                             ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│ [6] App.tsx renderPermissionModal() — 全局弹窗路由                       │
+│     取队首 firstPending，根据 toolName + questions.length 决定组件：     │
+│     • questions.length > 1  → <CoworkQuestionWizard />（分步向导）       │
+│     • questions.length == 1, 2 选项, 非多选 → ConfirmModeModal（确认）  │
+│     • 其他 AskUserQuestion → MultiQuestionModal（堆叠选择）             │
+│     • 非 AskUserQuestion → StandardApprovalModal（exec 审批）           │
+│     弹窗在所有视图分支（bootcheck/onboarding/settings/main）之上渲染     │
+└────────────────────────────┬─────────────────────────────────────────────┘
+                             │ 用户点击选项
+                             ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│ [7] handlePermissionRespond 回调                                         │
+│     window.api.cowork.respondPermission(requestId, result)               │
+│     usePermissionStore.dequeue(requestId) → 队列出队，下一个请求浮出     │
+└────────────────────────────┬─────────────────────────────────────────────┘
+                             │ IPC invoke 'cowork:permission:respond'
+                             ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│ [8] chat-ipc.ts Dual-Dispatch                                            │
+│     • mcpBridgeServer.resolveAskUser(requestId, { behavior, answers })   │
+│       → clearTimeout + pendingAskUser.delete + resolve Promise           │
+│     • coworkController.respondToPermission(requestId, result)            │
+│       → no-op（requestId 不匹配 SDK 队列）                              │
+│     两者可安全同时调用，requestId 命名空间隔离                            │
+└────────────────────────────┬─────────────────────────────────────────────┘
+                             │ Promise resolve → HTTP 响应
+                             ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│ [9] McpBridgeServer                                                      │
+│     HTTP 200: { behavior: 'allow'|'deny', answers: { q: selectedLabel }} │
+└────────────────────────────┬─────────────────────────────────────────────┘
+                             │ fetch() resolve
+                             ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│ [10] ask-user-question/index.ts execute() 返回工具结果                    │
+│      allow → "问题: 答案\n..."（Agent 继续执行）                         │
+│      deny  → "User denied the operation."（Agent 放弃执行）              │
+└──────────────────────────────────────────────────────────────────────────┘
+
+          ─── 超时路径（120s）───
+[3] timer 触发 → pendingAskUser.delete(requestId)
+  → onAskUserDismissCallback(requestId)
+    → IPC 'cowork:stream:permission-dismiss' → usePermissionListener
+      → usePermissionStore.dequeue(requestId) → 弹窗自动消失
+  → resolve({ behavior: 'deny' }) → 插件收到 deny 响应
+```
+
+**扩展定义层**（`openclaw-extensions/ask-user-question/`）：
+
+| 文件 | 职责 |
+|------|------|
+| `openclaw.plugin.json` | 插件元数据：id `ask-user-question`，configSchema 定义 `callbackUrl` + `secret` |
+| `index.ts` | 注册 `AskUserQuestion` 工具：TypeBox schema 校验参数（1-4 个问题，每个 2-4 选项），`askUser()` HTTP 回调 |
+| `package.json` | ESM 模块声明 |
+
+**工具参数 schema**：
+
+```typescript
+// 问题结构
+interface Question {
+  question: string           // 问题文本
+  header?: string            // 可选短标签（如 "Auth method"）
+  options: QuestionOption[]  // 2-4 个选项
+  multiSelect?: boolean      // 是否允许多选
+}
+
+interface QuestionOption {
+  label: string              // 选项标签
+  description?: string       // 选项说明
+}
+
+// 工具输入
+interface AskUserInput {
+  questions: Question[]      // 1-4 个问题
+}
+```
+
+**Session 过滤**（工厂模式）：
+- 插件通过 `api.registerTool(factory)` 注册，factory 函数根据 `ctx.sessionKey` 动态决定是否暴露工具
+- `sessionKey.startsWith('agent:main:petclaw:')` → 桌面本地会话 → 返回工具对象
+- 其他前缀（钉钉、QQ Bot、微信、飞书、企微等 IM 渠道）→ 返回 `null` → 工具不可见
+- 原因：IM 渠道无法弹窗交互，强制隐藏避免 Agent 调用后永远超时
 
 **启用条件**：
 - `callbackUrl` + `secret` 由 ConfigSync 写入 `openclaw.json` 的插件配置
-- 仅桌面端会话（`sessionKey.startsWith('agent:main:petclaw:')`）启用，IM 渠道会话不注册此工具
+- secret 使用环境变量占位符 `${PETCLAW_MCP_BRIDGE_SECRET}`，明文通过 `collectSecretEnvVars()` 注入子进程环境，不落盘
 
 **Renderer 展示层**：
-- 多问题场景使用 `CoworkQuestionWizard`（分步向导），每步展示单个问题 + radio/checkbox 选项
-- 单问题场景直接在 `CoworkPermissionModal` 内联展示（`ask-user-question` 模式）
-- 所有权限请求经由 `usePermissionStore` FIFO 队列串行处理，`usePermissionListener` 全局订阅主进程推送事件
+
+| 组件 | 触发条件 | 功能 |
+|------|----------|------|
+| `CoworkQuestionWizard` | `AskUserQuestion` + `questions.length > 1` | 分步向导：进度条、步骤圆点导航（可点击跳转，已答绿色 ✓）、单选自动前进（150ms 延迟）、多选 checkbox / 单选 radio 图标、"其他"自由文本输入、"跳过"按钮、提交守卫（allAnswered）、Escape 关闭 |
+| `ConfirmModeModal` | `AskUserQuestion` + 单问题 + 2 选项 + 非多选 | 确认模式：智能识别正向/负向语义按钮（`resolveConfirmModeButtons`），命令预览，危险等级色彩区分 |
+| `MultiQuestionModal` | `AskUserQuestion` + 其他 | 堆叠选择：所有问题同屏展示，radio/checkbox 图标区分单选/多选，`|||` 分隔符拼接多选值 |
+| `StandardApprovalModal` | 非 AskUserQuestion（Bash exec 等） | 标准审批：工具名 + 参数展示，允许/拒绝按钮 |
+
+**权限弹窗全局架构**：
+- 弹窗在 `App.tsx` 所有 return 分支之上渲染（Fragment 包裹），视图切换不影响
+- `usePermissionStore`（Zustand）维护 FIFO 队列，`enqueue` 去重入队、`dequeue` 精确出队
+- `usePermissionListener` 在 App 顶层调用一次，订阅 `onPermission` → 入队、`onPermissionDismiss` → 出队
+- 并发请求不覆盖：多个请求依次入队，UI 展示队首，响应后自动浮出下一个
+
+**危险等级展示**：
+- 主进程 `command-safety.ts` 返回 `{ level, reason }`，通过 IPC `toolInput.dangerLevel` / `toolInput.dangerReason` 传入 renderer
+- `DANGER_REASON_I18N_MAP` 将 reason slug（如 `recursive-delete`）映射为 i18n key
+- destructive → 红色警告条 + 原因文案；caution → 黄色警告条 + 原因文案
+
+**Agent 行为约束**（`MANAGED_EXEC_SAFETY` prompt，写入 `AGENTS.md`）：
+- 删除操作前，检查 `AskUserQuestion` 工具是否可用
+- 可用 → 必须先调用获取用户确认
+- 不可用 → 直接执行（IM 渠道场景）
+- 非删除操作 → 直接执行，不弹确认
+- 用户需要做选择时，优先用 `AskUserQuestion`（`multiSelect: true` 适配多选）
 
 #### mcp-bridge
 
-**职责**：将 App 管理的 MCP 服务器工具暴露为 Openclaw 原生工具。
+**职责**：将 App 管理的 MCP 服务器工具暴露为 Openclaw 原生工具，Agent 可像调用原生 tool 一样调用任何 MCP server 的功能。
 
-**工作原理**：
-1. `McpServerManager.startServers()` 连接所有已启用 MCP servers → `client.listTools()` 发现 tools → `McpToolManifestEntry[]`
-2. ConfigSync 通过 `getMcpBridgeConfig()` 回调获取 `callbackUrl` + `secret`（环境变量占位符）+ `tools` 清单 → 写入 `openclaw.json` 的 mcp-bridge plugin config
-3. 插件为每个 tool 注册代理 tool（名称格式 `mcp_{server}_{tool}`），Agent 调用时 → 插件 HTTP POST 到 `callbackUrl`（携带 `x-mcp-bridge-secret` header）→ `McpBridgeServer` → `McpServerManager.callTool()` → 实际 MCP server 执行 → 结果返回
+**端到端完整数据流**：
 
-**配置字段**：`callbackUrl`（`http://127.0.0.1:{port}/mcp/execute`）、`secret`（`${PETCLAW_MCP_BRIDGE_SECRET}`）、`tools`（`McpToolManifestEntry[]`）
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ [1] 用户在 Settings → MCP 页面配置 MCP Server（stdio/sse/streamable-http）   │
+│     McpManager.create() → emit 'change' → refreshMcpBridge()                │
+└────────────────────────────────┬─────────────────────────────────────────────┘
+                                 │ refreshMcpBridge()
+                                 ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ [2] McpServerManager.startServers(enabledServers)                             │
+│     • 遍历已启用 MCP servers → 按 transport_type 创建 SDK Client              │
+│       stdio → StdioClientTransport（支持 Windows windowsHide init script）   │
+│       sse → SSEClientTransport                                               │
+│       streamable-http → StreamableHTTPClientTransport                        │
+│     • client.connect() 建立连接                                              │
+│     • client.listTools() 发现每个 server 暴露的 tools                        │
+│     • 聚合为 McpToolManifestEntry[]（server + name + description + schema）  │
+└────────────────────────────────┬─────────────────────────────────────────────┘
+                                 │ tools 列表就绪
+                                 ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ [3] ConfigSync.sync('mcp-bridge-refresh')                                    │
+│     • getMcpBridgeConfig() 回调获取运行时配置：                               │
+│       { callbackUrl, askUserCallbackUrl, secret, tools[] }                   │
+│     • buildPluginsConfig() 将 tools 写入 openclaw.json：                     │
+│       plugins.entries["mcp-bridge"].config.tools = [                         │
+│         { server: "fs", name: "read_file", description, inputSchema }        │
+│       ]                                                                      │
+│     • secret 使用环境变量占位符 ${PETCLAW_MCP_BRIDGE_SECRET}                  │
+│     • mcpBridgeConfigChanged 检测 → needsGatewayRestart = true               │
+└────────────────────────────────┬─────────────────────────────────────────────┘
+                                 │ Gateway 重启（加载新配置）
+                                 ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ [4] OpenClaw Runtime 启动，加载 mcp-bridge 插件                               │
+│     plugin.register(api):                                                    │
+│     • parsePluginConfig(api.pluginConfig) → 读取 tools[]                     │
+│     • 三者缺一（callbackUrl / secret / tools）→ 跳过注册                     │
+│     • 遍历 tools，为每个注册代理 tool：                                       │
+│       buildRegisteredToolName(server, tool, usedNames)                        │
+│       → 名称格式: mcp_{server}_{tool}（sanitize + 同名去重 _2、_3...）       │
+│       → api.registerTool({ name, label, description, parameters, execute })  │
+│     • Agent 的 tool 列表中出现 mcp_xxx_yyy 工具                              │
+└────────────────────────────────┬─────────────────────────────────────────────┘
+                                 │ Agent 调用 mcp_{server}_{tool}
+                                 ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ [5] mcp-bridge/index.ts execute() → invokeBridge()                           │
+│     • AbortController + setTimeout(requestTimeoutMs, 默认 120s)              │
+│     • fetch(callbackUrl, {                                                   │
+│         method: 'POST',                                                      │
+│         headers: { 'x-mcp-bridge-secret': secret },                          │
+│         body: JSON.stringify({ server, tool, args })                          │
+│       })                                                                     │
+│     • HTTP 连接挂起等待 McpBridgeServer 响应                                 │
+└────────────────────────────────┬─────────────────────────────────────────────┘
+                                 │ HTTP POST /mcp/execute
+                                 ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ [6] McpBridgeServer.handleMcpExecute()                                       │
+│     • 验证 x-mcp-bridge-secret header                                       │
+│     • 解析 { server, tool, args }                                            │
+│     • res.on('close') → AbortController（gateway 断连时取消调用）            │
+│       ※ 监听 res 而非 req，因为 req 在 body 读完后自动 close                │
+│     • mcpManager.callTool(server, tool, args, { signal })                    │
+└────────────────────────────────┬─────────────────────────────────────────────┘
+                                 │ callTool()
+                                 ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ [7] McpServerManager.callTool(serverName, toolName, args, { signal })         │
+│     • 从已连接的 clients Map 中取出对应 server 的 MCP Client                 │
+│     • client.callTool({ name: toolName, arguments: args })                   │
+│     • raceAbortSignal() 竞赛：signal abort 时立即中止，不等 MCP server       │
+│     • 实际 MCP server 执行并返回结果                                          │
+│     • 返回 { content: [{type,text}], isError: boolean }                      │
+└────────────────────────────────┬─────────────────────────────────────────────┘
+                                 │ 结果返回
+                                 ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ [8] McpBridgeServer → HTTP 200 JSON 响应                                     │
+│     { content: [{ type: "text", text: "file content..." }], isError: false } │
+└────────────────────────────────┬─────────────────────────────────────────────┘
+                                 │ fetch() resolve
+                                 ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ [9] mcp-bridge/index.ts execute() → ensureToolResultPayload()                │
+│     • 标准格式（已有 content[]）→ 直接透传                                    │
+│     • 非标准格式 → 包装为 { content: [{ type: "text", text }] }              │
+│     • 附加 details: { alias, server, tool }（调试追溯）                      │
+│     • 返回给 Agent 作为 tool 结果                                             │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+          ─── 错误 / 中断路径 ───
+
+超时（120s AbortController）:
+  [5] AbortController.abort() → fetch 抛出 AbortError
+  → execute() catch → { content: [{text: error.message}], isError: true }
+
+Gateway 断连（用户中止会话、会话超时等）:
+  [6] res.close 事件触发 → AbortController.abort()
+  → [7] raceAbortSignal() 中止进行中的 callTool
+  → [6] catch → 500 Bridge error（但 res 已关闭，无法发送）
+
+MCP Server 执行失败:
+  [7] callTool 返回 { isError: true, content }
+  → [8] HTTP 200（MCP 协议层成功，业务层失败）
+  → [9] 透传 isError:true 给 Agent
+
+传输层错误:
+  [7] client.callTool() 抛出异常（连接断开等）
+  → [6] catch → HTTP 500 { content: [{text: "Bridge error: ..."}], isError: true }
+  → [9] invokeBridge() 抛出错误 → execute() catch 返回 isError 结果
+```
+
+**扩展定义层**（`openclaw-extensions/mcp-bridge/`）：
+
+| 文件 | 职责 |
+|------|------|
+| `openclaw.plugin.json` | 插件元数据：id `mcp-bridge`，configSchema 定义 `callbackUrl`、`secret`、`requestTimeoutMs`、`tools[]` |
+| `index.ts` | 插件核心逻辑：解析配置 → 为每个 tool 注册代理 → invokeBridge() HTTP 转发 → 结果规范化 |
+| `package.json` | ESM 模块声明，`openclaw.extensions` 指向入口 |
+
+**插件配置 schema**：
+
+```typescript
+interface McpBridgePluginConfig {
+  callbackUrl: string          // PetClaw HTTP 端点 URL
+  secret: string               // 共享密钥
+  requestTimeoutMs: number     // 单次调用超时（默认 120000ms，最小 1000ms）
+  tools: McpBridgeToolConfig[] // 需要注册的 tool 列表
+}
+
+interface McpBridgeToolConfig {
+  server: string               // MCP server 名称（如 "filesystem"）
+  name: string                 // MCP tool 名称（如 "read_file"）
+  description?: string         // 功能描述（透传给 Agent）
+  inputSchema: Record<string, unknown>  // 参数 JSON Schema
+}
+```
+
+**代理 tool 命名规则**：
+- 格式：`mcp_{server}_{tool}`，sanitize 规则：小写 + 非字母数字替换为 `_` + 去首尾 `_`
+- 同名冲突自动追加递增序号：`mcp_server1_read`、`mcp_server2_read_2`
+- Agent 看到的 tool 描述：`Proxy to MCP tool "{tool}" on server "{server}". {description}`
+
+**安全机制**：
+- 共享 secret 由 `index.ts` 启动时 `crypto.randomUUID()` 生成，生命周期与进程绑定
+- 通过 ConfigSync 以环境变量占位符 `${PETCLAW_MCP_BRIDGE_SECRET}` 写入 `openclaw.json`
+- OpenClaw runtime 子进程通过 `collectSecretEnvVars()` 注入明文到环境变量
+- McpBridgeServer 同时接受 `x-mcp-bridge-secret` 和 `x-ask-user-secret` header（两个扩展共用同一 secret）
+- HTTP server 仅绑定 `127.0.0.1` 本地回环地址，外部网络不可达
+
+**连接中断处理（关键设计决策）**：
+- 监听 `res.on('close')` 而非 `req.on('close')` — `req` 在 body 读完后自动 close，会导致 signal 在 callTool 开始前就被 abort
+- `res.close` 仅在 socket 真正断连时触发（如 gateway abort），此时才取消进行中的 MCP tool 调用
+- `raceAbortSignal()` 竞赛确保 signal abort 时 callTool 立即返回，不阻塞等待 MCP server
+
+**全局开关特性**：
+- MCP 是纯全局开关，没有会话级隔离（OpenClaw 的 mcp-bridge 插件全局注册 tool，运行时层面无法按会话过滤）
+- 对话框 "+" 菜单的连接器 Toggle 是全局开关的快捷入口
+- 开关后立即 `refreshMcpBridge()` → ConfigSync → Gateway 重启
+
+**诊断能力**：
+- stderr 环形缓冲区：捕获 stdio MCP server 的 stderr 输出 → tool 调用失败时附带诊断信息
+- `mcp-log.ts` 安全序列化：脱敏 api_key/token/secret/password、截断超长字符串、处理循环引用
+- `looksLikeTransportErrorText()` 检测传输层错误 vs 业务逻辑错误，避免将传输错误静默透传
+
+**配置字段**：`callbackUrl`（`http://127.0.0.1:{port}/mcp/execute`）、`secret`（`${PETCLAW_MCP_BRIDGE_SECRET}`）、`requestTimeoutMs`（120000）、`tools`（`McpToolManifestEntry[]`）
 
 #### 构建流程
 
