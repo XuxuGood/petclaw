@@ -1,0 +1,91 @@
+diff --git a/src/plugin-sdk/facade-runtime.ts b/src/plugin-sdk/facade-runtime.ts
+index 3b4bc1eebe..dc4b85025b 100644
+--- a/src/plugin-sdk/facade-runtime.ts
++++ b/src/plugin-sdk/facade-runtime.ts
+@@ -1,11 +1,11 @@
+ import { createRequire } from "node:module";
+ import path from "node:path";
++// PetClaw patch: 静态导入 facade-activation-check，esbuild 可以将其内联到
++// gateway-bundle.mjs。原始的 createRequire(import.meta.url) 动态加载在 bundle
++// 后路径解析异常（ESM 块间引用依赖 dist/ 目录结构），静态导入彻底避免该问题。
++import * as _facadeActivationCheckStatic from "./facade-activation-check.runtime.js";
+ import { fileURLToPath } from "node:url";
+ import { resolveBundledPluginsDir } from "../plugins/bundled-dir.js";
+-import {
+-  getCachedPluginJitiLoader,
+-  type PluginJitiLoaderCache,
+-} from "../plugins/jiti-loader-cache.js";
+ import { resolveLoaderPackageRoot } from "../plugins/sdk-alias.js";
+ import {
+   loadBundledPluginPublicSurfaceModuleSync as loadBundledPluginPublicSurfaceModuleSyncLight,
+@@ -112,57 +112,10 @@ type BundledPluginPublicSurfaceParams = {
+ type FacadeActivationCheckRuntimeModule = typeof import("./facade-activation-check.runtime.js");
+ 
+ const nodeRequire = createRequire(import.meta.url);
+-const FACADE_ACTIVATION_CHECK_RUNTIME_CANDIDATES = [
+-  "./facade-activation-check.runtime.js",
+-  "./facade-activation-check.runtime.ts",
+-] as const;
+-
+-let facadeActivationCheckRuntimeModule: FacadeActivationCheckRuntimeModule | undefined;
+-const facadeActivationCheckRuntimeJitiLoaders: PluginJitiLoaderCache = new Map();
+-
+-function getFacadeActivationCheckRuntimeJiti(modulePath: string) {
+-  return getCachedPluginJitiLoader({
+-    cache: facadeActivationCheckRuntimeJitiLoaders,
+-    modulePath,
+-    importerUrl: import.meta.url,
+-    jitiFilename: import.meta.url,
+-    aliasMap: {},
+-    tryNative: false,
+-  });
+-}
+-
+-function loadFacadeActivationCheckRuntimeFromCandidates(
+-  loadCandidate: (
+-    candidate: (typeof FACADE_ACTIVATION_CHECK_RUNTIME_CANDIDATES)[number],
+-  ) => unknown,
+-): FacadeActivationCheckRuntimeModule | undefined {
+-  for (const candidate of FACADE_ACTIVATION_CHECK_RUNTIME_CANDIDATES) {
+-    try {
+-      return loadCandidate(candidate) as FacadeActivationCheckRuntimeModule;
+-    } catch {
+-      // Try source/runtime candidates in order.
+-    }
+-  }
+-  return undefined;
+-}
+ 
++// PetClaw patch: 静态导入替代 createRequire 动态加载，支持 esbuild bundling
+ function loadFacadeActivationCheckRuntime(): FacadeActivationCheckRuntimeModule {
+-  if (facadeActivationCheckRuntimeModule) {
+-    return facadeActivationCheckRuntimeModule;
+-  }
+-  facadeActivationCheckRuntimeModule = loadFacadeActivationCheckRuntimeFromCandidates((candidate) =>
+-    nodeRequire(candidate),
+-  );
+-  if (facadeActivationCheckRuntimeModule) {
+-    return facadeActivationCheckRuntimeModule;
+-  }
+-  facadeActivationCheckRuntimeModule = loadFacadeActivationCheckRuntimeFromCandidates((candidate) =>
+-    getFacadeActivationCheckRuntimeJiti(candidate)(candidate),
+-  );
+-  if (facadeActivationCheckRuntimeModule) {
+-    return facadeActivationCheckRuntimeModule;
+-  }
+-  throw new Error("Unable to load facade activation check runtime");
++  return _facadeActivationCheckStatic as FacadeActivationCheckRuntimeModule;
+ }
+ 
+ function loadFacadeModuleAtLocationSync<T extends object>(params: {
+@@ -245,9 +198,7 @@ export function tryLoadActivatedBundledPluginPublicSurfaceModuleSync<T extends o
+ 
+ export function resetFacadeRuntimeStateForTest(): void {
+   resetFacadeLoaderStateForTest();
+-  facadeActivationCheckRuntimeModule?.resetFacadeActivationCheckRuntimeStateForTest();
+-  facadeActivationCheckRuntimeModule = undefined;
+-  facadeActivationCheckRuntimeJitiLoaders.clear();
++  (_facadeActivationCheckStatic as any).resetFacadeActivationCheckRuntimeStateForTest?.();
+   cachedFacadeModuleLocationsByKey.clear();
+ }
+ 

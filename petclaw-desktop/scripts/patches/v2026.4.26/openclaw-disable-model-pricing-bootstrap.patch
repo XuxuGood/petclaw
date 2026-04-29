@@ -1,0 +1,18 @@
+diff --git a/src/gateway/server-runtime-services.ts b/src/gateway/server-runtime-services.ts
+index 8bb832772e..26ff299a83 100644
+--- a/src/gateway/server-runtime-services.ts
++++ b/src/gateway/server-runtime-services.ts
+@@ -108,8 +108,12 @@ export function startGatewayRuntimeServices(params: {
+   return {
+     heartbeatRunner: createNoopHeartbeatRunner(),
+     channelHealthMonitor,
++    // PetClaw patch: disable model-pricing bootstrap to avoid startup delays.
++    // The gateway fetches https://openrouter.ai/api/v1/models on startup which
++    // times out (15s) in regions with slow external API access, delaying the
++    // WebSocket handshake.  See openclaw/openclaw#60116, openclaw/openclaw#59348.
+     stopModelPricingRefresh:
+-      !params.minimalTestGateway && !isVitestRuntimeEnv()
++      !params.minimalTestGateway && !isVitestRuntimeEnv() && process.env.OPENCLAW_SKIP_MODEL_PRICING !== "1"
+         ? startGatewayModelPricingRefresh({
+             config: params.cfgAtStart,
+             ...(params.pluginLookUpTable ? { pluginLookUpTable: params.pluginLookUpTable } : {}),

@@ -130,7 +130,7 @@ echo "[6/7] Verifying layout..."
 ERRORS=0
 [ -d "$OUT_DIR/node_modules" ] || { echo "FAIL: node_modules missing"; ERRORS=$((ERRORS+1)); }
 if [ -f "$OUT_DIR/gateway.asar" ]; then
-  [ ! -f "$OUT_DIR/openclaw.mjs" ] || { echo "FAIL: openclaw.mjs should be packed"; ERRORS=$((ERRORS+1)); }
+  [ ! -f "$OUT_DIR/openclaw.mjs" ] || { echo "FAIL: openclaw.mjs should be packed into gateway.asar"; ERRORS=$((ERRORS+1)); }
 fi
 [ -f "$BUILD_INFO_FILE" ] || { echo "FAIL: runtime-build-info.json missing"; ERRORS=$((ERRORS+1)); }
 
