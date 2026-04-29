@@ -61,7 +61,7 @@ export function registerChatIpcHandlers(deps: ChatIpcDeps): void {
     return config
   })
 
-  // IPC channel 对齐 LobsterAI 命名规范：cowork:session:*
+  // IPC channel 统一命名规范：cowork:session:*
   safeHandle(
     'cowork:session:start',
     async (

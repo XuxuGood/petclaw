@@ -1,5 +1,5 @@
 // src/main/scheduler/types.ts
-// 定时任务类型定义（参考 LobsterAI scheduledTask/types.ts + constants.ts，PetClaw 简化版）
+// 定时任务类型定义
 
 // ── Schedule 调度方式 ──
 

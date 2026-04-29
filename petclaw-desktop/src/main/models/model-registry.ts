@@ -209,8 +209,9 @@ export class ModelRegistry extends EventEmitter {
     const provider = this.getProvider(providerId)
     if (!provider) return { ok: false, error: 'Provider not found' }
     const definition = this.providerRegistry.get(providerId)
+    const requiresApiKey = definition?.requiresApiKey ?? true
     const apiKey = this.store.getApiKey(providerId)
-    if ((definition?.auth ?? 'api-key') === 'api-key' && !apiKey) {
+    if (requiresApiKey && !apiKey) {
       return { ok: false, error: 'API Key not configured' }
     }
 
@@ -253,8 +254,10 @@ export class ModelRegistry extends EventEmitter {
 
       const definition = this.providerRegistry.get(provider.id)
       const auth = definition?.auth ?? 'api-key'
+      const requiresApiKey = definition?.requiresApiKey ?? true
       const apiKey = this.store.getApiKey(provider.id)
-      if (auth === 'api-key' && !apiKey) continue
+      // 需要密钥但未配置的 provider 不写入 runtime 配置
+      if (requiresApiKey && !apiKey) continue
 
       const openClawProviderId = definition?.openClawProviderId ?? provider.id
       const config: OpenClawProviderConfig = {
@@ -269,8 +272,13 @@ export class ModelRegistry extends EventEmitter {
         }))
       }
 
-      if (auth === 'api-key') {
+      if (requiresApiKey) {
+        // 需要密钥的 provider 写环境变量占位符，明文通过 collectSecretEnvVars 注入
         config.apiKey = `\${${this.buildEnvVarName(provider.id)}}`
+      } else {
+        // 不需要密钥的 provider（petclaw、ollama 等）写占位符，
+        // gateway 要求每个 provider 都有非空 apiKey
+        config.apiKey = 'sk-petclaw-local'
       }
 
       // 非本地 provider 且系统代理已启用时，告知 runtime 走环境变量代理
@@ -291,7 +299,8 @@ export class ModelRegistry extends EventEmitter {
     for (const provider of this.listProviders()) {
       if (!provider.enabled) continue
       const definition = this.providerRegistry.get(provider.id)
-      if ((definition?.auth ?? 'api-key') !== 'api-key') continue
+      // 只收集需要密钥的 provider，不需要密钥的用占位符不走 env
+      if (!(definition?.requiresApiKey ?? true)) continue
 
       const apiKey = this.store.getApiKey(provider.id)
       if (apiKey) {

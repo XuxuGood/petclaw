@@ -3,7 +3,7 @@
 // main/ai/types.ts 通过 re-export 继续对外暴露，避免改动已有 import 路径。
 
 export type ModelApiFormat = 'openai-completions' | 'anthropic' | 'google-generative-ai'
-export type ModelAuthMode = 'api-key' | 'none'
+export type ModelAuthMode = 'api-key' | 'oauth'
 
 export interface ModelDefinition {
   id: string
@@ -22,6 +22,8 @@ export interface ProviderDefinition {
   defaultBaseUrl: string
   apiFormat: ModelApiFormat
   auth: ModelAuthMode
+  /** 是否需要用户提供 API Key。false 表示该 provider 无需密钥即可使用（如 petclaw、ollama）。 */
+  requiresApiKey: boolean
   isPreset: boolean
   defaultModels: ModelDefinition[]
 }

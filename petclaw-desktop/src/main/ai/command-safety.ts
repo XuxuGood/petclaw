@@ -1,6 +1,5 @@
 // command-safety.ts：命令安全等级判定
 // 用于 Cowork 和 IM channel 的 auto-approve 逻辑、permission 弹窗的危险等级展示。
-// 参考 LobsterAI commandSafety.ts
 
 // ── 删除命令模式 ──
 const DELETE_COMMAND_RE = /\b(rm|rmdir|unlink|del|erase|remove-item|trash)\b/i

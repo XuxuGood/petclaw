@@ -1,7 +1,6 @@
 // cowork-util.ts：环境变量构造和工具函数
 // 负责构建 OpenClaw 引擎所需的完整进程环境，包括 PATH 解析、node shim、
 // git-bash 检测（Windows）、系统代理注入等。
-// 移植自 LobsterAI/src/main/libs/coworkUtil.ts，已适配 PetClaw 命名体系。
 
 import { execSync, spawnSync } from 'child_process'
 import { app } from 'electron'

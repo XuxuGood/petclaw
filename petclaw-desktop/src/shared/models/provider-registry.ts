@@ -8,7 +8,8 @@ const BUILT_IN_PROVIDERS: ProviderDefinition[] = [
     logo: 'petclaw',
     defaultBaseUrl: 'https://petclaw.ai/api/v1',
     apiFormat: 'openai-completions',
-    auth: 'none',
+    auth: 'api-key',
+    requiresApiKey: false,
     isPreset: true,
     defaultModels: [
       {
@@ -37,6 +38,7 @@ const BUILT_IN_PROVIDERS: ProviderDefinition[] = [
     defaultBaseUrl: 'https://api.openai.com/v1',
     apiFormat: 'openai-completions',
     auth: 'api-key',
+    requiresApiKey: true,
     isPreset: true,
     defaultModels: [
       {
@@ -73,6 +75,7 @@ const BUILT_IN_PROVIDERS: ProviderDefinition[] = [
     defaultBaseUrl: 'https://api.anthropic.com',
     apiFormat: 'anthropic',
     auth: 'api-key',
+    requiresApiKey: true,
     isPreset: true,
     defaultModels: [
       {
@@ -101,6 +104,7 @@ const BUILT_IN_PROVIDERS: ProviderDefinition[] = [
     defaultBaseUrl: 'https://api.deepseek.com/v1',
     apiFormat: 'openai-completions',
     auth: 'api-key',
+    requiresApiKey: true,
     isPreset: true,
     defaultModels: [
       {
@@ -129,6 +133,7 @@ const BUILT_IN_PROVIDERS: ProviderDefinition[] = [
     defaultBaseUrl: 'https://open.bigmodel.cn/api/paas/v4',
     apiFormat: 'openai-completions',
     auth: 'api-key',
+    requiresApiKey: true,
     isPreset: true,
     defaultModels: [
       {
@@ -149,6 +154,7 @@ const BUILT_IN_PROVIDERS: ProviderDefinition[] = [
     defaultBaseUrl: 'https://api.minimax.chat/v1',
     apiFormat: 'openai-completions',
     auth: 'api-key',
+    requiresApiKey: true,
     isPreset: true,
     defaultModels: [
       {
@@ -169,6 +175,7 @@ const BUILT_IN_PROVIDERS: ProviderDefinition[] = [
     defaultBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
     apiFormat: 'openai-completions',
     auth: 'api-key',
+    requiresApiKey: true,
     isPreset: true,
     defaultModels: []
   },
@@ -180,6 +187,7 @@ const BUILT_IN_PROVIDERS: ProviderDefinition[] = [
     defaultBaseUrl: 'https://api.youdao.com/v1',
     apiFormat: 'openai-completions',
     auth: 'api-key',
+    requiresApiKey: true,
     isPreset: true,
     defaultModels: []
   },
@@ -191,6 +199,7 @@ const BUILT_IN_PROVIDERS: ProviderDefinition[] = [
     defaultBaseUrl: 'https://aip.baidubce.com/rpc/2.0/ai_custom/v1',
     apiFormat: 'openai-completions',
     auth: 'api-key',
+    requiresApiKey: true,
     isPreset: true,
     defaultModels: []
   },
@@ -202,6 +211,7 @@ const BUILT_IN_PROVIDERS: ProviderDefinition[] = [
     defaultBaseUrl: 'https://api.stepfun.com/v1',
     apiFormat: 'openai-completions',
     auth: 'api-key',
+    requiresApiKey: true,
     isPreset: true,
     defaultModels: []
   },
@@ -213,6 +223,7 @@ const BUILT_IN_PROVIDERS: ProviderDefinition[] = [
     defaultBaseUrl: 'https://api.xiaomi.com/v1',
     apiFormat: 'openai-completions',
     auth: 'api-key',
+    requiresApiKey: true,
     isPreset: true,
     defaultModels: []
   },
@@ -223,7 +234,8 @@ const BUILT_IN_PROVIDERS: ProviderDefinition[] = [
     logo: 'ollama',
     defaultBaseUrl: 'http://localhost:11434/v1',
     apiFormat: 'openai-completions',
-    auth: 'none',
+    auth: 'api-key',
+    requiresApiKey: false,
     isPreset: true,
     defaultModels: []
   },
@@ -235,6 +247,7 @@ const BUILT_IN_PROVIDERS: ProviderDefinition[] = [
     defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
     apiFormat: 'google-generative-ai',
     auth: 'api-key',
+    requiresApiKey: true,
     isPreset: true,
     defaultModels: [
       {
@@ -255,6 +268,7 @@ const BUILT_IN_PROVIDERS: ProviderDefinition[] = [
     defaultBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
     apiFormat: 'openai-completions',
     auth: 'api-key',
+    requiresApiKey: true,
     isPreset: true,
     defaultModels: [
       {
@@ -275,6 +289,7 @@ const BUILT_IN_PROVIDERS: ProviderDefinition[] = [
     defaultBaseUrl: 'https://api.mistral.ai/v1',
     apiFormat: 'openai-completions',
     auth: 'api-key',
+    requiresApiKey: true,
     isPreset: true,
     defaultModels: [
       {
@@ -295,6 +310,7 @@ const BUILT_IN_PROVIDERS: ProviderDefinition[] = [
     defaultBaseUrl: 'https://api.groq.com/openai/v1',
     apiFormat: 'openai-completions',
     auth: 'api-key',
+    requiresApiKey: true,
     isPreset: true,
     defaultModels: [
       {

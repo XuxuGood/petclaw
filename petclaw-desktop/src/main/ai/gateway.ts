@@ -115,7 +115,7 @@ export class OpenclawGateway extends EventEmitter {
     this.engineManager = em
   }
 
-  // ── 按需连接（参考 LobsterAI ensureGatewayClientReady）──
+  // ── 按需连接 ──
 
   // 确保 GatewayClient 已连接：引擎未启动则启动，WS 未连接则连接
   // RPC 方法内部自动调用，调用方无需关心连接状态

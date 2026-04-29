@@ -1,7 +1,6 @@
 // mcp-bridge-server.ts：MCP Bridge HTTP callback server
 // 为 OpenClaw 的 mcp-bridge 和 ask-user-question 扩展提供 HTTP 端点。
 // 绑定 127.0.0.1 随机端口，仅本地流量。
-// 紧密参考 LobsterAI mcpBridgeServer.ts
 import crypto from 'crypto'
 import http from 'http'
 import net from 'net'

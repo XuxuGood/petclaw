@@ -1,6 +1,5 @@
 // mcp-server-manager.ts：MCP SDK 连接生命周期管理
 // 负责启动/停止 MCP servers、发现 tools、路由 tool 调用。
-// 紧密参考 LobsterAI mcpServerManager.ts
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'

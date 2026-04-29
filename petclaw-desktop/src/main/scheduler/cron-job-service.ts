@@ -1,6 +1,6 @@
 // src/main/scheduler/cron-job-service.ts
 // CronJobService — 所有定时任务 CRUD 委托给 OpenClaw Gateway RPC
-// 参考 LobsterAI CronJobService，PetClaw 简化版，不维护本地 DB 表
+// 不维护��地 DB 表，状态完全由 Gateway 管理
 
 import { BrowserWindow } from 'electron'
 

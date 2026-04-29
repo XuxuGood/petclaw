@@ -1,8 +1,7 @@
 // claude-settings.ts：API 配置管理
 // 负责从应用配置解析当前使用的 provider，构造 CoworkApiConfig 供 OpenClaw 引擎使用。
-// 移植自 LobsterAI/src/main/libs/claudeSettings.ts，已适配 PetClaw 依赖体系。
 
-// ── 内联类型定义（LobsterAI 的 shared/providers 依赖） ──────────────────────────
+// ── 内联类型定义（shared/providers 依赖） ──────────────────────────
 
 type ApiFormat = 'anthropic' | 'openai'
 
@@ -51,7 +50,7 @@ function normalizeProviderApiFormat(apiFormat: unknown): AnthropicApiFormat {
   return 'openai'
 }
 
-// ── CoworkApiConfig 类型定义（来自 LobsterAI coworkConfigStore） ─────────────────
+// ── CoworkApiConfig 类型定义 ────────��────────
 
 export type CoworkApiType = 'anthropic' | 'openai'
 
@@ -96,7 +95,7 @@ async function tryImportCompatProxy(): Promise<{
   }
 }
 
-// ── KVStore 接口（替代 LobsterAI 的 SqliteStore） ────────────────────────────────
+// ── KVStore 接口 ────────────────────────────────
 
 interface KVStore {
   get<T>(key: string): T | undefined

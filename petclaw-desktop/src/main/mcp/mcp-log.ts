@@ -1,6 +1,5 @@
 // mcp-log.ts：MCP Bridge 诊断日志工具
 // 提供安全序列化（脱敏敏感 key、截断长文本、处理循环引用）和传输错误检测。
-// 紧密参考 LobsterAI mcpLog.ts
 
 const LOG_PREVIEW_MAX_CHARS = 400
 const MAX_LOG_ARRAY_ITEMS = 10
