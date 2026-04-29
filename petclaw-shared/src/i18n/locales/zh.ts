@@ -74,6 +74,28 @@ export const zh: Record<string, string> = {
   'permission.deny': '拒绝',
   'permission.allow': '允许',
 
+  // 危险原因文案
+  'dangerReason.fileDelete': '文件删除操作',
+  'dangerReason.recursiveDelete': '递归删除操作（不可恢复）',
+  'dangerReason.gitForcePush': 'Git 强制推送',
+  'dangerReason.gitResetHard': 'Git 硬重置（丢弃本地修改）',
+  'dangerReason.diskOverwrite': '磁盘写入操作',
+  'dangerReason.diskFormat': '磁盘格式化操作',
+  'dangerReason.gitClean': 'Git 清理未跟踪文件',
+  'dangerReason.findDelete': '批量查找删除',
+  'dangerReason.processKill': '终止进程',
+  'dangerReason.permissionChange': '权限变更操作',
+  'dangerReason.gitPush': 'Git 推送',
+
+  // Question Wizard
+  'wizard.title': '需要您的确认',
+  'wizard.skip': '跳过',
+  'wizard.submit': '提交',
+  'wizard.other': '其他',
+  'wizard.previous': '上一步',
+  'wizard.next': '下一步',
+  'wizard.answerRequired': '请回答所有问题后提交',
+
   // ── monitor ──
   'monitor.title': 'AI 工具监控',
   'monitor.noActive': '暂无活跃的 AI 工具',

@@ -74,6 +74,28 @@ export const en: Record<string, string> = {
   'permission.deny': 'Deny',
   'permission.allow': 'Allow',
 
+  // Danger reason labels
+  'dangerReason.fileDelete': 'File deletion',
+  'dangerReason.recursiveDelete': 'Recursive deletion (irreversible)',
+  'dangerReason.gitForcePush': 'Git force push',
+  'dangerReason.gitResetHard': 'Git hard reset (discards local changes)',
+  'dangerReason.diskOverwrite': 'Disk write operation',
+  'dangerReason.diskFormat': 'Disk format operation',
+  'dangerReason.gitClean': 'Git clean untracked files',
+  'dangerReason.findDelete': 'Batch find & delete',
+  'dangerReason.processKill': 'Process termination',
+  'dangerReason.permissionChange': 'Permission change',
+  'dangerReason.gitPush': 'Git push',
+
+  // Question Wizard
+  'wizard.title': 'Confirmation Needed',
+  'wizard.skip': 'Skip',
+  'wizard.submit': 'Submit',
+  'wizard.other': 'Other',
+  'wizard.previous': 'Previous',
+  'wizard.next': 'Next',
+  'wizard.answerRequired': 'Please answer all questions before submitting',
+
   // ── monitor ──
   'monitor.title': 'AI Tool Monitor',
   'monitor.noActive': 'No active AI tools',
