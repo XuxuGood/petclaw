@@ -3,7 +3,7 @@ import { useChatStore } from '../../../src/renderer/src/stores/chat-store'
 
 describe('ChatStore', () => {
   beforeEach(() => {
-    useChatStore.setState({ messages: [], isLoading: false })
+    useChatStore.getState().reset()
   })
 
   it('starts with empty messages', () => {
@@ -44,5 +44,40 @@ describe('ChatStore', () => {
     useChatStore.getState().loadHistory(history)
     expect(useChatStore.getState().messages).toHaveLength(2)
     expect(useChatStore.getState().messages[0].id).toBeDefined()
+  })
+
+  it('keeps messages isolated by active session', () => {
+    useChatStore.getState().setActiveSession('session-a')
+    useChatStore.getState().addMessage({ role: 'user', content: 'from a' }, 'session-a')
+    useChatStore.getState().setActiveSession('session-b')
+    useChatStore.getState().addMessage({ role: 'user', content: 'from b' }, 'session-b')
+
+    expect(useChatStore.getState().messages.map((message) => message.content)).toEqual(['from b'])
+
+    useChatStore.getState().setActiveSession('session-a')
+    expect(useChatStore.getState().messages.map((message) => message.content)).toEqual(['from a'])
+  })
+
+  it('routes background stream updates to their session bucket', () => {
+    useChatStore.getState().setActiveSession('session-a')
+    useChatStore.getState().addMessage({ role: 'assistant', content: '' }, 'session-b')
+    useChatStore.getState().replaceLastAssistantMessage('background response', 'session-b')
+
+    expect(useChatStore.getState().messages).toEqual([])
+
+    useChatStore.getState().setActiveSession('session-b')
+    expect(useChatStore.getState().messages[0].content).toBe('background response')
+  })
+
+  it('moves draft messages into the created session', () => {
+    useChatStore.getState().addMessage({ role: 'user', content: 'draft prompt' }, null)
+    useChatStore.getState().setLoading(true, null)
+    useChatStore.getState().bindDraftToSession('created-session')
+
+    expect(useChatStore.getState().activeSessionId).toBe('created-session')
+    expect(useChatStore.getState().isLoading).toBe(true)
+    expect(useChatStore.getState().messages.map((message) => message.content)).toEqual([
+      'draft prompt'
+    ])
   })
 })

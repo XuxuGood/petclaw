@@ -35,11 +35,12 @@ interface TaskRun {
 
 interface CronPageProps {
   createSignal?: number
+  refreshSignal?: number
   /** 顶栏传入的搜索关键词，用于本地过滤任务与执行记录。 */
   search?: string
 }
 
-export function CronPage({ createSignal = 0, search = '' }: CronPageProps) {
+export function CronPage({ createSignal = 0, refreshSignal = 0, search = '' }: CronPageProps) {
   const { t } = useI18n()
   const [activeTab, setActiveTab] = useState<CronTab>('tasks')
   const [tasks, setTasks] = useState<ScheduledTask[]>([])
@@ -141,6 +142,12 @@ export function CronPage({ createSignal = 0, search = '' }: CronPageProps) {
     createSignalRef.current = createSignal
     handleCreate()
   }, [createSignal, handleCreate])
+
+  useEffect(() => {
+    if (refreshSignal === 0) return
+    loadTasks()
+    loadRuns()
+  }, [refreshSignal, loadTasks, loadRuns])
 
   // Tab 数据在渲染内部定义，保证 i18n 响应式更新
   const TABS: Array<{ id: CronTab; label: string }> = [

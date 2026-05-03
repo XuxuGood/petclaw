@@ -2,7 +2,7 @@
 
 本文件是 Codex 在 PetClaw 仓库中的执行入口。Codex 即使只读取本文件，也必须能正确开发、排查和验证本项目。
 
-架构事实源：`docs/架构设计/PetClaw总体架构设计.md`。本文件写执行规则和高频项目上下文，架构文档写完整原理、数据模型和模块设计。
+架构事实源：`docs/架构设计/PetClaw总体架构设计.md`；前端事实源：`docs/架构设计/PetClaw前端架构设计.md`。本文件写执行规则和高频项目上下文，架构文档写完整原理、数据模型和模块设计。
 
 ## 1. 构建与开发命令
 
@@ -134,6 +134,7 @@ petclaw/
 ├── AGENTS.md                         Codex 工作入口
 ├── docs/架构设计/
 │   ├── PetClaw总体架构设计.md          架构事实源
+│   ├── PetClaw前端架构设计.md          前端架构事实源
 │   ├── 模块设计/                      后续模块级详细设计
 │   └── 决策记录/                      后续架构决策记录
 ├── docs/superpowers/specs/           阶段性设计 spec
@@ -327,7 +328,7 @@ Codex 专属规则：
 2. 用 `rg` 查调用方、旧路径、IPC channel、配置 key。
 3. 列清楚修改边界，保持改动最小。
 4. 先测试后实现；文档重组类任务至少做引用检查和 `typecheck`。
-5. 开发完成后同步 `CLAUDE.md` / `AGENTS.md` 中仍然有效的规则，以及 `petclaw-desktop/README.md`、`docs/架构设计/PetClaw总体架构设计.md` 的相关章节。
+5. 开发完成后同步 `CLAUDE.md` / `AGENTS.md` 中仍然有效的规则，以及 `petclaw-desktop/README.md`、`docs/架构设计/PetClaw总体架构设计.md`、`docs/架构设计/PetClaw前端架构设计.md` 的相关章节。
 6. 不回滚、不覆盖、不格式化无关用户改动。
 
 前端 UI/UX：
@@ -335,6 +336,10 @@ Codex 专属规则：
 - 设计前端 UI/UX 时，先使用项目要求的 UI/UX skill。
 - 参考 `docs/设计/` 下的对应设计稿。
 - 做实际可用界面，不做营销式占位页。
+- 所有可见按钮必须有真实行为；阶段性未接入的能力必须 disabled 或隐藏，禁止空 `onClick`。
+- Cowork 消息、loading 和流式事件必须按 `sessionId` 隔离，禁止多会话共享单一消息数组。
+- 新增前端 IPC 必须同步 main handler、preload 实现、preload 类型声明和 renderer 调用点。
+- 前端架构、路由、状态、UI/UX 边界以 `docs/架构设计/PetClaw前端架构设计.md` 为准。
 
 Git 提交：
 
@@ -345,6 +350,7 @@ Git 提交：
 ## 11. 参考文档
 
 - 总体架构：`docs/架构设计/PetClaw总体架构设计.md`
+- 前端架构：`docs/架构设计/PetClaw前端架构设计.md`
 - AI 代码上下文工程设计：`docs/架构设计/AI代码上下文工程设计.md`
 - 阶段性设计：`docs/superpowers/specs/`
 - 实施计划：`docs/superpowers/plans/`
@@ -358,9 +364,10 @@ Git 提交：
 - 接到代码改动任务后，先从用户需求、已提到的文件、symbol、模块名和错误信息中自动推断 `target`。
 - 写文件前必须主动运行 `pnpm ai:prepare-change -- --target <target>` 获取代码图谱、调用链、影响面和符号上下文；不要要求用户手动运行。
 - 只有无法可靠推断 `target`，或 `prepare-change` 输出表明工具链不可用且无法降级时，才向用户提一个明确问题。
-- 不把 `npx gitnexus analyze` 当作默认入口；需要手动刷新索引时使用 `pnpm ai:index`，工具链异常时使用 `pnpm ai:tools:check`。
+- 不把 `npx gitnexus analyze` 当作默认入口；需要手动刷新索引时使用 `pnpm ai:index`，工具链异常时优先使用 `pnpm ai:doctor`，快速检查才使用 `pnpm ai:tools:check`。
 - 首次接入或 MCP 客户端配置问题使用 `pnpm ai:setup -- --client <client>`；只看说明用 `pnpm ai:mcp:guide -- --client <client>`；真正写客户端配置才用 `pnpm ai:mcp:install -- --client <client>`。
 - 不在脏工作区默认运行 `gitnexus.detect_changes({ scope: "all" })`；提交前使用 `pnpm ai:impact` 或 `scope: "staged"`，任务内排查只针对本次目标文件/符号。
+- AI 需要机器可读结果时使用 `pnpm --silent ai:prepare-change -- --target <target> --json`、`pnpm --silent ai:impact -- --json` 或 `pnpm --silent ai:doctor -- --json`；不要解析人类日志。
 - GitNexus `.gitnexus/lbug` 锁、`~/.gitnexus/registry.json` 权限、沙箱 `EPERM/EACCES` 属于工具链环境异常；AI 必须降级为 MCP 可用能力和本地 `rg` 使用面扫描，不得误判为业务代码风险或遗留给用户处理。
 - 核心模块改动前必须完成 impact analysis，尤其是 ConfigSync、Cowork、IPC、preload、SQLite、i18n、Openclaw runtime 链路。
 - 涉及 IPC、ConfigSync、SQLite、i18n、preload 的改动必须追踪完整链路，不能只做字符串搜索。

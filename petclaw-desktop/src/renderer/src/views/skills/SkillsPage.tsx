@@ -12,9 +12,10 @@ interface SkillItem {
 interface SkillsPageProps {
   /** 顶栏传入的搜索关键词 */
   search?: string
+  refreshSignal?: number
 }
 
-export function SkillsPage({ search: externalSearch = '' }: SkillsPageProps) {
+export function SkillsPage({ search: externalSearch = '', refreshSignal = 0 }: SkillsPageProps) {
   const { t } = useI18n()
   const [skills, setSkills] = useState<SkillItem[]>([])
 
@@ -22,7 +23,7 @@ export function SkillsPage({ search: externalSearch = '' }: SkillsPageProps) {
     window.api.skills.list().then((list: unknown) => {
       setSkills(list as SkillItem[])
     })
-  }, [])
+  }, [refreshSignal])
 
   const filtered = skills.filter(
     (s) =>

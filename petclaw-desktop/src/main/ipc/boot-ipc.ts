@@ -1,4 +1,4 @@
-import { app } from 'electron'
+import { app, shell, systemPreferences } from 'electron'
 import { join } from 'path'
 import { writeFileSync } from 'fs'
 
@@ -19,6 +19,30 @@ export function registerBootIpcHandlers(deps: BootIpcDeps): void {
   const { db } = deps
 
   safeHandle('app:version', async () => app.getVersion())
+
+  safeHandle('onboarding:get-permissions', async () => {
+    return getSystemPermissionStatus()
+  })
+
+  safeHandle(
+    'onboarding:request-permission',
+    async (_event, type: 'accessibility' | 'microphone') => {
+      if (type === 'accessibility') {
+        if (process.platform === 'darwin') {
+          systemPreferences.isTrustedAccessibilityClient(true)
+          await shell.openExternal(
+            'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'
+          )
+        }
+        return getSystemPermissionStatus()
+      }
+
+      if (process.platform === 'darwin') {
+        await systemPreferences.askForMediaAccess('microphone')
+      }
+      return getSystemPermissionStatus()
+    }
+  )
 
   safeHandle('onboarding:check-env', async () => {
     return checkEnvironment()
@@ -84,4 +108,18 @@ export function registerBootIpcHandlers(deps: BootIpcDeps): void {
       setLanguage(locale as Locale)
     }
   })
+}
+
+function getSystemPermissionStatus(): { accessibility: boolean; microphone: boolean } {
+  if (process.platform !== 'darwin') {
+    // Windows/Linux 没有与 macOS TCC 等价的系统级引导入口；应用内视为无需预授权，
+    // 真正的设备/系统能力失败仍由具体功能入口处理。
+    return { accessibility: true, microphone: true }
+  }
+
+  const microphoneStatus = systemPreferences.getMediaAccessStatus('microphone')
+  return {
+    accessibility: systemPreferences.isTrustedAccessibilityClient(false),
+    microphone: microphoneStatus === 'granted'
+  }
 }

@@ -56,11 +56,14 @@ export function App() {
   // Settings 子菜单
   const [settingsTab, setSettingsTab] = useState('preferences')
   const [cronCreateSignal, setCronCreateSignal] = useState(0)
+  const [cronRefreshSignal, setCronRefreshSignal] = useState(0)
+  const [skillsRefreshSignal, setSkillsRefreshSignal] = useState(0)
 
   // 任务监控面板开关
   const [taskMonitorOpen, setTaskMonitorOpen] = useState(true)
   // 主侧栏开关：小窗用户需要把完整宽度留给当前任务。
   const [mainSidebarOpen, setMainSidebarOpen] = useState(true)
+  const [starterPrompt, setStarterPrompt] = useState<string | null>(null)
 
   // 权限弹窗响应：发送结果到主进程并出队
   const handlePermissionRespond = useCallback(
@@ -145,6 +148,8 @@ export function App() {
           rightSlot = (
             <>
               <button
+                type="button"
+                disabled
                 className="topbar-btn topbar-btn-ghost ui-focus"
                 aria-label={t('about.feedback')}
               >
@@ -170,7 +175,7 @@ export function App() {
             <div className="topbar-workbench-tools">
               <button
                 type="button"
-                onClick={() => {}}
+                onClick={() => setCronRefreshSignal((v) => v + 1)}
                 className="topbar-btn topbar-btn-ghost topbar-btn-icon ui-focus"
                 aria-label={t('common.refresh')}
               >
@@ -213,7 +218,7 @@ export function App() {
             <div className="topbar-workbench-tools">
               <button
                 type="button"
-                onClick={() => {}}
+                onClick={() => setSkillsRefreshSignal((v) => v + 1)}
                 className="topbar-btn topbar-btn-ghost topbar-btn-icon ui-focus"
                 aria-label={t('common.refresh')}
               >
@@ -238,11 +243,7 @@ export function App() {
                   <Sparkles size={13} strokeWidth={1.9} />
                   <span>{t('cron.createdVia')}</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {}}
-                  className="topbar-btn topbar-btn-primary ui-focus"
-                >
+                <button type="button" disabled className="topbar-btn topbar-btn-primary ui-focus">
                   <Plus size={14} strokeWidth={2.1} />
                   <span>{t('skills.installSkill')}</span>
                 </button>
@@ -256,7 +257,7 @@ export function App() {
             <div className="topbar-workbench-tools">
               <button
                 type="button"
-                onClick={() => {}}
+                disabled
                 className="topbar-btn topbar-btn-ghost topbar-btn-icon ui-focus"
                 aria-label={t('common.refresh')}
               >
@@ -281,11 +282,7 @@ export function App() {
                   <Sparkles size={13} strokeWidth={1.9} />
                   <span>{t('cron.createdVia')}</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {}}
-                  className="topbar-btn topbar-btn-primary ui-focus"
-                >
+                <button type="button" disabled className="topbar-btn topbar-btn-primary ui-focus">
                   <Plus size={14} strokeWidth={2.1} />
                   <span>{t('expertKits.installKit')}</span>
                 </button>
@@ -297,6 +294,8 @@ export function App() {
         case 'im-channels': {
           rightSlot = (
             <button
+              type="button"
+              disabled
               className="topbar-btn topbar-btn-ghost ui-focus"
               aria-label={t('about.feedback')}
             >
@@ -349,6 +348,18 @@ export function App() {
     }
     window.addEventListener('app:navigate', handler)
     return () => window.removeEventListener('app:navigate', handler)
+  }, [handleViewChange])
+
+  // Settings 内部卡片只暴露目标 tab，App 统一负责切换主视图和记录返回来源。
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ tab?: string }>).detail
+      if (!detail?.tab) return
+      setSettingsTab(detail.tab)
+      handleViewChange('settings')
+    }
+    window.addEventListener('app:navigate-settings', handler)
+    return () => window.removeEventListener('app:navigate-settings', handler)
   }, [handleViewChange])
 
   // 监听 boot 完成事件（push + 轮询兜底）
@@ -413,7 +424,13 @@ export function App() {
     return (
       <>
         {renderPermissionModal()}
-        <OnboardingPanel onComplete={() => setPhase('main')} />
+        <OnboardingPanel
+          onComplete={(prompt) => {
+            if (prompt) setStarterPrompt(prompt)
+            setActiveView('chat')
+            setPhase('main')
+          }}
+        />
       </>
     )
   }
@@ -486,9 +503,13 @@ export function App() {
                 activeSessionId={activeSessionId}
                 onSessionCreated={setActiveSessionId}
                 currentDirectoryId={currentDirectoryId}
+                starterPrompt={starterPrompt}
+                onStarterPromptConsumed={() => setStarterPrompt(null)}
               />
             )}
-            {activeView === 'skills' && <SkillsPage search={skillsSearch} />}
+            {activeView === 'skills' && (
+              <SkillsPage search={skillsSearch} refreshSignal={skillsRefreshSignal} />
+            )}
             {activeView === 'expert-kits' && (
               <div className="page-scroll">
                 <div className="page-container-workbench workspace-page-container">
@@ -507,7 +528,11 @@ export function App() {
               </div>
             )}
             {activeView === 'cron' && (
-              <CronPage createSignal={cronCreateSignal} search={cronSearch} />
+              <CronPage
+                createSignal={cronCreateSignal}
+                refreshSignal={cronRefreshSignal}
+                search={cronSearch}
+              />
             )}
             {activeView === 'im-channels' && <ImChannelsPage />}
           </div>

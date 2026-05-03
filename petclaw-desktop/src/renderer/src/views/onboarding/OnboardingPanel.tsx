@@ -143,11 +143,34 @@ function NavFooter({
 function PermissionsStep() {
   const { permissions, setPermission } = useOnboardingStore()
   const { t } = useI18n()
+  const [pendingPermission, setPendingPermission] = useState<'accessibility' | 'microphone' | null>(
+    null
+  )
+
+  useEffect(() => {
+    let cancelled = false
+    window.api
+      .getSystemPermissions()
+      .then((status) => {
+        if (cancelled) return
+        setPermission('accessibility', status.accessibility)
+        setPermission('microphone', status.microphone)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [setPermission])
 
   const handlePermission = async (type: 'accessibility' | 'microphone') => {
-    // In production: call system API to request permission
-    // For now, toggle to simulate
-    setPermission(type, !permissions[type])
+    setPendingPermission(type)
+    try {
+      const status = await window.api.requestSystemPermission(type)
+      setPermission('accessibility', status.accessibility)
+      setPermission('microphone', status.microphone)
+    } finally {
+      setPendingPermission(null)
+    }
   }
 
   return (
@@ -163,6 +186,7 @@ function PermissionsStep() {
         {/* Accessibility */}
         <button
           onClick={() => handlePermission('accessibility')}
+          disabled={pendingPermission !== null}
           className="w-full flex items-center justify-between p-4 border border-border-input rounded-[8px] hover:bg-bg-hover transition-colors text-left"
         >
           <span className="text-[15px] text-text-primary font-medium">
@@ -182,6 +206,7 @@ function PermissionsStep() {
         {/* Microphone */}
         <button
           onClick={() => handlePermission('microphone')}
+          disabled={pendingPermission !== null}
           className="w-full flex items-center justify-between p-4 border border-border-input rounded-[8px] hover:bg-bg-hover transition-colors text-left"
         >
           <span className="text-[15px] text-text-primary font-medium">
@@ -537,24 +562,27 @@ function StarterCardsStep({ onSelectCard }: { onSelectCard: (message: string) =>
 /* ──────────────────────────────────────────
    Main Onboarding Panel
    ────────────────────────────────────────── */
-export function OnboardingPanel({ onComplete }: { onComplete: () => void }) {
+export function OnboardingPanel({ onComplete }: { onComplete: (starterPrompt?: string) => void }) {
   const { step, catBubbleText, goNext, goPrev, setCatBubbleText } = useOnboardingStore()
   const { t } = useI18n()
   const isLastStep = step === 'first-chat'
   const isFirstStep = step === 'permissions'
 
   // 抽取保存配置逻辑，handleSkip / handleNext / handleSelectCard 都复用
-  const saveAndComplete = useCallback(async () => {
-    const store = useOnboardingStore.getState()
-    await window.api.saveOnboardingConfig({
-      nickname: store.nickname.trim() || 'PetClaw',
-      roles: store.roles,
-      selectedSkills: store.skills.filter((s) => s.selected).map((s) => s.id),
-      voiceShortcut: store.shortcut,
-      language: store.language
-    })
-    onComplete()
-  }, [onComplete])
+  const saveAndComplete = useCallback(
+    async (starterPrompt?: string) => {
+      const store = useOnboardingStore.getState()
+      await window.api.saveOnboardingConfig({
+        nickname: store.nickname.trim() || 'PetClaw',
+        roles: store.roles,
+        selectedSkills: store.skills.filter((s) => s.selected).map((s) => s.id),
+        voiceShortcut: store.shortcut,
+        language: store.language
+      })
+      onComplete(starterPrompt)
+    },
+    [onComplete]
+  )
 
   const handleSkip = useCallback(async () => {
     await saveAndComplete()
@@ -579,10 +607,7 @@ export function OnboardingPanel({ onComplete }: { onComplete: () => void }) {
   // 延迟 500ms 等 ChatView 完成挂载，避免消息丢失
   const handleSelectCard = useCallback(
     async (message: string) => {
-      await saveAndComplete()
-      setTimeout(() => {
-        window.api.cowork.startSession({ prompt: message, cwd: '' })
-      }, 500)
+      await saveAndComplete(message)
     },
     [saveAndComplete]
   )

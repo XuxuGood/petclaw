@@ -42,6 +42,9 @@ pnpm --filter petclaw-desktop dev:openclaw
 # 可选：首次拉取项目后初始化一次 AI 代码上下文工具链并接入 AI 客户端
 pnpm ai:setup -- --client codex
 
+# 可选：诊断 GitNexus / Serena / MCP / 锁 / 权限
+pnpm ai:doctor
+
 # 可选：仅查看某个 AI 客户端的接入说明
 pnpm ai:mcp:guide -- --client claude-code
 ```
@@ -62,6 +65,8 @@ pnpm -r lint                      # workspace 全量 lint
 |------|------|
 | [`CLAUDE.md`](./CLAUDE.md) | Claude Code 工作指南 |
 | [`AGENTS.md`](./AGENTS.md) | Codex 工作指南 |
+| [`docs/架构设计/PetClaw总体架构设计.md`](./docs/架构设计/PetClaw总体架构设计.md) | PetClaw 总体架构事实源 |
+| [`docs/架构设计/PetClaw前端架构设计.md`](./docs/架构设计/PetClaw前端架构设计.md) | 渲染进程、Preload API 和桌面 UI/UX 架构事实源 |
 | [`docs/架构设计/AI代码上下文工程设计.md`](./docs/架构设计/AI代码上下文工程设计.md) | AI 代码上下文工具链、MCP 客户端适配与自动化变更影响分析设计 |
 | [`docs/架构设计/`](./docs/架构设计/) | 总体架构与模块设计 |
 | [`docs/superpowers/specs/`](./docs/superpowers/specs/) | 阶段性设计规格 |

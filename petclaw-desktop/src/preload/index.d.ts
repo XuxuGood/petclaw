@@ -26,6 +26,10 @@ interface ElectronAPI {
     voiceShortcut: string
     language: string
   }) => Promise<{ success: boolean }>
+  getSystemPermissions: () => Promise<{ accessibility: boolean; microphone: boolean }>
+  requestSystemPermission: (
+    type: 'accessibility' | 'microphone'
+  ) => Promise<{ accessibility: boolean; microphone: boolean }>
   onBootStepUpdate: (
     callback: (
       steps: Array<{

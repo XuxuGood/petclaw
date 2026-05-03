@@ -57,6 +57,12 @@ const api = {
     voiceShortcut: string
     language: string
   }): Promise<{ success: boolean }> => ipcRenderer.invoke('onboarding:save-config', data),
+  getSystemPermissions: (): Promise<{ accessibility: boolean; microphone: boolean }> =>
+    ipcRenderer.invoke('onboarding:get-permissions'),
+  requestSystemPermission: (
+    type: 'accessibility' | 'microphone'
+  ): Promise<{ accessibility: boolean; microphone: boolean }> =>
+    ipcRenderer.invoke('onboarding:request-permission', type),
 
   // BootCheck
   onBootStepUpdate: (
