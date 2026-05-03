@@ -36,11 +36,12 @@ build-tar/
 .claude/
 .openclaw/
 .gitnexus/
-.petclaw/
+.petclaw/*
+!.petclaw/ai-tools/
+!.petclaw/ai-tools/*
 .qoder/
 .serena/
 .superpowers/
-.mcp.json
 .idea/
 .vscode/settings.json
 

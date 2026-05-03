@@ -1,0 +1,18 @@
+{
+  "context_servers": {
+    "gitnexus": {
+      "command": "gitnexus",
+      "args": [
+        "mcp"
+      ]
+    },
+    "serena": {
+      "command": "serena",
+      "args": [
+        "start-mcp-server",
+        "--project-from-cwd",
+        "--open-web-dashboard=false"
+      ]
+    }
+  }
+}

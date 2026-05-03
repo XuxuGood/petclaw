@@ -1,0 +1,11 @@
+# PetClaw MCP 配置片段
+# 将本片段合并到 Codex 的 config.toml。
+
+[mcp_servers.gitnexus]
+command = "gitnexus"
+args = ["mcp"]
+
+[mcp_servers.serena]
+startup_timeout_sec = 15
+command = "serena"
+args = ["start-mcp-server", "--project-from-cwd", "--open-web-dashboard=false", "--context=codex"]

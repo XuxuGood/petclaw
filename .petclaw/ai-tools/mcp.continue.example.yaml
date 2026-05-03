@@ -1,0 +1,14 @@
+# PetClaw MCP 配置示例
+# Continue 的配置格式会随版本变化；如果当前版本支持 MCP，请把 servers 部分合并到对应配置。
+
+mcpServers:
+  gitnexus:
+    command: gitnexus
+    args:
+      - mcp
+  serena:
+    command: serena
+    args:
+      - start-mcp-server
+      - --project-from-cwd
+      - --open-web-dashboard=false
