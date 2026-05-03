@@ -59,7 +59,7 @@ export function DirectorySettings() {
             <button
               key={dir.agentId}
               onClick={() => handleEdit(dir.agentId)}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-[14px] bg-bg-card border border-border hover:bg-bg-hover transition-colors text-left"
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-[12px] bg-bg-card border border-border hover:bg-bg-hover transition-colors text-left"
             >
               <FolderOpen size={18} className="text-text-tertiary shrink-0" />
               <div className="flex-1 min-w-0">

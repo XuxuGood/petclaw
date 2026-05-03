@@ -1,1 +1,5 @@
+# 提交前先运行 lint-staged，保持当前暂存区代码格式和 ESLint 自动修复逻辑。
 pnpm exec lint-staged
+
+# 再对暂存区变更做 GitNexus 影响分析；脚本默认宽松降级，只有 PETCLAW_AI_IMPACT_STRICT=1 时才会阻断提交。
+node scripts/ai/gitnexus-impact.cjs

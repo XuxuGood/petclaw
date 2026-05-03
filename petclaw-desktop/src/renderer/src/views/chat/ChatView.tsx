@@ -1,36 +1,39 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { PawPrint } from 'lucide-react'
 
 import { useChatStore } from '../../stores/chat-store'
 import { useI18n } from '../../i18n'
-import { ChatHeader } from './ChatHeader'
 import { ChatInputBox } from './ChatInputBox'
-import { WelcomePage } from '../../components/WelcomePage'
-import { TaskMonitorPanel } from '../../components/TaskMonitorPanel'
 import type { SelectedModel } from '../../components/ModelSelector'
+import { WelcomePage } from '../../components/WelcomePage'
+
+interface ChatImageAttachment {
+  name: string
+  mimeType: string
+  base64Data: string
+}
+
+// 路径引用（文件或目录的绝对路径）：不预读内容，仅把路径注入本轮 prompt，由 AI 按需调用 Read/Glob 抓取
+export interface ChatPathReference {
+  path: string
+  kind: 'file' | 'directory'
+}
 
 interface ChatViewProps {
   activeSessionId?: string | null
   onSessionCreated?: (id: string) => void
   currentDirectoryId?: string
-  taskMonitorOpen?: boolean
-  onToggleMonitor?: () => void
 }
 
 export function ChatView({
   activeSessionId,
   onSessionCreated,
-  currentDirectoryId: _currentDirectoryId,
-  taskMonitorOpen,
-  onToggleMonitor
+  currentDirectoryId: _currentDirectoryId
 }: ChatViewProps) {
   const { messages, isLoading, addMessage, replaceLastAssistantMessage, setLoading } =
     useChatStore()
   const { t } = useI18n()
   const scrollRef = useRef<HTMLDivElement>(null)
-
-  // 会话标题（后续可从 session 数据中读取，此处先用默认值）
-  const [sessionTitle, setSessionTitle] = useState(() => t('chat.newConversation'))
 
   // 订阅协作消息事件
   useEffect(() => {
@@ -93,7 +96,9 @@ export function ChatView({
     message: string,
     cwd: string,
     skillIds?: string[],
-    selectedModel?: SelectedModel | null
+    selectedModel?: SelectedModel | null,
+    imageAttachments?: ChatImageAttachment[],
+    pathReferences?: ChatPathReference[]
   ) => {
     if (!message || isLoading) return
     addMessage({ role: 'user', content: message })
@@ -104,6 +109,8 @@ export function ChatView({
         const result = await window.api.cowork.startSession({
           prompt: message,
           cwd,
+          imageAttachments,
+          pathReferences,
           skillIds,
           selectedModel: selectedModel ?? undefined
         })
@@ -117,13 +124,14 @@ export function ChatView({
         // 主进程返回的 sessionId 通知父组件（Sidebar 侧边栏渲染任务列表）
         if (typeof r.sessionId === 'string') {
           onSessionCreated?.(r.sessionId)
-          setSessionTitle(message.slice(0, 30) || t('chat.newConversation'))
         }
       } else {
         // 继续已有会话
         await window.api.cowork.continueSession({
           sessionId: activeSessionId,
           prompt: message,
+          imageAttachments,
+          pathReferences,
           skillIds,
           selectedModel: selectedModel ?? undefined
         })
@@ -141,37 +149,22 @@ export function ChatView({
   }
 
   return (
-    // 外层横向布局：左侧主聊天区 + 右侧可选任务监控面板
-    <div className="flex-1 flex min-h-0">
-      {/* 主聊天区 */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {activeSessionId ? (
-          <>
-            {/* 有会话：顶栏 + 消息列表 + 输入框 */}
-            <ChatHeader
-              sessionTitle={sessionTitle}
-              onToggleMonitor={onToggleMonitor ?? (() => {})}
-              monitorOpen={taskMonitorOpen}
-            />
-            <div ref={scrollRef} className="flex-1 overflow-y-auto">
-              <MessageList messages={messages} isLoading={isLoading} />
-            </div>
-            <ChatInputBox onSend={handleSend} disabled={isLoading} />
-          </>
-        ) : (
-          <>
-            {/* 无会话：拖拽占位 + 欢迎页 + 输入框 */}
-            <div className="drag-region h-[52px] shrink-0" />
-            <div ref={scrollRef} className="flex-1 overflow-y-auto flex flex-col">
-              <WelcomePage onSendPrompt={handleSendFromWelcome} />
-            </div>
-            <ChatInputBox onSend={handleSend} disabled={isLoading} />
-          </>
-        )}
-      </div>
-
-      {/* 右侧任务监控面板：仅在 taskMonitorOpen 且有活跃会话时显示 */}
-      {taskMonitorOpen && activeSessionId && <TaskMonitorPanel sessionId={activeSessionId} />}
+    <div className="flex-1 flex min-h-0 flex-col">
+      {activeSessionId ? (
+        <>
+          <div ref={scrollRef} className="flex-1 overflow-y-auto">
+            <MessageList messages={messages} isLoading={isLoading} />
+          </div>
+          <ChatInputBox onSend={handleSend} disabled={isLoading} />
+        </>
+      ) : (
+        <>
+          <div ref={scrollRef} className="flex-1 overflow-y-auto flex flex-col">
+            <WelcomePage onSendPrompt={handleSendFromWelcome} />
+          </div>
+          <ChatInputBox onSend={handleSend} disabled={isLoading} />
+        </>
+      )}
     </div>
   )
 }
@@ -186,23 +179,23 @@ interface Message {
 
 function MessageList({ messages, isLoading }: { messages: Message[]; isLoading: boolean }) {
   return (
-    <div className="px-6 py-4 space-y-5">
+    <div className="w-full space-y-5 px-[var(--space-page-x)] py-[var(--space-page-y)]">
       {messages.map((msg) => (
         <div
           key={msg.id}
           className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
         >
           {msg.role === 'assistant' && (
-            <div className="w-7 h-7 rounded-full bg-accent flex items-center justify-center shrink-0 mt-0.5">
-              <PawPrint size={13} className="text-white" strokeWidth={2.5} />
+            <div className="w-7 h-7 rounded-full border border-border bg-white/80 flex items-center justify-center shrink-0 mt-0.5 shadow-[var(--shadow-card)]">
+              <PawPrint size={13} className="text-text-secondary" strokeWidth={2.2} />
             </div>
           )}
 
           <div
             className={`max-w-[75%] px-4 py-2.5 text-[13.5px] leading-[1.65] ${
               msg.role === 'user'
-                ? 'bg-bg-bubble-user text-text-bubble-user rounded-[14px] rounded-br-[6px]'
-                : 'bg-bg-bubble-ai text-text-bubble-ai rounded-[14px] rounded-bl-[6px] shadow-[var(--shadow-card)]'
+                ? 'bg-bg-bubble-user text-text-bubble-user rounded-[12px] rounded-br-[6px]'
+                : 'bg-bg-bubble-ai text-text-bubble-ai rounded-[12px] rounded-bl-[6px] shadow-[var(--shadow-card)]'
             }`}
           >
             {msg.content ? (

@@ -58,7 +58,7 @@ export function PreferenceSettings() {
       <p className="text-[13px] text-text-tertiary mb-6">{t('preferences.subtitle')}</p>
 
       {/* 语言 */}
-      <div className="rounded-[14px] bg-bg-card border border-border overflow-hidden mb-4">
+      <div className="rounded-[12px] bg-bg-card border border-border overflow-hidden mb-4">
         <div className="px-5 py-3 border-b border-border">
           <span className="text-[12px] text-text-tertiary font-medium uppercase tracking-wider">
             {t('preferences.language')}
@@ -83,7 +83,7 @@ export function PreferenceSettings() {
       </div>
 
       {/* 主题 */}
-      <div className="rounded-[14px] bg-bg-card border border-border overflow-hidden mb-4">
+      <div className="rounded-[12px] bg-bg-card border border-border overflow-hidden mb-4">
         <div className="px-5 py-3 border-b border-border">
           <span className="text-[12px] text-text-tertiary font-medium uppercase tracking-wider">
             {t('preferences.theme')}
@@ -108,7 +108,7 @@ export function PreferenceSettings() {
       </div>
 
       {/* 字号 */}
-      <div className="rounded-[14px] bg-bg-card border border-border overflow-hidden">
+      <div className="rounded-[12px] bg-bg-card border border-border overflow-hidden">
         <div className="px-5 py-3 border-b border-border">
           <span className="text-[12px] text-text-tertiary font-medium uppercase tracking-wider">
             {t('preferences.fontSize')}

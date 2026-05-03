@@ -16,6 +16,7 @@ export const en: Record<string, string> = {
   'common.submit': 'Submit',
   'common.resubmit': 'Resubmit',
   'common.retry': 'Retry',
+  'common.refresh': 'Refresh',
   'common.nextStep': 'Next',
   'common.prevStep': 'Previous',
   'common.startUsing': 'Get Started',
@@ -48,9 +49,28 @@ export const en: Record<string, string> = {
   'sidebar.workDir': 'Workspace',
   'sidebar.tasks': 'Tasks',
   'sidebar.channels': 'Channels',
+  'sidebar.scheduledTasks': 'Scheduled Tasks',
+  'sidebar.taskList': 'Task List',
   'sidebar.noTasks': 'No tasks yet',
+  'sidebar.noScheduledTasks': 'No scheduled tasks',
+  'sidebar.noScheduledRuns': 'No run history',
+  'sidebar.noChannels': 'No IM channels',
   'sidebar.defaultTitle': 'New Task',
   'sidebar.channelsComingSoon': 'Channels coming soon',
+  'sidebar.mainWorkspace': 'Main',
+  'sidebar.unknownWorkspace': 'Unknown workspace',
+  'sidebar.originChat': 'Chat task',
+  'sidebar.originIm': 'IM trigger',
+  'sidebar.originScheduler': 'Scheduled task',
+  'sidebar.originHook': 'Hook trigger',
+  'sidebar.channelEnabled': 'Enabled',
+  'sidebar.channelDisabled': 'Disabled',
+  'sidebar.channelConversationPending': 'Conversation list requires IM mapping IPC',
+  'sidebar.defaultUserName': 'PetClaw User',
+  'sidebar.freePlan': 'Free Plan',
+  'sidebar.open': 'Open sidebar',
+  'sidebar.close': 'Close sidebar',
+  'sidebar.settings': 'Settings',
 
   // ── chat ──
   'chat.inputPlaceholder': 'Type a message, Enter to send, Shift+Enter for new line...',
@@ -62,6 +82,23 @@ export const en: Record<string, string> = {
   'chat.confirmTitle': 'Confirm title',
   'chat.toggleMonitor': 'Toggle task monitor panel',
   'chat.moreActions': 'More actions',
+  'chat.addContext': 'Add context',
+  'chat.actionExpertKits': 'Expert kits',
+  'chat.actionSkills': 'Skills',
+  'chat.actionConnectors': 'Connectors',
+  'chat.actionAddFile': 'Add file or folder',
+  'chat.removeAttachment': 'Remove reference',
+  'chat.removeSkill': 'Remove skill',
+  'chat.clearAllContext': 'Clear all',
+  'chat.attachmentDir': 'Folder',
+  'chat.attachmentFile': 'File',
+  'chat.attachmentImagePreview': 'Preview image',
+  'chat.expertKitsEmptyTitle': 'Expert Kits Coming Soon',
+  'chat.expertKitsEmptyDesc': 'Expert kits will bundle pre-tuned skills for specific scenarios. Stay tuned.',
+  'chat.connectorsEmptyTitle': 'Connectors Coming Soon',
+  'chat.connectorsEmptyDesc': 'Connectors integrate external systems and MCP services. Polishing in progress.',
+  'chat.manageSkills': 'Manage skills',
+  'chat.selectSkillsEmpty': 'No skills available. Add one from the manage page.',
 
   // ── permission modal ──
   'permission.toolCall': 'Tool Call',
@@ -119,6 +156,7 @@ export const en: Record<string, string> = {
   'settings.connectors': 'Connectors',
   'settings.mcp': 'MCP Services',
   'settings.backToApp': 'Back to App',
+  'settings.openNavigation': 'Open settings navigation',
 
   // ── preferences ──
   'preferences.title': 'Preferences',
@@ -299,8 +337,9 @@ export const en: Record<string, string> = {
   // ── cron ──
   'cron.myTasks': 'My Scheduled Tasks',
   'cron.runHistory': 'Run History',
-  'cron.createdVia': 'Created via PetClaw',
+  'cron.createdVia': 'Create with QoderWork',
   'cron.newTask': 'New Scheduled Task',
+  'cron.searchPlaceholder': 'Search scheduled tasks',
   'cron.title': 'Scheduled Tasks',
   'cron.subtitle': 'Set up automated tasks so PetClaw can handle repetitive work on schedule',
   'cron.sleepWarning': 'Scheduled tasks only run while your computer is awake',
@@ -379,14 +418,28 @@ export const en: Record<string, string> = {
   'skills.searchSkill': 'Search skills',
   'skills.noInstalled': 'No installed skills',
   'skills.manage': 'Manage Skills',
+  'skills.groupCustom': 'Custom Skills',
+  'skills.groupBuiltIn': 'Built-in Skills',
+  'skills.installSkill': 'Install Skill',
+
+  // ── expert kits ──
+  'expertKits.searchPlaceholder': 'Search expert kits',
+  'expertKits.installKit': 'Install Kit',
 
   // ── task monitor panel ──
+  'taskMonitor.title': 'Task Monitor',
   'taskMonitor.todoTasks': 'To-do Tasks',
   'taskMonitor.noTodo': 'No to-do tasks',
   'taskMonitor.artifacts': 'Artifacts',
   'taskMonitor.noArtifacts': 'No artifacts',
   'taskMonitor.skillsAndMcp': 'Skills & MCP',
   'taskMonitor.noSkills': 'No enabled skills',
+
+  // ── context usage inline indicator ──
+  'contextUsage.label': 'Context usage',
+  'contextUsage.detail': '{used} / {total} tokens',
+  'contextUsage.warn': 'Approaching limit — older messages may be compressed soon',
+  'contextUsage.danger': 'Context nearly full — consider starting a new session for best quality',
 
   // ── connector popup ──
   'connectorPopup.mcpServers': 'MCP Servers',
@@ -395,6 +448,7 @@ export const en: Record<string, string> = {
   // ── cwd selector ──
   'cwdSelector.title': 'Directory',
   'cwdSelector.addFolder': 'Add Folder',
+  'cwdSelector.changeFolder': 'Change Folder',
   'cwdSelector.recent': 'Recent',
   'cwdSelector.noRecent': 'No recent directories',
   'cwdSelector.promptPath': 'Enter directory path:',

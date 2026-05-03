@@ -75,6 +75,8 @@ PetClaw 的核心是 **Cowork 模式**，它能在本地环境中执行工具、
 
 ### 安装与开发
 
+执行目录：仓库根目录 `petclaw/`。
+
 ```bash
 # 克隆仓库
 git clone https://github.com/XuxuGood/petclaw.git
@@ -89,6 +91,8 @@ pnpm --filter petclaw-desktop dev
 
 PetClaw 使用 [OpenClaw](https://github.com/openclaw/openclaw) 作为 Agent 引擎。所依赖的 OpenClaw 版本在 `petclaw-desktop/package.json` 的 `openclaw.version` 字段中声明。
 
+执行目录：仓库根目录 `petclaw/`。
+
 ```bash
 # 首次运行：自动克隆并构建 OpenClaw（可能需要几分钟）
 pnpm --filter petclaw-desktop dev:openclaw
@@ -99,11 +103,15 @@ pnpm --filter petclaw-desktop dev:openclaw
 
 默认 OpenClaw 源码会被克隆/管理在 `../openclaw`（相对于本仓库）。可通过环境变量覆盖：
 
+执行目录：仓库根目录 `petclaw/`。
+
 ```bash
 OPENCLAW_SRC=/path/to/openclaw pnpm --filter petclaw-desktop dev:openclaw
 ```
 
 强制重新构建（即使版本未变）：
+
+执行目录：仓库根目录 `petclaw/`。
 
 ```bash
 OPENCLAW_FORCE_BUILD=1 pnpm --filter petclaw-desktop dev:openclaw
@@ -111,11 +119,15 @@ OPENCLAW_FORCE_BUILD=1 pnpm --filter petclaw-desktop dev:openclaw
 
 跳过自动版本切换（如需本地开发 OpenClaw 时）：
 
+执行目录：仓库根目录 `petclaw/`。
+
 ```bash
 OPENCLAW_SKIP_ENSURE=1 pnpm --filter petclaw-desktop dev:openclaw
 ```
 
 ### 代码质量
+
+执行目录：仓库根目录 `petclaw/`。
 
 ```bash
 npm run typecheck                              # workspace 全量类型检查
@@ -124,11 +136,29 @@ pnpm --filter petclaw-desktop lint             # ESLint 代码检查
 pnpm --filter petclaw-desktop test -- config-sync   # 只跑指定模块的测试
 ```
 
-git commit 时自动触发 lint-staged（prettier + eslint）+ commitlint（conventional commits）。
+git commit 时自动触发 lint-staged（prettier + eslint）、GitNexus 变更影响分析和 commitlint（conventional commits）。GitNexus 未安装时默认只提示并跳过，不阻断提交。
+
+### AI 代码上下文工程
+
+PetClaw 使用 GitNexus、Serena、项目级 `.mcp.json`、客户端 MCP 模板和 Husky hooks 组成 AI 代码上下文工具链。开发者首次拉取项目后初始化一次即可；日常切分支、merge、rebase 和提交由 Husky 自动处理索引刷新和变更影响分析。AI 改代码前会自动运行上下文准备脚本，通常不需要人工介入。
+
+执行目录：仓库根目录 `petclaw/`。
+
+```bash
+pnpm ai:setup -- --client codex                # 首次接入只执行这一条
+pnpm ai:mcp:install -- --client codex          # 仅在需要修复/重装 Codex MCP 配置时执行
+pnpm ai:mcp:guide -- --client claude-code      # 仅查看指定客户端接入说明
+pnpm ai:tools:check                            # 工具链异常时排查状态
+pnpm ai:serena:dashboard                       # 查看当前可访问的 Serena Dashboard 地址
+```
+
+完整设计见 [`docs/架构设计/AI代码上下文工程设计.md`](../docs/架构设计/AI代码上下文工程设计.md)。
 
 ## 打包分发
 
 使用 [electron-builder](https://www.electron.build/) 生成各平台安装包，输出到 `release/` 目录。
+
+执行目录：仓库根目录 `petclaw/`。
 
 ```bash
 # macOS - Apple Silicon
@@ -148,6 +178,8 @@ pnpm --filter petclaw-desktop dist:linux:x64
 
 也可以手动构建 OpenClaw runtime：
 
+执行目录：仓库根目录 `petclaw/`。
+
 ```bash
 # 按当前主机平台自动选择 target
 pnpm --filter petclaw-desktop openclaw:runtime:host
@@ -159,6 +191,8 @@ pnpm --filter petclaw-desktop openclaw:runtime:linux-x64
 ```
 
 ## 完整开发流程
+
+执行目录：仓库根目录 `petclaw/`。下方所有命令都从该目录执行，除非注释明确说明切换目录。
 
 ```bash
 # ═══════════════════════════════════════════════
@@ -207,6 +241,7 @@ pnpm --filter petclaw-desktop lint                  # ESLint 代码检查
 pnpm --filter petclaw-desktop test -- config-sync   # 只跑指定模块的测试
 
 # git commit 时自动触发 lint-staged（prettier + eslint）+ commitlint（conventional commits）
+# git commit 时还会运行 GitNexus 暂存区变更影响分析；默认宽松降级，严格模式可设置 PETCLAW_AI_IMPACT_STRICT=1
 
 # ═══════════════════════════════════════════════
 # 阶段 4：升级 Openclaw 版本

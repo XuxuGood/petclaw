@@ -1,0 +1,2 @@
+# merge / pull 后依赖和调用链可能变化，自动检查 GitNexus 索引；失败只提示，不破坏 Git 操作。
+node scripts/ai/gitnexus-refresh.cjs --reason post-merge

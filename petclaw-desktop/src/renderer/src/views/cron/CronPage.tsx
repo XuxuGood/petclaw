@@ -1,5 +1,5 @@
 // src/renderer/src/chat/components/CronPage.tsx
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Clock, Plus, MoreHorizontal, Play, Trash2, Edit3, Info } from 'lucide-react'
 
 import { useI18n } from '../../i18n'
@@ -33,7 +33,13 @@ interface TaskRun {
   error: string | null
 }
 
-export function CronPage() {
+interface CronPageProps {
+  createSignal?: number
+  /** 顶栏传入的搜索关键词，用于本地过滤任务与执行记录。 */
+  search?: string
+}
+
+export function CronPage({ createSignal = 0, search = '' }: CronPageProps) {
   const { t } = useI18n()
   const [activeTab, setActiveTab] = useState<CronTab>('tasks')
   const [tasks, setTasks] = useState<ScheduledTask[]>([])
@@ -47,6 +53,7 @@ export function CronPage() {
   >()
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
   const [timeRange, setTimeRange] = useState<TimeRange>('day')
+  const createSignalRef = useRef(createSignal)
 
   // cron 表达式转人类可读描述，依赖 i18n 的 dayNames 和格式模板
   const cronToDescription = useCallback(
@@ -123,41 +130,58 @@ export function CronPage() {
     setMenuOpenId(null)
   }
 
-  const handleCreate = () => {
+  const handleCreate = useCallback(() => {
     setEditingTaskId(null)
     setEditingData(undefined)
     setEditDialogOpen(true)
-  }
+  }, [])
+
+  useEffect(() => {
+    if (createSignal === createSignalRef.current) return
+    createSignalRef.current = createSignal
+    handleCreate()
+  }, [createSignal, handleCreate])
 
   // Tab 数据在渲染内部定义，保证 i18n 响应式更新
   const TABS: Array<{ id: CronTab; label: string }> = [
     { id: 'tasks', label: t('cron.myTasks') },
     { id: 'runs', label: t('cron.runHistory') }
   ]
+  const normalizedSearch = search.trim().toLowerCase()
+  const filteredTasks = normalizedSearch
+    ? tasks.filter((task) => {
+        const scheduleLabel =
+          task.schedule.kind === 'cron' && task.schedule.expr
+            ? cronToDescription(task.schedule.expr)
+            : task.schedule.kind
+        return [task.name, task.payload.message, scheduleLabel].some((value) =>
+          value.toLowerCase().includes(normalizedSearch)
+        )
+      })
+    : tasks
+  const filteredRuns = normalizedSearch
+    ? runs.filter((run) =>
+        [run.taskName, run.taskId, run.status, run.error]
+          .filter((value): value is string => typeof value === 'string')
+          .some((value) => value.toLowerCase().includes(normalizedSearch))
+      )
+    : runs
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      {/* 拖拽区 + 按钮 */}
-      <div className="drag-region h-[52px] shrink-0 flex items-center justify-end pr-5 gap-2">
-        <button
-          onClick={handleCreate}
-          className="no-drag flex items-center gap-1.5 px-3 py-1.5 text-[12px] rounded-[8px] bg-text-primary text-white hover:opacity-90 transition-all active:scale-[0.96] duration-[120ms]"
-        >
-          <Plus size={13} />
-          {t('cron.newTask')}
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-[800px] mx-auto px-6 py-2">
-          {/* 标题 */}
-          <h1 className="text-[24px] font-bold text-text-primary mb-1">{t('cron.title')}</h1>
-          <p className="text-[14px] text-text-tertiary mb-5">{t('cron.subtitle')}</p>
+      <div className="page-scroll">
+        <div className="page-container-workbench workspace-page-container">
+          <div className="page-hero">
+            <h1 className="page-title">{t('cron.title')}</h1>
+            <p className="page-subtitle">{t('cron.subtitle')}</p>
+          </div>
 
           {/* 信息条 */}
-          <div className="flex items-center gap-3 px-4 py-3 mb-5 bg-caution-bg border border-caution-border rounded-[10px]">
+          <div className="flex items-start gap-3 px-4 py-3 mb-5 bg-caution-bg border border-caution-border rounded-[8px]">
             <Info size={16} className="text-caution-icon shrink-0" />
-            <p className="text-[13px] text-warning flex-1">{t('cron.sleepWarning')}</p>
+            <p className="text-[13px] text-warning flex-1 leading-[1.55]">
+              {t('cron.sleepWarning')}
+            </p>
           </div>
 
           {/* Tab */}
@@ -184,7 +208,7 @@ export function CronPage() {
                 <div className="flex items-center justify-center py-20">
                   <div className="w-5 h-5 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
                 </div>
-              ) : tasks.length === 0 ? (
+              ) : filteredTasks.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20">
                   <Clock size={48} className="text-text-tertiary mb-4" strokeWidth={1.25} />
                   <h3 className="text-[15px] font-medium text-text-primary mb-1">
@@ -193,18 +217,18 @@ export function CronPage() {
                   <p className="text-[13px] text-text-tertiary mb-4">{t('cron.noTasksHint')}</p>
                   <button
                     onClick={handleCreate}
-                    className="flex items-center gap-1.5 px-4 py-2 text-[13px] rounded-[10px] bg-accent text-white hover:bg-accent-hover transition-colors active:scale-[0.96] duration-[120ms]"
+                    className="flex items-center gap-1.5 rounded-[8px] bg-accent px-4 py-2 text-[13px] text-white transition-colors duration-[120ms] hover:bg-accent-hover"
                   >
                     <Plus size={14} />
                     {t('cron.newTask')}
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-4">
-                  {tasks.map((task) => (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {filteredTasks.map((task) => (
                     <div
                       key={task.id}
-                      className="relative rounded-[14px] border border-border p-4 hover:border-text-tertiary/30 transition-colors"
+                      className="relative min-w-0 rounded-[12px] border border-border p-4 hover:border-text-tertiary/30 transition-colors"
                     >
                       <div className="flex items-start gap-3">
                         {/* 圆形 checkbox */}
@@ -228,7 +252,7 @@ export function CronPage() {
                         </button>
 
                         <div className="flex-1 min-w-0">
-                          <h3 className="text-[14px] font-semibold text-text-primary mb-1">
+                          <h3 className="text-[14px] font-semibold text-text-primary mb-1 truncate">
                             {task.name}
                           </h3>
                           <p className="text-[12px] text-text-tertiary leading-[1.5] line-clamp-3">
@@ -245,7 +269,7 @@ export function CronPage() {
                             <MoreHorizontal size={16} />
                           </button>
                           {menuOpenId === task.id && (
-                            <div className="absolute right-0 top-8 w-[140px] bg-bg-root border border-border rounded-[10px] shadow-lg py-1 z-10">
+                            <div className="absolute right-0 top-8 w-[140px] bg-bg-root border border-border rounded-[8px] shadow-lg py-1 z-10">
                               <button
                                 onClick={() => handleEdit(task)}
                                 className="w-full flex items-center gap-2 px-3 py-2 text-[13px] text-text-secondary hover:bg-bg-hover transition-colors"
@@ -276,9 +300,9 @@ export function CronPage() {
                       </div>
 
                       {/* 底部时间描述 */}
-                      <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-border">
+                      <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-border min-w-0">
                         <Clock size={13} className="text-text-tertiary" />
-                        <span className="text-[12px] text-text-tertiary">
+                        <span className="text-[12px] text-text-tertiary truncate">
                           {task.schedule.kind === 'cron' && task.schedule.expr
                             ? cronToDescription(task.schedule.expr as string)
                             : task.schedule.kind}
@@ -295,7 +319,7 @@ export function CronPage() {
           {activeTab === 'runs' && (
             <div>
               {/* 筛选器 */}
-              <div className="flex items-center gap-3 mb-4">
+              <div className="flex flex-wrap items-center gap-3 mb-4">
                 <div className="flex bg-bg-hover rounded-[8px] p-0.5">
                   {(['day', 'week', 'month'] as TimeRange[]).map((range) => (
                     <button
@@ -317,7 +341,7 @@ export function CronPage() {
                 </div>
               </div>
 
-              {runs.length === 0 ? (
+              {filteredRuns.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20">
                   <Clock size={48} className="text-text-tertiary mb-4" strokeWidth={1.25} />
                   <h3 className="text-[15px] font-medium text-text-primary mb-1">
@@ -327,17 +351,17 @@ export function CronPage() {
                 </div>
               ) : (
                 <div className="space-y-1">
-                  {runs.map((run) => (
+                  {filteredRuns.map((run) => (
                     <div
                       key={run.id}
-                      className="flex items-center gap-3 px-4 py-3 rounded-[10px] hover:bg-bg-hover transition-colors"
+                      className="flex min-w-0 flex-wrap items-center gap-3 px-4 py-3 rounded-[8px] hover:bg-bg-hover transition-colors"
                     >
                       <div className="flex-1 min-w-0">
                         <span className="text-[13px] text-text-primary">
                           {run.taskName ?? run.taskId}
                         </span>
                       </div>
-                      <span className="text-[12px] text-text-tertiary">
+                      <span className="text-[12px] text-text-tertiary shrink-0">
                         {new Date(run.startedAt).toLocaleString('zh-CN', {
                           hour: '2-digit',
                           minute: '2-digit',
@@ -365,7 +389,7 @@ export function CronPage() {
                               : t('cron.statusSkipped')}
                       </span>
                       {run.durationMs !== null && (
-                        <span className="text-[12px] text-text-tertiary w-[60px] text-right">
+                        <span className="text-[12px] text-text-tertiary w-[60px] text-right shrink-0">
                           {run.durationMs < 1000
                             ? `${run.durationMs}ms`
                             : `${(run.durationMs / 1000).toFixed(1)}s`}

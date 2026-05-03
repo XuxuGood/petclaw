@@ -14,6 +14,7 @@ import type {
   ActiveTurn,
   CoworkContinueOptions,
   CoworkStartOptions,
+  PathReference,
   PermissionRequest,
   PermissionResult,
   CoworkMessage,
@@ -198,6 +199,7 @@ interface RunTurnOptions {
   autoApprove?: boolean
   confirmationMode?: 'modal' | 'text'
   imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>
+  pathReferences?: PathReference[]
   skillIds?: string[]
   skillPrompt?: string
   systemPrompt?: string
@@ -469,7 +471,8 @@ export class CoworkController extends EventEmitter {
       sessionId,
       sessionKey,
       prompt,
-      turnSystemPrompt
+      turnSystemPrompt,
+      options.pathReferences
     )
 
     // completionPromise
@@ -927,7 +930,8 @@ export class CoworkController extends EventEmitter {
     sessionId: string,
     sessionKey: string,
     prompt: string,
-    systemPrompt?: string
+    systemPrompt?: string,
+    pathReferences?: PathReference[]
   ): Promise<string> {
     const sections: string[] = []
 
@@ -979,6 +983,20 @@ export class CoworkController extends EventEmitter {
 
     if (prompt.trim()) {
       sections.push(`[Current user request]\n${prompt}`)
+    }
+
+    // 路径引用注入：仅本轮有效，不写回 session 历史；以 XML 标签封装便于模型识别。
+    // 每条引用只传绝对路径和 kind，不预读内容，交由 Agent/工具按需读取。
+    if (pathReferences && pathReferences.length > 0) {
+      const lines = pathReferences.map((ref) => `- ${ref.kind}: ${ref.path}`)
+      sections.push(
+        [
+          '<attached_paths>',
+          'The user attached the following local paths for this turn. Read or inspect them on demand using available tools.',
+          ...lines,
+          '</attached_paths>'
+        ].join('\n')
+      )
     }
 
     return sections.join('\n\n')

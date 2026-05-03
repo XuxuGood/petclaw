@@ -190,8 +190,8 @@ export function CoworkPermissionModal({ permission, onRespond }: CoworkPermissio
   const DangerIcon = style.icon
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay">
-      <div className="bg-bg-root rounded-[14px] shadow-lg w-[480px] max-h-[80vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-6">
+      <div className="bg-bg-root rounded-[12px] shadow-lg w-[min(480px,calc(100vw-48px))] max-h-[calc(100vh-48px)] flex flex-col overflow-hidden">
         {/* 标题栏：危险等级色彩区分 */}
         <div className={`flex items-center gap-3 px-5 py-4 ${style.bg} border-b ${style.border}`}>
           <DangerIcon size={20} className={style.iconColor} />
@@ -199,7 +199,7 @@ export function CoworkPermissionModal({ permission, onRespond }: CoworkPermissio
           <div className="flex-1" />
           <button
             onClick={() => onRespond({ behavior: 'deny', message: t('permission.userCancel') })}
-            className="p-1 rounded-[8px] hover:bg-bg-active transition-colors"
+            className="min-h-[var(--size-control-min)] min-w-[var(--size-control-min)] rounded-[8px] hover:bg-bg-active transition-colors ui-focus"
           >
             <X size={16} className="text-text-tertiary" />
           </button>
@@ -222,30 +222,30 @@ export function CoworkPermissionModal({ permission, onRespond }: CoworkPermissio
           )}
 
         {/* 工具名称 + 参数展示 */}
-        <div className="px-5 py-4 overflow-y-auto">
+        <div className="ui-contained-scroll px-5 py-4 overflow-y-auto">
           <div className="mb-3">
             <span className="text-[12px] text-text-tertiary">{t('permission.toolName')}</span>
             <div className="text-[14px] font-mono text-text-primary mt-1">{toolName}</div>
           </div>
           <div>
             <span className="text-[12px] text-text-tertiary">{t('permission.params')}</span>
-            <pre className="text-[12px] font-mono text-text-secondary mt-1 p-3 bg-bg-hover rounded-[10px] overflow-x-auto max-h-[200px]">
+            <pre className="text-[12px] font-mono text-text-secondary mt-1 p-3 bg-bg-hover rounded-[8px] overflow-x-auto max-h-[200px]">
               {JSON.stringify(toolInput, null, 2)}
             </pre>
           </div>
         </div>
 
         {/* 操作按钮 */}
-        <div className="flex justify-end gap-2 px-5 py-4 border-t border-border">
+        <div className="flex flex-wrap justify-end gap-2 px-5 py-4 border-t border-border">
           <button
             onClick={() => onRespond({ behavior: 'deny', message: t('permission.userDeny') })}
-            className="px-4 py-2 text-[13px] rounded-[10px] bg-bg-hover text-text-secondary hover:bg-bg-active transition-colors active:scale-[0.96] duration-[120ms]"
+            className="min-h-[var(--size-control-min)] px-4 py-2 text-[13px] rounded-[8px] bg-bg-hover text-text-secondary hover:bg-bg-active transition-colors active:scale-[0.96] duration-[120ms] ui-focus"
           >
             {t('permission.deny')}
           </button>
           <button
             onClick={() => onRespond({ behavior: 'allow' })}
-            className={`px-4 py-2 text-[13px] rounded-[10px] text-white transition-colors active:scale-[0.96] duration-[120ms] ${
+            className={`min-h-[var(--size-control-min)] px-4 py-2 text-[13px] rounded-[8px] text-white transition-colors active:scale-[0.96] duration-[120ms] ui-focus ${
               dangerLevel === 'destructive'
                 ? 'bg-danger-btn hover:bg-danger-btn-hover'
                 : 'bg-accent hover:bg-accent-hover'
@@ -287,8 +287,8 @@ function ConfirmModeModal({
   const DangerIcon = style.icon
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay">
-      <div className="bg-bg-root rounded-[14px] shadow-lg w-[420px] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-6">
+      <div className="bg-bg-root rounded-[12px] shadow-lg w-[min(420px,calc(100vw-48px))] max-h-[calc(100vh-48px)] flex flex-col overflow-hidden">
         {/* 危险操作时显示标题栏 */}
         {dangerLevel !== 'safe' && (
           <div className={`flex items-center gap-3 px-5 py-3 ${style.bg} border-b ${style.border}`}>
@@ -307,15 +307,15 @@ function ConfirmModeModal({
             </span>
           </div>
         )}
-        <div className="px-5 py-4">
+        <div className="ui-contained-scroll px-5 py-4 overflow-y-auto">
           <p className="text-[14px] text-text-primary leading-[1.6]">{questionText}</p>
           {requestedCommand && (
-            <pre className="text-[12px] font-mono text-text-secondary mt-3 p-3 bg-bg-hover rounded-[10px] overflow-x-auto max-h-[160px]">
+            <pre className="text-[12px] font-mono text-text-secondary mt-3 p-3 bg-bg-hover rounded-[8px] overflow-x-auto max-h-[160px]">
               {requestedCommand}
             </pre>
           )}
         </div>
-        <div className="flex justify-end gap-2 px-5 py-4 border-t border-border">
+        <div className="flex flex-wrap justify-end gap-2 px-5 py-4 border-t border-border">
           <button
             onClick={() =>
               onRespond({
@@ -323,7 +323,7 @@ function ConfirmModeModal({
                 updatedInput: { ...toolInput, answers: { [questionText]: secondary.label } }
               })
             }
-            className="px-4 py-2 text-[13px] rounded-[10px] bg-bg-hover text-text-secondary hover:bg-bg-active transition-colors active:scale-[0.96] duration-[120ms]"
+            className="min-h-[var(--size-control-min)] px-4 py-2 text-[13px] rounded-[8px] bg-bg-hover text-text-secondary hover:bg-bg-active transition-colors active:scale-[0.96] duration-[120ms] ui-focus"
           >
             {secondary.label}
           </button>
@@ -334,7 +334,7 @@ function ConfirmModeModal({
                 updatedInput: { ...toolInput, answers: { [questionText]: primary.label } }
               })
             }
-            className={`px-4 py-2 text-[13px] rounded-[10px] text-white transition-colors active:scale-[0.96] duration-[120ms] ${
+            className={`min-h-[var(--size-control-min)] px-4 py-2 text-[13px] rounded-[8px] text-white transition-colors active:scale-[0.96] duration-[120ms] ui-focus ${
               dangerLevel === 'destructive'
                 ? 'bg-danger-btn hover:bg-danger-btn-hover'
                 : 'bg-accent hover:bg-accent-hover'
@@ -390,9 +390,9 @@ function MultiQuestionModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay">
-      <div className="bg-bg-root rounded-[14px] shadow-lg w-[500px] max-h-[80vh] flex flex-col overflow-hidden">
-        <div className="px-5 py-4 overflow-y-auto flex-1">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-6">
+      <div className="bg-bg-root rounded-[12px] shadow-lg w-[min(500px,calc(100vw-48px))] max-h-[calc(100vh-48px)] flex flex-col overflow-hidden">
+        <div className="ui-contained-scroll px-5 py-4 overflow-y-auto flex-1">
           {questions.map((q, qi) => {
             const questionText = String(q.question ?? '')
             const header = typeof q.header === 'string' ? q.header : ''
@@ -406,7 +406,7 @@ function MultiQuestionModal({
               <div key={qi} className="mb-5">
                 <p className="text-[14px] font-medium text-text-primary mb-2">
                   {header && (
-                    <span className="inline-block text-[11px] uppercase tracking-wide px-2 py-0.5 mr-1.5 rounded-[10px] bg-bg-hover text-text-tertiary align-middle">
+                    <span className="inline-block text-[11px] uppercase tracking-wide px-2 py-0.5 mr-1.5 rounded-[8px] bg-bg-hover text-text-tertiary align-middle">
                       {header}
                     </span>
                   )}
@@ -439,7 +439,7 @@ function MultiQuestionModal({
                             }))
                           }
                         }}
-                        className={`w-full text-left px-3 py-2.5 rounded-[10px] text-[13px] transition-colors duration-[120ms] flex items-start gap-3 ${
+                        className={`w-full text-left px-3 py-2.5 rounded-[8px] text-[13px] transition-colors duration-[120ms] flex items-start gap-3 active:scale-[0.96] ui-focus ${
                           isSelected
                             ? 'bg-accent/10 text-accent border border-accent/30'
                             : 'bg-bg-hover text-text-secondary hover:bg-bg-active border border-transparent'
@@ -448,7 +448,7 @@ function MultiQuestionModal({
                         {/* radio/checkbox 指示器：多选用方形 checkbox，单选用圆形 radio */}
                         {isMulti ? (
                           <span
-                            className={`w-4 h-4 rounded-[3px] border-2 flex items-center justify-center mt-0.5 flex-shrink-0 transition-colors ${
+                            className={`w-4 h-4 rounded-[8px] border-2 flex items-center justify-center mt-0.5 flex-shrink-0 transition-colors ${
                               isSelected ? 'border-accent bg-accent' : 'border-text-tertiary'
                             }`}
                           >
@@ -493,17 +493,17 @@ function MultiQuestionModal({
             )
           })}
         </div>
-        <div className="flex justify-end gap-2 px-5 py-4 border-t border-border">
+        <div className="flex flex-wrap justify-end gap-2 px-5 py-4 border-t border-border">
           <button
             onClick={() => onRespond({ behavior: 'deny', message: t('permission.userCancel') })}
-            className="px-4 py-2 text-[13px] rounded-[10px] bg-bg-hover text-text-secondary hover:bg-bg-active transition-colors active:scale-[0.96] duration-[120ms]"
+            className="min-h-[var(--size-control-min)] px-4 py-2 text-[13px] rounded-[8px] bg-bg-hover text-text-secondary hover:bg-bg-active transition-colors active:scale-[0.96] duration-[120ms] ui-focus"
           >
             {t('common.cancel')}
           </button>
           <button
             onClick={handleSubmit}
             disabled={!isComplete}
-            className="px-4 py-2 text-[13px] rounded-[10px] bg-accent text-white hover:bg-accent-hover transition-colors active:scale-[0.96] duration-[120ms] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="min-h-[var(--size-control-min)] px-4 py-2 text-[13px] rounded-[8px] bg-accent text-white hover:bg-accent-hover transition-colors active:scale-[0.96] duration-[120ms] disabled:opacity-50 disabled:cursor-not-allowed ui-focus"
           >
             {t('common.confirm')}
           </button>

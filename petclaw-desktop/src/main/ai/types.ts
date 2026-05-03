@@ -33,6 +33,13 @@ export interface ImageAttachment {
   base64Data: string
 }
 
+// 路径引用：用于把用户在聊天框“添加文件/目录”的选项以绝对路径形式传递给 Cowork，
+// 不预读内容（交由 Agent/工具按需读取）。kind 区分文件/目录，供 prompt 拼接时声明额外语义。
+export interface PathReference {
+  path: string
+  kind: 'file' | 'directory'
+}
+
 export interface CoworkMessageMetadata {
   toolName?: string
   toolInput?: Record<string, unknown>
@@ -89,6 +96,7 @@ export interface CoworkStartOptions {
   autoApprove?: boolean
   confirmationMode?: 'modal' | 'text'
   imageAttachments?: ImageAttachment[]
+  pathReferences?: PathReference[]
   skillIds?: string[]
   skillPrompt?: string
   selectedModel?: SelectedModel
@@ -99,6 +107,8 @@ export interface CoworkStartOptions {
 
 export interface CoworkContinueOptions {
   systemPrompt?: string
+  imageAttachments?: ImageAttachment[]
+  pathReferences?: PathReference[]
   skillIds?: string[]
   skillPrompt?: string
   selectedModel?: SelectedModel

@@ -5,9 +5,10 @@ import { is } from '@electron-toolkit/utils'
 
 import { readAppSettings, writeAppSettings } from './app-settings'
 import {
+  CHAT_H_MIN,
+  CHAT_W_MIN,
   PET_H,
   PET_W,
-  resolveChatSize,
   resolveMainWindowBounds,
   resolvePetWindowBounds,
   type WindowBounds
@@ -90,7 +91,6 @@ export function createPetWindow(): BrowserWindow {
 
 export function createMainWindow(): BrowserWindow {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize
-  const chatSize = resolveChatSize({ width, height })
   const settingsPath = getSettingsPath()
   const savedBounds = readAppSettings(settingsPath).windowBounds
   const initialBounds = resolveMainWindowBounds({
@@ -106,11 +106,17 @@ export function createMainWindow(): BrowserWindow {
       : {}),
     frame: false,
     titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 16, y: 18 },
-    backgroundColor: '#f8f8fa',
+    trafficLightPosition: { x: 16, y: 21 },
+    // 主窗口必须透明，renderer 的 backdrop-filter 才能读到底层桌面并形成真正毛玻璃。
+    transparent: true,
+    backgroundColor: '#00000000',
+    vibrancy: 'under-window',
+    // 毛玻璃跟随窗口焦点：失焦时整窗自然变暗，避免 hiddenInset 原生红绿灯
+    // 退色成浅灰后压在常亮毛玻璃上泛白的视觉问题，保持与 macOS 其它 app 一致的失焦表现。
+    visualEffectState: 'followWindow',
     show: false,
-    minWidth: chatSize.width,
-    minHeight: chatSize.height,
+    minWidth: CHAT_W_MIN,
+    minHeight: CHAT_H_MIN,
     resizable: true,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),

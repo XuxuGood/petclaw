@@ -3,7 +3,7 @@ import { type BrowserWindow } from 'electron'
 import { safeHandle } from './ipc-registry'
 import type { CoworkSessionManager } from '../ai/cowork-session-manager'
 import type { CoworkController } from '../ai/cowork-controller'
-import type { PermissionResult, SelectedModel } from '../ai/types'
+import type { ImageAttachment, PathReference, PermissionResult, SelectedModel } from '../ai/types'
 import type { CoworkConfigStore, CoworkConfigUpdate } from '../data/cowork-config-store'
 import type { SkillManager } from '../skills/skill-manager'
 import type { ConfigSync, ConfigSyncResult } from '../ai/config-sync'
@@ -70,6 +70,8 @@ export function registerChatIpcHandlers(deps: ChatIpcDeps): void {
         prompt: string
         cwd?: string
         systemPrompt?: string
+        imageAttachments?: ImageAttachment[]
+        pathReferences?: PathReference[]
         skillIds?: string[]
         selectedModel?: SelectedModel
       }
@@ -92,6 +94,8 @@ export function registerChatIpcHandlers(deps: ChatIpcDeps): void {
         confirmationMode: 'modal',
         systemPrompt,
         skillPrompt,
+        imageAttachments: options.imageAttachments,
+        pathReferences: options.pathReferences,
         skillIds: options.skillIds,
         selectedModel: options.selectedModel,
         useMainAgent: !hasExplicitCwd && !hasConfiguredDefaultDirectory,
@@ -108,6 +112,8 @@ export function registerChatIpcHandlers(deps: ChatIpcDeps): void {
         sessionId: string
         prompt: string
         systemPrompt?: string
+        imageAttachments?: ImageAttachment[]
+        pathReferences?: PathReference[]
         skillIds?: string[]
         selectedModel?: SelectedModel
       }
@@ -123,6 +129,8 @@ export function registerChatIpcHandlers(deps: ChatIpcDeps): void {
       coworkSessionManager.continueSession(options.sessionId, options.prompt, {
         systemPrompt,
         skillPrompt,
+        imageAttachments: options.imageAttachments,
+        pathReferences: options.pathReferences,
         skillIds: options.skillIds,
         selectedModel: options.selectedModel
       })

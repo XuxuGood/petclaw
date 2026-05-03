@@ -16,6 +16,7 @@ export const zh: Record<string, string> = {
   'common.submit': '提交',
   'common.resubmit': '重新提交',
   'common.retry': '重试',
+  'common.refresh': '刷新',
   'common.nextStep': '下一步',
   'common.prevStep': '上一步',
   'common.startUsing': '开始使用',
@@ -48,9 +49,28 @@ export const zh: Record<string, string> = {
   'sidebar.workDir': '工作目录',
   'sidebar.tasks': '任务',
   'sidebar.channels': '频道',
+  'sidebar.scheduledTasks': '定时任务',
+  'sidebar.taskList': '任务列表',
   'sidebar.noTasks': '暂无任务记录',
+  'sidebar.noScheduledTasks': '暂无定时任务',
+  'sidebar.noScheduledRuns': '暂无执行记录',
+  'sidebar.noChannels': '暂无 IM 频道',
   'sidebar.defaultTitle': '新建任务',
   'sidebar.channelsComingSoon': '频道功能即将推出',
+  'sidebar.mainWorkspace': 'Main',
+  'sidebar.unknownWorkspace': '未知目录',
+  'sidebar.originChat': '普通任务',
+  'sidebar.originIm': 'IM 触发',
+  'sidebar.originScheduler': '定时任务',
+  'sidebar.originHook': 'Hook 触发',
+  'sidebar.channelEnabled': '已启用',
+  'sidebar.channelDisabled': '未启用',
+  'sidebar.channelConversationPending': '对话列表需要 IM 映射 IPC 后展示',
+  'sidebar.defaultUserName': 'PetClaw 用户',
+  'sidebar.freePlan': '免费套餐',
+  'sidebar.open': '打开侧边栏',
+  'sidebar.close': '关闭侧边栏',
+  'sidebar.settings': '设置',
 
   // ── chat ──
   'chat.inputPlaceholder': '输入消息，Enter 发送，Shift+Enter 换行...',
@@ -62,6 +82,23 @@ export const zh: Record<string, string> = {
   'chat.confirmTitle': '确认标题',
   'chat.toggleMonitor': '切换任务监控面板',
   'chat.moreActions': '更多操作',
+  'chat.addContext': '添加上下文',
+  'chat.actionExpertKits': '专家套件',
+  'chat.actionSkills': '技能',
+  'chat.actionConnectors': '连接器',
+  'chat.actionAddFile': '添加文件或文件夹',
+  'chat.removeAttachment': '移除引用',
+  'chat.removeSkill': '移除技能',
+  'chat.clearAllContext': '清空全部',
+  'chat.attachmentDir': '文件夹',
+  'chat.attachmentFile': '文件',
+  'chat.attachmentImagePreview': '预览图片',
+  'chat.expertKitsEmptyTitle': '专家套件即将上线',
+  'chat.expertKitsEmptyDesc': '专家套件将提供为特定场景精调的技能组合，敬请期待。',
+  'chat.connectorsEmptyTitle': '连接器即将上线',
+  'chat.connectorsEmptyDesc': '连接器用于接入外部系统和 MCP 服务，正在打磨中。',
+  'chat.manageSkills': '管理技能',
+  'chat.selectSkillsEmpty': '暂无可用技能，前往管理页添加',
 
   // ── permission modal ──
   'permission.toolCall': '工具调用',
@@ -119,6 +156,7 @@ export const zh: Record<string, string> = {
   'settings.connectors': '连接器',
   'settings.mcp': 'MCP 服务',
   'settings.backToApp': '返回应用',
+  'settings.openNavigation': '打开设置导航',
 
   // ── preferences ──
   'preferences.title': '偏好设置',
@@ -299,8 +337,9 @@ export const zh: Record<string, string> = {
   // ── cron ──
   'cron.myTasks': '我的定时任务',
   'cron.runHistory': '执行记录',
-  'cron.createdVia': '通过 PetClaw 创建',
+  'cron.createdVia': '通过 QoderWork 创建',
   'cron.newTask': '新建定时任务',
+  'cron.searchPlaceholder': '搜索定时任务',
   'cron.title': '定时任务',
   'cron.subtitle': '设置自动化任务，让 PetClaw 按计划帮你完成重复性工作',
   'cron.sleepWarning': '定时任务仅在电脑保持唤醒时运行',
@@ -379,14 +418,28 @@ export const zh: Record<string, string> = {
   'skills.searchSkill': '搜索技能',
   'skills.noInstalled': '暂无已安装技能',
   'skills.manage': '管理技能',
+  'skills.groupCustom': '自定义技能',
+  'skills.groupBuiltIn': '内置技能',
+  'skills.installSkill': '安装技能',
+
+  // ── expert kits ──
+  'expertKits.searchPlaceholder': '搜索专家套件',
+  'expertKits.installKit': '安装套件',
 
   // ── task monitor panel ──
+  'taskMonitor.title': '任务监控',
   'taskMonitor.todoTasks': '待办任务',
   'taskMonitor.noTodo': '暂无待办任务',
   'taskMonitor.artifacts': '产物',
   'taskMonitor.noArtifacts': '暂无产物',
   'taskMonitor.skillsAndMcp': '技能与 MCP',
   'taskMonitor.noSkills': '暂无启用的技能',
+
+  // ── context usage inline indicator ──
+  'contextUsage.label': '上下文使用',
+  'contextUsage.detail': '{used} / {total} tokens',
+  'contextUsage.warn': '即将接近上限，较早对话将被压缩',
+  'contextUsage.danger': '已接近上限，建议新开会话以保证回复质量',
 
   // ── connector popup ──
   'connectorPopup.mcpServers': 'MCP 服务器',
@@ -395,6 +448,7 @@ export const zh: Record<string, string> = {
   // ── cwd selector ──
   'cwdSelector.title': '工作目录',
   'cwdSelector.addFolder': '添加文件夹',
+  'cwdSelector.changeFolder': '更换目录',
   'cwdSelector.recent': '最近使用',
   'cwdSelector.noRecent': '暂无最近目录',
   'cwdSelector.promptPath': '请输入工作目录路径：',

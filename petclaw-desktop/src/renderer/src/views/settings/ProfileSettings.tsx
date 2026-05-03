@@ -41,13 +41,13 @@ export function ProfileSettings() {
   }
 
   return (
-    <div>
+    <div className="min-w-0">
       <h1 className="text-[20px] font-bold text-text-primary mb-1">{t('profile.title')}</h1>
-      <p className="text-[13px] text-text-tertiary mb-6">{t('profile.subtitle')}</p>
+      <p className="mb-6 text-[13px] leading-[1.55] text-text-tertiary">{t('profile.subtitle')}</p>
 
-      <div className="rounded-[14px] bg-bg-card border border-border overflow-hidden mb-4">
+      <div className="ui-card overflow-hidden mb-4">
         {/* 昵称 */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+        <div className="flex flex-col gap-2 px-5 py-4 border-b border-border sm:flex-row sm:items-center sm:justify-between">
           <label className="text-[14px] text-text-primary font-medium">
             {t('profile.nickname')}
           </label>
@@ -56,17 +56,17 @@ export function ProfileSettings() {
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
             placeholder={t('profile.nicknamePlaceholder')}
-            className="w-[200px] px-3 py-1.5 rounded-[10px] bg-bg-input border-none text-[14px] text-text-primary outline-none placeholder:text-text-tertiary text-right"
+            className="w-full px-3 py-1.5 rounded-[8px] bg-bg-input border-none text-[14px] text-text-primary outline-none placeholder:text-text-tertiary sm:w-[220px] sm:text-right"
           />
         </div>
 
         {/* 职业角色 */}
-        <div className="flex items-center justify-between px-5 py-4">
+        <div className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <label className="text-[14px] text-text-primary font-medium">{t('profile.role')}</label>
           <select
             value={role}
             onChange={(e) => setRole(e.target.value)}
-            className="w-[200px] px-3 py-1.5 rounded-[10px] bg-bg-input border-none text-[14px] text-text-primary outline-none appearance-none text-right"
+            className="w-full px-3 py-1.5 rounded-[8px] bg-bg-input border-none text-[14px] text-text-primary outline-none appearance-none sm:w-[220px] sm:text-right"
           >
             <option value="">{t('profile.rolePlaceholder')}</option>
             {ROLE_OPTIONS.map((r) => (
@@ -81,7 +81,7 @@ export function ProfileSettings() {
       {/* 保存按钮 */}
       <button
         onClick={handleSave}
-        className="px-5 py-2 rounded-[10px] bg-accent text-white text-[14px] font-medium transition-all duration-[120ms] active:scale-[0.96] hover:opacity-90"
+        className="min-h-[var(--size-control-min)] px-5 py-2 rounded-[8px] bg-accent text-white text-[14px] font-medium transition-all duration-[120ms] active:scale-[0.96] hover:opacity-90 ui-focus"
       >
         {saved ? t('profile.saved') : t('common.save')}
       </button>

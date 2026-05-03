@@ -68,24 +68,23 @@ export function ImChannelsPage() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      {/* 交通灯占位区 */}
-      <div className="drag-region h-[52px] shrink-0" />
-
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-[720px] mx-auto px-6 py-4">
-          <h1 className="text-[24px] font-bold text-text-primary mb-2">{t('im.title')}</h1>
-          <p className="text-[14px] text-text-tertiary mb-6 leading-[1.6]">
-            {t('im.subtitle')}
-            {t('im.localOnly')}
-          </p>
+      <div className="page-scroll">
+        <div className="page-container-workbench workspace-page-container">
+          <div className="page-hero">
+            <h1 className="page-title">{t('im.title')}</h1>
+            <p className="page-subtitle">
+              {t('im.subtitle')}
+              {t('im.localOnly')}
+            </p>
+          </div>
 
           {/* 权限提示信息条 */}
-          <div className="flex items-start gap-3 px-4 py-3 mb-6 bg-accent/5 border border-accent/15 rounded-[10px]">
+          <div className="flex flex-col gap-3 px-4 py-3 mb-6 bg-accent/5 border border-accent/15 rounded-[8px] sm:flex-row sm:items-start">
             <Info size={16} className="text-accent shrink-0 mt-0.5" />
             <p className="text-[13px] text-text-secondary leading-[1.6] flex-1">
               {t('im.fullDiskHint')}
             </p>
-            <button className="text-[13px] text-accent hover:underline shrink-0">
+            <button className="min-h-[32px] text-left text-[13px] text-accent hover:underline shrink-0 ui-focus">
               {t('im.goSettings')}
             </button>
           </div>
@@ -103,7 +102,7 @@ export function ImChannelsPage() {
               return (
                 <div
                   key={key}
-                  className="flex items-center gap-4 px-4 py-3.5 rounded-[14px] border border-border hover:border-text-tertiary/30 transition-colors"
+                  className="flex min-w-0 flex-col gap-3 px-4 py-3.5 rounded-[12px] border border-border hover:border-text-tertiary/30 transition-colors md:flex-row md:items-center md:gap-4"
                 >
                   {/* 平台图标 */}
                   <div className="w-10 h-10 shrink-0">{PLATFORM_ICONS[key]}</div>
@@ -111,7 +110,9 @@ export function ImChannelsPage() {
                   {/* 名称 + 描述 */}
                   <div className="flex-1 min-w-0">
                     <div className="text-[14px] font-medium text-text-primary">{t(nameKey)}</div>
-                    <div className="text-[12px] text-text-tertiary mt-0.5">{t(descKey)}</div>
+                    <div className="text-[12px] text-text-tertiary mt-0.5 leading-[1.55]">
+                      {t(descKey)}
+                    </div>
                   </div>
 
                   {/* 已连接徽标 */}
@@ -121,10 +122,11 @@ export function ImChannelsPage() {
                     </span>
                   )}
 
-                  {/* 配置按钮 */}
+                  {/* 配置按钮：卡片内的紧凑 CTA，与顶栏 topbar-btn 解耦；
+                      r8 方正形态与卡片内其他元素对齐，常驻灰底表达“固定入口”语义。 */}
                   <button
                     onClick={() => openConfig(key)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] text-text-secondary hover:text-text-primary bg-bg-hover hover:bg-bg-active rounded-[10px] transition-colors active:scale-[0.96] duration-[120ms]"
+                    className="h-8 inline-flex items-center gap-1.5 rounded-[8px] px-2.5 text-[12px] font-medium text-text-primary bg-[var(--color-workspace-state-active)] transition-colors duration-[var(--motion-fast)] hover:bg-[var(--color-workspace-state-hover)] ui-focus"
                   >
                     <Settings2 size={14} />
                     {connected ? t('im.configManage') : t('im.configure')}
@@ -133,19 +135,19 @@ export function ImChannelsPage() {
                   {/* Toggle 开关 */}
                   <button
                     onClick={() => handleToggle(key, !enabled)}
-                    className={`relative w-[36px] h-[20px] rounded-full transition-colors duration-200 ${
+                    className={`relative h-[32px] w-[44px] shrink-0 rounded-full transition-colors duration-200 ui-focus ${
                       enabled ? 'bg-accent' : 'bg-border'
                     }`}
                   >
                     <div
-                      className={`absolute top-[2px] w-[16px] h-[16px] rounded-full bg-white shadow transition-transform duration-200 ${
-                        enabled ? 'translate-x-[18px]' : 'translate-x-[2px]'
+                      className={`absolute top-[7px] w-[18px] h-[18px] rounded-full bg-white shadow transition-transform duration-200 ${
+                        enabled ? 'translate-x-[22px]' : 'translate-x-[4px]'
                       }`}
                     />
                   </button>
 
                   {/* 更多操作按钮 */}
-                  <button className="p-1.5 text-text-tertiary hover:text-text-secondary rounded-[8px] hover:bg-bg-hover transition-colors">
+                  <button className="min-h-[var(--size-control-min)] min-w-[var(--size-control-min)] p-1.5 text-text-tertiary hover:text-text-secondary rounded-[8px] hover:bg-bg-hover transition-colors ui-focus">
                     <MoreHorizontal size={16} />
                   </button>
                 </div>

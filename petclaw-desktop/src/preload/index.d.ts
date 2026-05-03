@@ -44,12 +44,28 @@ interface ElectronAPI {
   quitApp: () => void
   showPetContextMenu: (paused: boolean) => void
   onPetTogglePause: (callback: () => void) => () => void
+  // Chat (附件对话框)
+  chat: {
+    selectAttachments: (options?: {
+      defaultPath?: string
+      mode?: 'auto' | 'file' | 'directory'
+    }) => Promise<
+      Array<{
+        path: string
+        kind: 'file' | 'directory' | 'image'
+        mimeType?: string
+        base64Data?: string
+      }>
+    >
+  }
   // Cowork
   cowork: {
     startSession: (options: {
       prompt: string
       cwd?: string
       systemPrompt?: string
+      imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>
+      pathReferences?: Array<{ path: string; kind: 'file' | 'directory' }>
       skillIds?: string[]
       selectedModel?: { providerId: string; modelId: string }
     }) => Promise<unknown>
@@ -57,6 +73,8 @@ interface ElectronAPI {
       sessionId: string
       prompt: string
       systemPrompt?: string
+      imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>
+      pathReferences?: Array<{ path: string; kind: 'file' | 'directory' }>
       skillIds?: string[]
       selectedModel?: { providerId: string; modelId: string }
     }) => Promise<void>
@@ -111,6 +129,7 @@ interface ElectronAPI {
     updateName: (agentId: string, name: string) => Promise<void>
     updateModel: (agentId: string, model: string) => Promise<void>
     updateSkills: (agentId: string, skillIds: string[]) => Promise<void>
+    selectDirectory: (options?: { defaultPath?: string }) => Promise<string | null>
   }
   models: {
     providers: () => Promise<unknown>

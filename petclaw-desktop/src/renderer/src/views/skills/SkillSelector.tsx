@@ -79,7 +79,7 @@ export function SkillSelector({ selectedIds, onChange, onManage }: SkillSelector
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1 px-2 py-1.5 rounded-[10px] text-[12px] text-text-secondary hover:bg-bg-card hover:text-text-primary transition-all duration-[120ms]"
+        className="ui-icon-button gap-1 px-2 text-[12px] ui-focus"
         title={t('skills.selectTitle')}
       >
         <Wrench size={14} strokeWidth={1.75} />
@@ -126,7 +126,7 @@ export function SkillSelector({ selectedIds, onChange, onManage }: SkillSelector
 
       {/* 多选 Popover */}
       {open && (
-        <div className="absolute bottom-full left-0 mb-2 w-64 rounded-[14px] bg-bg-card border border-border shadow-[var(--shadow-dropdown)] z-50 overflow-hidden">
+        <div className="absolute bottom-full left-0 mb-2 w-64 rounded-[12px] bg-bg-card border border-border shadow-[var(--shadow-dropdown)] z-50 overflow-hidden">
           {/* 搜索框 */}
           <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border">
             <Search size={13} strokeWidth={1.75} className="text-text-tertiary shrink-0" />
@@ -141,7 +141,7 @@ export function SkillSelector({ selectedIds, onChange, onManage }: SkillSelector
           </div>
 
           {/* 技能列表 */}
-          <div className="max-h-56 overflow-y-auto">
+          <div className="ui-contained-scroll max-h-56 overflow-y-auto">
             {filtered.length === 0 ? (
               <div className="px-3 py-3 text-[12px] text-text-tertiary text-center">
                 {skills.length === 0 ? t('skills.noInstalled') : t('skills.noMatch')}
@@ -154,7 +154,7 @@ export function SkillSelector({ selectedIds, onChange, onManage }: SkillSelector
                     key={skill.id}
                     type="button"
                     onClick={() => toggle(skill.id)}
-                    className={`w-full flex items-start gap-2.5 px-3 py-2 text-left hover:bg-bg-input transition-colors duration-[120ms] ${checked ? 'bg-accent/5' : ''}`}
+                    className={`flex w-full items-start gap-2.5 px-3 py-2 text-left transition-colors duration-[120ms] hover:bg-bg-hover ${checked ? 'bg-bg-active' : ''}`}
                   >
                     {/* Checkbox */}
                     <span
@@ -196,7 +196,7 @@ export function SkillSelector({ selectedIds, onChange, onManage }: SkillSelector
                 setOpen(false)
                 onManage?.()
               }}
-              className="w-full flex items-center gap-2 px-3 py-2.5 text-[12px] text-text-tertiary hover:text-text-secondary hover:bg-bg-input transition-all duration-[120ms] text-left"
+              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-[12px] text-text-tertiary transition-colors duration-[120ms] hover:bg-bg-hover hover:text-text-secondary"
             >
               <Settings size={13} strokeWidth={1.75} />
               <span>{t('skills.manage')}</span>

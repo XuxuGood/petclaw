@@ -156,13 +156,13 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
       <button
         type="button"
         onClick={() => setOpen((next) => !next)}
-        className="flex max-w-[170px] items-center gap-1.5 rounded-[10px] px-2 py-1.5 text-[12px] text-text-secondary transition-all duration-[120ms] hover:bg-bg-card hover:text-text-primary active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+        className="ui-icon-button max-w-[170px] gap-1.5 px-2.5 text-[12px] font-semibold text-text-secondary ui-focus"
         title={displayName}
         aria-label={displayName}
         aria-expanded={open}
       >
         {currentOption?.model.reasoning ? (
-          <Brain size={13} strokeWidth={1.75} className="shrink-0 text-accent" />
+          <Brain size={13} strokeWidth={1.75} className="shrink-0 text-brand" />
         ) : (
           <Zap size={13} strokeWidth={1.75} className="shrink-0 text-text-secondary" />
         )}
@@ -171,24 +171,23 @@ export function ModelSelector({ value, onChange }: ModelSelectorProps) {
       </button>
 
       {open && (
-        <div className="absolute bottom-full left-0 z-50 mb-2 w-72 overflow-hidden rounded-[14px] border border-border bg-bg-card shadow-[var(--shadow-dropdown)]">
+        <div className="ui-popover absolute bottom-full right-0 mb-2 w-56" style={{ padding: 0 }}>
           {loading ? (
-            <div className="px-3 py-3 text-center text-[12px] text-text-tertiary">
-              {t('common.loading')}
+            // 空态/加载态统一走 .ui-popover-empty token，和 CwdSelector、ChatInputBox 空态视觉一致
+            <div className="ui-popover-empty">
+              <div className="ui-popover-empty-title">{t('common.loading')}</div>
             </div>
           ) : groupedOptions.length === 0 ? (
-            <div className="px-3 py-3 text-center text-[12px] text-text-tertiary">
-              {t('modelSelector.noModels')}
+            <div className="ui-popover-empty">
+              <div className="ui-popover-empty-title">{t('modelSelector.noModels')}</div>
             </div>
           ) : (
-            <div className="max-h-72 overflow-y-auto py-1">
+            <div className="ui-contained-scroll max-h-56 overflow-y-auto p-1.5">
               {groupedOptions.map((group, index) => (
-                <div
-                  key={group.provider.id}
-                  className={index === 0 ? '' : 'mt-1 border-t border-border pt-1'}
-                >
-                  <div className="flex items-center gap-1.5 px-3 pb-1 pt-2 text-[10px] font-semibold uppercase text-text-tertiary">
-                    <Server size={10} strokeWidth={2} />
+                <div key={group.provider.id}>
+                  {index > 0 && <div className="ui-popover-divider" />}
+                  <div className="ui-popover-title">
+                    <Server size={10} strokeWidth={2} className="shrink-0" />
                     <span className="truncate">{group.provider.name}</span>
                   </div>
                   {group.options.map((option) => (
@@ -225,17 +224,15 @@ function ModelOption({ option, selected, onSelect }: ModelOptionProps) {
     <button
       type="button"
       onClick={onSelect}
-      className={`flex min-h-11 w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] transition-colors duration-[120ms] hover:bg-bg-input active:scale-[0.96] ${
-        selected ? 'text-accent' : 'text-text-primary'
-      }`}
+      className={`ui-popover-row ${selected ? 'ui-popover-row-active' : ''}`}
     >
       {option.model.reasoning ? (
-        <Brain size={13} strokeWidth={1.75} className="shrink-0 text-accent" />
+        <Brain size={13} strokeWidth={1.75} className="shrink-0 text-brand" />
       ) : (
         <Zap size={13} strokeWidth={1.75} className="shrink-0 text-text-secondary" />
       )}
       <span className="flex-1 truncate">{option.model.name}</span>
-      {selected && <Check size={13} strokeWidth={2.5} className="shrink-0 text-accent" />}
+      {selected && <Check size={13} strokeWidth={2.5} className="shrink-0 text-brand" />}
     </button>
   )
 }

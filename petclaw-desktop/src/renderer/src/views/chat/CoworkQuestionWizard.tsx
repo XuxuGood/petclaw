@@ -235,8 +235,8 @@ export function CoworkQuestionWizard({ permission, onRespond }: CoworkQuestionWi
   })
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay">
-      <div className="bg-bg-root rounded-[14px] shadow-lg w-[560px] max-h-[80vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-6">
+      <div className="bg-bg-root rounded-[12px] shadow-lg w-[min(560px,calc(100vw-48px))] max-h-[calc(100vh-48px)] flex flex-col overflow-hidden">
         {/* 顶部进度条 */}
         <div className="h-1 bg-bg-hover">
           <div
@@ -251,7 +251,7 @@ export function CoworkQuestionWizard({ permission, onRespond }: CoworkQuestionWi
           <div className="flex-1" />
           <button
             onClick={handleDeny}
-            className="p-1 rounded-[10px] hover:bg-bg-active transition-colors"
+            className="min-h-[var(--size-control-min)] min-w-[var(--size-control-min)] rounded-[8px] hover:bg-bg-active transition-colors ui-focus"
             aria-label="Close"
           >
             <X size={16} className="text-text-tertiary" />
@@ -259,13 +259,13 @@ export function CoworkQuestionWizard({ permission, onRespond }: CoworkQuestionWi
         </div>
 
         {/* 内容区 */}
-        <div className="px-5 py-5 min-h-[280px] flex flex-col overflow-y-auto">
+        <div className="ui-contained-scroll px-5 py-5 min-h-[280px] flex flex-col overflow-y-auto">
           <div className="flex-1">
             {/* 问题头部和步骤导航 */}
-            <div className="flex items-start justify-between gap-4 mb-4">
-              <div className="flex-1">
+            <div className="flex flex-col gap-4 mb-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 flex-1">
                 {currentQuestion.header && (
-                  <span className="inline-block text-[11px] uppercase tracking-wide px-2 py-0.5 rounded-[10px] bg-bg-hover text-text-tertiary mb-2">
+                  <span className="inline-block text-[11px] uppercase tracking-wide px-2 py-0.5 rounded-[8px] bg-bg-hover text-text-tertiary mb-2">
                     {currentQuestion.header}
                   </span>
                 )}
@@ -275,11 +275,11 @@ export function CoworkQuestionWizard({ permission, onRespond }: CoworkQuestionWi
               </div>
 
               {/* 步骤圆点导航 */}
-              <div className="flex items-center gap-1.5 flex-shrink-0">
+              <div className="flex flex-wrap items-center gap-1.5 flex-shrink-0">
                 {!isFirstStep && (
                   <button
                     onClick={handlePrevious}
-                    className="p-1 rounded-[10px] text-text-primary hover:bg-bg-hover transition-colors active:scale-[0.96] duration-[120ms]"
+                    className="min-h-[var(--size-control-min)] min-w-[var(--size-control-min)] rounded-[8px] text-text-primary hover:bg-bg-hover transition-colors active:scale-[0.96] duration-[120ms] ui-focus"
                     title={t('wizard.previous')}
                   >
                     <ChevronLeft size={18} />
@@ -296,7 +296,7 @@ export function CoworkQuestionWizard({ permission, onRespond }: CoworkQuestionWi
                       key={index}
                       type="button"
                       onClick={() => setCurrentStep(index)}
-                      className={`relative flex items-center justify-center w-7 h-7 rounded-full text-[11px] font-medium transition-all active:scale-[0.96] duration-[120ms] ${
+                      className={`relative flex items-center justify-center w-7 h-7 rounded-[8px] text-[11px] font-medium transition-all active:scale-[0.96] duration-[120ms] ui-focus ${
                         isActive
                           ? 'bg-accent text-white shadow-sm'
                           : isAnswered
@@ -313,7 +313,7 @@ export function CoworkQuestionWizard({ permission, onRespond }: CoworkQuestionWi
                 {!isLastStep && (
                   <button
                     onClick={handleNext}
-                    className="p-1 rounded-[10px] text-text-primary hover:bg-bg-hover transition-colors active:scale-[0.96] duration-[120ms]"
+                    className="min-h-[var(--size-control-min)] min-w-[var(--size-control-min)] rounded-[8px] text-text-primary hover:bg-bg-hover transition-colors active:scale-[0.96] duration-[120ms] ui-focus"
                     title={t('wizard.next')}
                   >
                     <ChevronRight size={18} />
@@ -331,7 +331,7 @@ export function CoworkQuestionWizard({ permission, onRespond }: CoworkQuestionWi
                     key={option.label}
                     type="button"
                     onClick={() => handleSelectOption(currentQuestion, option.label)}
-                    className={`w-full text-left px-3 py-2.5 rounded-[10px] text-[13px] transition-colors duration-[120ms] flex items-start gap-3 ${
+                    className={`w-full text-left px-3 py-2.5 rounded-[8px] text-[13px] transition-colors duration-[120ms] flex items-start gap-3 active:scale-[0.96] ui-focus ${
                       isSelected
                         ? 'bg-accent/10 text-accent border border-accent/30'
                         : 'bg-bg-hover text-text-secondary hover:bg-bg-active border border-transparent'
@@ -340,7 +340,7 @@ export function CoworkQuestionWizard({ permission, onRespond }: CoworkQuestionWi
                     {/* radio/checkbox 指示器 */}
                     {currentQuestion.multiSelect ? (
                       <span
-                        className={`w-4 h-4 rounded-[3px] border-2 flex items-center justify-center mt-0.5 flex-shrink-0 transition-colors ${
+                        className={`w-4 h-4 rounded-[8px] border-2 flex items-center justify-center mt-0.5 flex-shrink-0 transition-colors ${
                           isSelected ? 'border-accent bg-accent' : 'border-text-tertiary'
                         }`}
                       >
@@ -379,18 +379,18 @@ export function CoworkQuestionWizard({ permission, onRespond }: CoworkQuestionWi
             </div>
 
             {/* "其他"输入 + 跳过按钮 */}
-            <div className="mt-4 flex items-center gap-3">
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
               <input
                 type="text"
                 value={otherInputs[currentStep] || ''}
                 onChange={(e) => handleOtherInputChange(e.target.value)}
                 placeholder={t('wizard.other')}
-                className="flex-1 px-3 py-2 rounded-[10px] border border-border-input bg-bg-input text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent/30 text-[13px]"
+                className="min-w-0 flex-1 px-3 py-2 rounded-[8px] border border-border-input bg-bg-input text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent/30 text-[13px]"
               />
               <button
                 type="button"
                 onClick={handleSkip}
-                className="px-4 py-2 text-[13px] font-medium rounded-[10px] text-text-secondary hover:bg-bg-hover transition-colors active:scale-[0.96] duration-[120ms] whitespace-nowrap"
+                className="min-h-[var(--size-control-min)] px-4 py-2 text-[13px] font-medium rounded-[8px] text-text-secondary hover:bg-bg-hover transition-colors active:scale-[0.96] duration-[120ms] whitespace-nowrap ui-focus"
               >
                 {t('wizard.skip')}
               </button>
@@ -399,11 +399,11 @@ export function CoworkQuestionWizard({ permission, onRespond }: CoworkQuestionWi
         </div>
 
         {/* 底部操作栏 */}
-        <div className="flex items-center justify-end px-5 py-4 border-t border-border">
+        <div className="flex flex-wrap items-center justify-end px-5 py-4 border-t border-border">
           <button
             onClick={handleSubmit}
             disabled={!allAnswered}
-            className="px-5 py-2 text-[13px] font-medium rounded-[10px] bg-accent text-white hover:bg-accent-hover transition-colors active:scale-[0.96] duration-[120ms] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="min-h-[var(--size-control-min)] px-5 py-2 text-[13px] font-medium rounded-[8px] bg-accent text-white hover:bg-accent-hover transition-colors active:scale-[0.96] duration-[120ms] disabled:opacity-50 disabled:cursor-not-allowed ui-focus"
             title={!allAnswered ? t('wizard.answerRequired') : undefined}
           >
             {t('wizard.submit')}

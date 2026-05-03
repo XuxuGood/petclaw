@@ -250,7 +250,7 @@ Tailwind / CSS：
 
 - 样式写在 `className`，不抽自定义 CSS 类。
 - 使用 `index.css` token，禁止硬编码 hex。
-- 圆角只用 `rounded-[10px]` / `rounded-[14px]`。
+- 圆角默认用 `rounded-[8px]`，大卡片/弹窗用 `rounded-[12px]`；小图标、checkbox、气泡尾角和 pill 可使用更小圆角或 `rounded-full`。
 - 交互统一 `active:scale-[0.96]` + `duration-[120ms]`。
 
 文件命名：
@@ -336,7 +336,67 @@ Git 提交：
 ## 11. 参考文档
 
 - 总体架构：`docs/架构设计/PetClaw总体架构设计.md`
+- AI 代码上下文工程设计：`docs/架构设计/AI代码上下文工程设计.md`
 - 阶段性设计：`docs/superpowers/specs/`
 - 实施计划：`docs/superpowers/plans/`
 - Gateway 协议：`docs/openclaw-gateway-api.md`
 - UI 设计稿：`docs/设计/`
+
+## 12. AI 代码上下文执行规则
+
+完整设计见 `docs/架构设计/AI代码上下文工程设计.md`。
+
+- 接到代码改动任务后，先从用户需求、已提到的文件、symbol、模块名和错误信息中自动推断 `target`。
+- 写文件前必须主动运行 `pnpm ai:prepare-change -- --target <target>` 获取代码图谱、调用链、影响面和符号上下文；不要要求用户手动运行。
+- 只有无法可靠推断 `target`，或 `prepare-change` 输出表明工具链不可用且无法降级时，才向用户提一个明确问题。
+- 不把 `npx gitnexus analyze` 当作默认入口；需要手动刷新索引时使用 `pnpm ai:index`，工具链异常时使用 `pnpm ai:tools:check`。
+- 首次接入或 MCP 客户端配置问题使用 `pnpm ai:setup -- --client <client>`；只看说明用 `pnpm ai:mcp:guide -- --client <client>`；真正写客户端配置才用 `pnpm ai:mcp:install -- --client <client>`。
+- 不在脏工作区默认运行 `gitnexus.detect_changes({ scope: "all" })`；提交前使用 `pnpm ai:impact` 或 `scope: "staged"`，任务内排查只针对本次目标文件/符号。
+- GitNexus `.gitnexus/lbug` 锁、`~/.gitnexus/registry.json` 权限、沙箱 `EPERM/EACCES` 属于工具链环境异常；AI 必须降级为 MCP 可用能力和本地 `rg` 使用面扫描，不得误判为业务代码风险或遗留给用户处理。
+- 核心模块改动前必须完成 impact analysis，尤其是 ConfigSync、Cowork、IPC、preload、SQLite、i18n、Openclaw runtime 链路。
+- 涉及 IPC、ConfigSync、SQLite、i18n、preload 的改动必须追踪完整链路，不能只做字符串搜索。
+- 提交或交付前确认 Husky/GitNexus 变更影响分析、对应 typecheck / test 和必要文档同步均已处理；如果验证因环境限制无法运行，必须说明原因。
+
+<!-- gitnexus:start -->
+# GitNexus — Code Intelligence
+
+This project is indexed by GitNexus as **petclaw** (6188 symbols, 10737 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+
+> If any GitNexus tool warns the index is stale, use the project wrapper `pnpm ai:index` instead of calling `npx gitnexus analyze` directly.
+
+## Always Do
+
+- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
+- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.
+- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
+- When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
+- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
+
+## Never Do
+
+- NEVER edit a function, class, or method without first running `gitnexus_impact` on it.
+- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
+- NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.
+- NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.
+
+## Resources
+
+| Resource | Use for |
+|----------|---------|
+| `gitnexus://repo/petclaw/context` | Codebase overview, check index freshness |
+| `gitnexus://repo/petclaw/clusters` | All functional areas |
+| `gitnexus://repo/petclaw/processes` | All execution flows |
+| `gitnexus://repo/petclaw/process/{name}` | Step-by-step execution trace |
+
+## CLI
+
+| Task | Read this skill file |
+|------|---------------------|
+| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
+| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
+| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
+| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
+| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
+| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
+
+<!-- gitnexus:end -->

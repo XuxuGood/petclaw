@@ -1,0 +1,2 @@
+# rebase / amend 会改写提交历史和 diff 基线，自动检查 GitNexus 索引，保证后续 AI 影响分析基于新状态。
+node scripts/ai/gitnexus-refresh.cjs --reason post-rewrite

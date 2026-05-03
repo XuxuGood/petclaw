@@ -75,8 +75,8 @@ export function DirectoryConfigDialog({
   ]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay">
-      <div className="bg-bg-root rounded-[14px] shadow-lg w-[560px] max-h-[80vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-6">
+      <div className="bg-bg-root rounded-[12px] shadow-lg w-[min(560px,calc(100vw-48px))] max-h-[calc(100vh-48px)] flex flex-col overflow-hidden">
         {/* 标题栏：目录名称 + 路径 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex-1 min-w-0">
@@ -87,14 +87,15 @@ export function DirectoryConfigDialog({
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-[8px] hover:bg-bg-hover transition-colors ml-2"
+            className="min-h-[var(--size-control-min)] min-w-[var(--size-control-min)] rounded-[8px] hover:bg-bg-hover transition-colors ml-2 ui-focus"
           >
-            <X size={16} className="text-text-tertiary" />
+            {/* 关闭按钮是可操作图标，使用 secondary 保证 ≥3:1 图标对比度并与可交互语义一致。 */}
+            <X size={16} className="text-text-secondary" />
           </button>
         </div>
 
         {/* Tab 栏：纯文字，激活项底部蓝线 */}
-        <div className="flex gap-4 px-5 pt-3 border-b border-border">
+        <div className="flex flex-wrap gap-4 px-5 pt-3 border-b border-border">
           {TABS.map(({ id, label }) => (
             <button
               key={id}
@@ -111,7 +112,7 @@ export function DirectoryConfigDialog({
         </div>
 
         {/* 内容区域，可滚动 */}
-        <div className="flex-1 overflow-y-auto px-5 py-4">
+        <div className="ui-contained-scroll flex-1 overflow-y-auto px-5 py-4">
           {activeTab === 'basic' && (
             <div className="space-y-4">
               <Field label={t('dirConfig.alias')}>
@@ -120,7 +121,7 @@ export function DirectoryConfigDialog({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder={directoryPath.split('/').pop() || ''}
-                  className="w-full px-3 py-2 text-[13px] rounded-[10px] bg-bg-hover border border-border text-text-primary focus:outline-none focus:ring-1 focus:ring-accent/40"
+                  className="w-full px-3 py-2 text-[13px] rounded-[8px] bg-bg-hover border border-border text-text-primary focus:outline-none focus:ring-1 focus:ring-accent/40"
                 />
                 <p className="text-[11px] text-text-tertiary mt-1">{t('dirConfig.aliasHint')}</p>
               </Field>
@@ -130,7 +131,7 @@ export function DirectoryConfigDialog({
                   value={modelOverride}
                   onChange={(e) => setModelOverride(e.target.value)}
                   placeholder={t('dirConfig.modelOverridePlaceholder')}
-                  className="w-full px-3 py-2 text-[13px] rounded-[10px] bg-bg-hover border border-border text-text-primary focus:outline-none focus:ring-1 focus:ring-accent/40"
+                  className="w-full px-3 py-2 text-[13px] rounded-[8px] bg-bg-hover border border-border text-text-primary focus:outline-none focus:ring-1 focus:ring-accent/40"
                 />
                 <p className="text-[11px] text-text-tertiary mt-1">
                   {t('dirConfig.modelOverrideHint')}
@@ -145,17 +146,17 @@ export function DirectoryConfigDialog({
         </div>
 
         {/* 底部按钮 */}
-        <div className="flex items-center justify-end px-5 py-4 border-t border-border">
+        <div className="flex flex-wrap items-center justify-end gap-2 px-5 py-4 border-t border-border">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-[13px] rounded-[10px] text-text-secondary hover:bg-bg-hover transition-colors active:scale-[0.96] duration-[120ms] mr-2"
+            className="min-h-[var(--size-control-min)] px-4 py-2 text-[13px] rounded-[8px] text-text-secondary hover:bg-bg-hover transition-colors active:scale-[0.96] duration-[120ms] ui-focus"
           >
             {t('common.cancel')}
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-2 text-[13px] rounded-[10px] bg-accent text-white hover:bg-accent-hover transition-colors active:scale-[0.96] duration-[120ms] disabled:opacity-50"
+            className="min-h-[var(--size-control-min)] px-4 py-2 text-[13px] rounded-[8px] bg-accent text-white hover:bg-accent-hover transition-colors active:scale-[0.96] duration-[120ms] disabled:opacity-50 ui-focus"
           >
             {saving ? t('common.saving') : t('common.save')}
           </button>

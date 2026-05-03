@@ -59,7 +59,7 @@ export function WelcomePage({ onSendPrompt }: WelcomePageProps) {
             <button
               key={card.title}
               onClick={() => onSendPrompt(card.prompt)}
-              className="flex-1 flex flex-col items-start p-4 rounded-[14px] bg-bg-card border border-border shadow-[var(--shadow-card)] hover:border-text-tertiary hover:shadow-[var(--shadow-dropdown)] active:scale-[0.96] transition-all duration-[120ms] text-left"
+              className="ui-card-action flex flex-1 flex-col items-start p-4 text-left"
             >
               <Icon size={20} className="text-text-secondary mb-3" strokeWidth={1.75} />
               <span className="text-[14px] font-medium text-text-primary mb-1">{card.title}</span>

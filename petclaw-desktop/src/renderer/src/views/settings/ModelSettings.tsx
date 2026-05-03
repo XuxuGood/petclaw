@@ -35,9 +35,14 @@ type TestStatus = 'idle' | 'testing' | 'ok' | 'fail'
 function ProviderLogo({ provider }: { provider: ModelProviderConfig }) {
   const abbr = getProviderAbbreviation(provider.id, provider.name)
   const color = getProviderColor(provider.id)
+  const textSize = abbr.length > 2 ? 'text-[9px]' : 'text-[10px]'
   return (
-    <div className={`w-8 h-8 rounded-[8px] ${color} flex items-center justify-center shrink-0`}>
-      <span className="text-[10px] font-bold text-white leading-none">{abbr}</span>
+    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] ${color}`}>
+      <span
+        className={`${textSize} max-w-full whitespace-nowrap px-0.5 text-center font-bold leading-none tracking-normal text-white`}
+      >
+        {abbr}
+      </span>
     </div>
   )
 }
@@ -88,8 +93,8 @@ function AddModelDialog({ onConfirm, onCancel }: AddModelDialogProps) {
 
   return (
     // 遮罩层
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay">
-      <div className="w-[420px] rounded-[14px] bg-bg-card border border-border shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-6">
+      <div className="w-[min(420px,calc(100vw-48px))] max-h-[calc(100vh-48px)] rounded-[12px] bg-bg-card border border-border shadow-2xl flex flex-col overflow-hidden">
         {/* 标题 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <span className="text-[14px] font-semibold text-text-primary">
@@ -97,13 +102,13 @@ function AddModelDialog({ onConfirm, onCancel }: AddModelDialogProps) {
           </span>
           <button
             onClick={onCancel}
-            className="text-text-tertiary hover:text-text-primary transition-colors duration-[120ms]"
+            className="min-h-[var(--size-control-min)] min-w-[var(--size-control-min)] rounded-[8px] text-text-tertiary hover:text-text-primary hover:bg-bg-hover transition-colors duration-[120ms] ui-focus"
           >
             <X size={16} />
           </button>
         </div>
 
-        <div className="px-5 py-4 space-y-3">
+        <div className="ui-contained-scroll px-5 py-4 space-y-3 overflow-y-auto">
           {/* 模型 ID */}
           <div>
             <label className="block text-[12px] text-text-tertiary mb-1.5 font-medium">
@@ -114,7 +119,7 @@ function AddModelDialog({ onConfirm, onCancel }: AddModelDialogProps) {
               value={id}
               onChange={(e) => setId(e.target.value)}
               placeholder="例如：gpt-4o"
-              className="w-full px-3 py-2 rounded-[10px] bg-bg-input border border-border-input text-[13px] text-text-primary outline-none focus:border-accent transition-all duration-[120ms]"
+              className="w-full px-3 py-2 rounded-[8px] bg-bg-input border border-border-input text-[13px] text-text-primary outline-none focus:border-accent transition-all duration-[120ms]"
             />
           </div>
 
@@ -128,12 +133,12 @@ function AddModelDialog({ onConfirm, onCancel }: AddModelDialogProps) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="例如：GPT-4o"
-              className="w-full px-3 py-2 rounded-[10px] bg-bg-input border border-border-input text-[13px] text-text-primary outline-none focus:border-accent transition-all duration-[120ms]"
+              className="w-full px-3 py-2 rounded-[8px] bg-bg-input border border-border-input text-[13px] text-text-primary outline-none focus:border-accent transition-all duration-[120ms]"
             />
           </div>
 
           {/* 上下文 + 最大 Token */}
-          <div className="flex gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row">
             <div className="flex-1">
               <label className="block text-[12px] text-text-tertiary mb-1.5 font-medium">
                 {t('modelSettings.contextWindow')}
@@ -142,7 +147,7 @@ function AddModelDialog({ onConfirm, onCancel }: AddModelDialogProps) {
                 type="number"
                 value={contextWindow}
                 onChange={(e) => setContextWindow(e.target.value)}
-                className="w-full px-3 py-2 rounded-[10px] bg-bg-input border border-border-input text-[13px] text-text-primary outline-none focus:border-accent transition-all duration-[120ms]"
+                className="w-full px-3 py-2 rounded-[8px] bg-bg-input border border-border-input text-[13px] text-text-primary outline-none focus:border-accent transition-all duration-[120ms]"
               />
             </div>
             <div className="flex-1">
@@ -153,7 +158,7 @@ function AddModelDialog({ onConfirm, onCancel }: AddModelDialogProps) {
                 type="number"
                 value={maxTokens}
                 onChange={(e) => setMaxTokens(e.target.value)}
-                className="w-full px-3 py-2 rounded-[10px] bg-bg-input border border-border-input text-[13px] text-text-primary outline-none focus:border-accent transition-all duration-[120ms]"
+                className="w-full px-3 py-2 rounded-[8px] bg-bg-input border border-border-input text-[13px] text-text-primary outline-none focus:border-accent transition-all duration-[120ms]"
               />
             </div>
           </div>
@@ -186,17 +191,17 @@ function AddModelDialog({ onConfirm, onCancel }: AddModelDialogProps) {
         </div>
 
         {/* 操作按钮 */}
-        <div className="flex justify-end gap-2 px-5 py-4 border-t border-border">
+        <div className="flex flex-wrap justify-end gap-2 px-5 py-4 border-t border-border">
           <button
             onClick={onCancel}
-            className="px-4 py-1.5 rounded-[10px] text-[13px] text-text-secondary hover:bg-bg-hover transition-all duration-[120ms] active:scale-[0.96]"
+            className="min-h-[var(--size-control-min)] px-4 py-1.5 rounded-[8px] text-[13px] text-text-secondary hover:bg-bg-hover transition-all duration-[120ms] active:scale-[0.96] ui-focus"
           >
             {t('common.cancel')}
           </button>
           <button
             onClick={handleSubmit}
             disabled={!id.trim() || !name.trim()}
-            className="px-4 py-1.5 rounded-[10px] text-[13px] bg-accent text-white font-medium hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-[120ms] active:scale-[0.96]"
+            className="min-h-[var(--size-control-min)] px-4 py-1.5 rounded-[8px] text-[13px] bg-accent text-white font-medium hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-[120ms] active:scale-[0.96] ui-focus"
           >
             {t('common.add')}
           </button>
@@ -231,21 +236,21 @@ function AddProviderDialog({ onConfirm, onCancel }: AddProviderDialogProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay">
-      <div className="w-[420px] rounded-[14px] bg-bg-card border border-border shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-6">
+      <div className="w-[min(420px,calc(100vw-48px))] max-h-[calc(100vh-48px)] rounded-[12px] bg-bg-card border border-border shadow-2xl flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <span className="text-[14px] font-semibold text-text-primary">
             {t('modelSettings.addProvider')}
           </span>
           <button
             onClick={onCancel}
-            className="text-text-tertiary hover:text-text-primary transition-colors duration-[120ms]"
+            className="min-h-[var(--size-control-min)] min-w-[var(--size-control-min)] rounded-[8px] text-text-tertiary hover:text-text-primary hover:bg-bg-hover transition-colors duration-[120ms] ui-focus"
           >
             <X size={16} />
           </button>
         </div>
 
-        <div className="px-5 py-4 space-y-3">
+        <div className="ui-contained-scroll px-5 py-4 space-y-3 overflow-y-auto">
           <div>
             <label className="block text-[12px] text-text-tertiary mb-1.5 font-medium">
               {t('modelSettings.displayName')} <span className="text-error">*</span>
@@ -255,7 +260,7 @@ function AddProviderDialog({ onConfirm, onCancel }: AddProviderDialogProps) {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="例如：My OpenAI Proxy"
-              className="w-full px-3 py-2 rounded-[10px] bg-bg-input border border-border-input text-[13px] text-text-primary outline-none focus:border-accent transition-all duration-[120ms]"
+              className="w-full px-3 py-2 rounded-[8px] bg-bg-input border border-border-input text-[13px] text-text-primary outline-none focus:border-accent transition-all duration-[120ms]"
             />
           </div>
 
@@ -268,7 +273,7 @@ function AddProviderDialog({ onConfirm, onCancel }: AddProviderDialogProps) {
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
               placeholder="https://api.example.com/v1"
-              className="w-full px-3 py-2 rounded-[10px] bg-bg-input border border-border-input text-[13px] text-text-primary outline-none focus:border-accent transition-all duration-[120ms]"
+              className="w-full px-3 py-2 rounded-[8px] bg-bg-input border border-border-input text-[13px] text-text-primary outline-none focus:border-accent transition-all duration-[120ms]"
             />
           </div>
 
@@ -276,7 +281,7 @@ function AddProviderDialog({ onConfirm, onCancel }: AddProviderDialogProps) {
             <label className="block text-[12px] text-text-tertiary mb-1.5 font-medium">
               {t('modelSettings.apiFormat')}
             </label>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
               {(['openai-completions', 'anthropic'] as const).map((fmt) => (
                 <label key={fmt} className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -296,17 +301,17 @@ function AddProviderDialog({ onConfirm, onCancel }: AddProviderDialogProps) {
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 px-5 py-4 border-t border-border">
+        <div className="flex flex-wrap justify-end gap-2 px-5 py-4 border-t border-border">
           <button
             onClick={onCancel}
-            className="px-4 py-1.5 rounded-[10px] text-[13px] text-text-secondary hover:bg-bg-hover transition-all duration-[120ms] active:scale-[0.96]"
+            className="min-h-[var(--size-control-min)] px-4 py-1.5 rounded-[8px] text-[13px] text-text-secondary hover:bg-bg-hover transition-all duration-[120ms] active:scale-[0.96] ui-focus"
           >
             {t('common.cancel')}
           </button>
           <button
             onClick={handleSubmit}
             disabled={!name.trim() || !baseUrl.trim()}
-            className="px-4 py-1.5 rounded-[10px] text-[13px] bg-accent text-white font-medium hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-[120ms] active:scale-[0.96]"
+            className="min-h-[var(--size-control-min)] px-4 py-1.5 rounded-[8px] text-[13px] bg-accent text-white font-medium hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-[120ms] active:scale-[0.96] ui-focus"
           >
             {t('common.add')}
           </button>
@@ -391,11 +396,13 @@ function ProviderPanel({
   return (
     <div className="flex-1 min-w-0 flex flex-col gap-4">
       {/* Provider 名称 + 启用开关行 */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-center justify-between">
+        <div className="flex min-w-0 items-center gap-3">
           <ProviderLogo provider={provider} />
-          <div>
-            <h2 className="text-[16px] font-semibold text-text-primary">{provider.name}</h2>
+          <div className="min-w-0">
+            <h2 className="truncate text-[16px] font-semibold text-text-primary">
+              {provider.name}
+            </h2>
             <p className="text-[12px] text-text-tertiary">
               {!provider.isCustom
                 ? t('modelSettings.presetProvider')
@@ -406,12 +413,12 @@ function ProviderPanel({
       </div>
 
       {/* 配置卡片 */}
-      <div className="rounded-[14px] bg-bg-card border border-border overflow-hidden">
+      <div className="ui-card overflow-hidden">
         {/* API Key */}
         <div className="px-5 py-4 border-b border-border">
           <label className="block text-[12px] text-text-tertiary mb-2 font-medium">API Key</label>
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="relative min-w-0 flex-1">
               <input
                 type={showApiKey ? 'text' : 'password'}
                 value={apiKeyDraft}
@@ -425,12 +432,12 @@ function ProviderPanel({
                     ? t('modelSettings.apiKeyConfigured')
                     : t('modelSettings.apiKeyPlaceholder')
                 }
-                className="w-full px-3 py-2 pr-9 rounded-[10px] bg-bg-input border border-border-input text-[13px] text-text-primary outline-none focus:border-accent transition-all duration-[120ms] font-mono"
+                className="w-full px-3 py-2 pr-9 rounded-[8px] bg-bg-input border border-border-input text-[13px] text-text-primary outline-none focus:border-accent transition-all duration-[120ms] font-mono"
               />
               {/* 显示/隐藏 API Key 切换按钮 */}
               <button
                 onClick={() => setShowApiKey((v) => !v)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary transition-colors duration-[120ms]"
+                className="absolute right-1.5 top-1/2 min-h-[var(--size-control-min)] min-w-[var(--size-control-min)] -translate-y-1/2 rounded-[8px] text-text-tertiary hover:text-text-primary transition-colors duration-[120ms] ui-focus"
               >
                 {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
               </button>
@@ -443,7 +450,7 @@ function ProviderPanel({
                   setApiKeyDraft('')
                   setApiKeyDirty(false)
                 }}
-                className="px-3 py-2 rounded-[10px] text-[12px] text-text-secondary hover:bg-bg-hover hover:text-error transition-all duration-[120ms] active:scale-[0.96]"
+                className="min-h-[var(--size-control-min)] shrink-0 px-3 py-2 rounded-[8px] text-[12px] text-text-secondary hover:bg-bg-hover hover:text-error transition-all duration-[120ms] active:scale-[0.96] ui-focus"
               >
                 {t('modelSettings.clearApiKey')}
               </button>
@@ -459,7 +466,7 @@ function ProviderPanel({
             value={baseUrlDraft}
             onChange={(e) => setBaseUrlDraft(e.target.value)}
             onBlur={handleBaseUrlBlur}
-            className="w-full px-3 py-2 rounded-[10px] bg-bg-input border border-border-input text-[13px] text-text-primary outline-none focus:border-accent transition-all duration-[120ms] font-mono"
+            className="w-full px-3 py-2 rounded-[8px] bg-bg-input border border-border-input text-[13px] text-text-primary outline-none focus:border-accent transition-all duration-[120ms] font-mono"
           />
         </div>
 
@@ -468,7 +475,7 @@ function ProviderPanel({
           <label className="block text-[12px] text-text-tertiary mb-2 font-medium">
             {t('modelSettings.apiFormat')}
           </label>
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-x-4 gap-y-2">
             {(['openai-completions', 'anthropic', 'google-generative-ai'] as const).map((fmt) => (
               <label key={fmt} className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -493,11 +500,11 @@ function ProviderPanel({
 
         {/* 测试连接 */}
         <div className="px-5 py-4">
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={onTest}
               disabled={testStatus === 'testing'}
-              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-[10px] text-[13px] bg-accent text-white font-medium hover:bg-accent-hover disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-[120ms] active:scale-[0.96]"
+              className="inline-flex min-h-[var(--size-control-min)] items-center gap-1.5 px-4 py-1.5 rounded-[8px] text-[13px] bg-accent text-white font-medium hover:bg-accent-hover disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-[120ms] active:scale-[0.96] ui-focus"
             >
               {testStatus === 'testing' ? (
                 <>
@@ -517,9 +524,11 @@ function ProviderPanel({
               </div>
             )}
             {testStatus === 'fail' && (
-              <div className="flex items-center gap-1.5 text-error">
+              <div className="flex min-w-0 items-center gap-1.5 text-error">
                 <XCircle size={14} />
-                <span className="text-[13px]">{testError || t('modelSettings.connectFailed')}</span>
+                <span className="min-w-0 break-words text-[13px]">
+                  {testError || t('modelSettings.connectFailed')}
+                </span>
               </div>
             )}
           </div>
@@ -534,14 +543,14 @@ function ProviderPanel({
           </span>
           <button
             onClick={() => setShowAddModel(true)}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-[10px] text-[12px] text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-all duration-[120ms] active:scale-[0.96]"
+            className="inline-flex min-h-[var(--size-control-min)] items-center gap-1 px-2.5 py-1 rounded-[8px] text-[12px] text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-all duration-[120ms] active:scale-[0.96] ui-focus"
           >
             <Plus size={13} />
             <span>{t('modelSettings.addModel')}</span>
           </button>
         </div>
 
-        <div className="rounded-[14px] bg-bg-card border border-border overflow-hidden">
+        <div className="ui-card overflow-hidden">
           {provider.models.length === 0 ? (
             <div className="flex items-center justify-center py-10">
               <span className="text-[13px] text-text-tertiary">{t('modelSettings.noModels')}</span>
@@ -549,16 +558,23 @@ function ProviderPanel({
           ) : (
             <div className="divide-y divide-border">
               {provider.models.map((model) => (
-                <div key={model.id} className="flex items-center justify-between px-5 py-3.5 group">
-                  <div>
-                    <p className="text-[13px] text-text-primary font-medium">{model.name}</p>
-                    <p className="text-[11px] text-text-tertiary font-mono mt-0.5">{model.id}</p>
+                <div
+                  key={model.id}
+                  className="group flex min-w-0 flex-col gap-3 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-[13px] text-text-primary font-medium">
+                      {model.name}
+                    </p>
+                    <p className="mt-0.5 truncate font-mono text-[11px] text-text-tertiary">
+                      {model.id}
+                    </p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center justify-end gap-3">
                     <button
                       type="button"
                       onClick={() => onSetDefaultModel(model.id)}
-                      className={`inline-flex items-center gap-1 rounded-[10px] px-2 py-1 text-[11px] transition-all duration-[120ms] active:scale-[0.96] ${
+                      className={`inline-flex min-h-[var(--size-control-min)] items-center gap-1 rounded-[8px] px-2 py-1 text-[11px] transition-all duration-[120ms] active:scale-[0.96] ui-focus ${
                         defaultModel?.providerId === provider.id &&
                         defaultModel.modelId === model.id
                           ? 'text-accent bg-bg-input'
@@ -574,14 +590,14 @@ function ProviderPanel({
                       </span>
                     </button>
                     {/* 能力标签 */}
-                    <div className="flex gap-1.5">
+                    <div className="flex flex-wrap gap-1.5">
                       {model.reasoning && (
-                        <span className="px-1.5 py-0.5 rounded-md bg-violet-500/10 text-[10px] text-violet-400 font-medium">
+                        <span className="px-1.5 py-0.5 rounded-[8px] bg-violet-500/10 text-[10px] text-violet-400 font-medium">
                           {t('modelSettings.reasoning')}
                         </span>
                       )}
                       {model.supportsImage && (
-                        <span className="px-1.5 py-0.5 rounded-md bg-sky-500/10 text-[10px] text-sky-400 font-medium">
+                        <span className="px-1.5 py-0.5 rounded-[8px] bg-sky-500/10 text-[10px] text-sky-400 font-medium">
                           {t('modelSettings.image')}
                         </span>
                       )}
@@ -589,7 +605,7 @@ function ProviderPanel({
                     {/* 删除按钮 — 鼠标悬浮显示 */}
                     <button
                       onClick={() => onRemoveModel(model.id)}
-                      className="opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-error transition-all duration-[120ms]"
+                      className="min-h-[var(--size-control-min)] min-w-[var(--size-control-min)] rounded-[8px] text-text-tertiary opacity-100 transition-all duration-[120ms] hover:bg-bg-hover hover:text-error sm:opacity-0 sm:group-hover:opacity-100 ui-focus"
                     >
                       <Trash2 size={13} />
                     </button>
@@ -775,9 +791,11 @@ export function ModelSettings() {
   }
 
   return (
-    <div>
+    <div className="min-w-0">
       <h1 className="text-[20px] font-bold text-text-primary mb-1">{t('modelSettings.title')}</h1>
-      <p className="text-[13px] text-text-tertiary mb-6">{t('modelSettings.subtitle')}</p>
+      <p className="mb-6 text-[13px] leading-[1.55] text-text-tertiary">
+        {t('modelSettings.subtitle')}
+      </p>
 
       {loading ? (
         // 加载中骨架
@@ -786,11 +804,11 @@ export function ModelSettings() {
         </div>
       ) : (
         // 两栏布局
-        <div className="flex gap-4 items-start">
+        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[260px_minmax(0,1fr)]">
           {/* ── 左列：Provider 列表 ─────────────────────────────────── */}
-          <div className="w-[200px] shrink-0 flex flex-col gap-2">
+          <div className="min-w-0 flex flex-col gap-2">
             {/* Provider 卡片列表 */}
-            <div className="rounded-[14px] bg-bg-card border border-border overflow-hidden">
+            <div className="ui-card overflow-hidden">
               {providers.length === 0 ? (
                 <div className="flex items-center justify-center py-10">
                   <span className="text-[12px] text-text-tertiary">
@@ -819,7 +837,7 @@ export function ModelSettings() {
                               <button
                                 key={provider.id}
                                 onClick={() => setSelectedId(provider.id)}
-                                className={`w-full flex items-center gap-2.5 px-3 py-3 text-left transition-all duration-[120ms] active:scale-[0.98] ${
+                                className={`w-full min-h-[var(--size-touch-min)] flex items-center gap-2.5 px-3 py-3 text-left transition-all duration-[120ms] active:scale-[0.98] ui-focus ${
                                   isSelected ? 'bg-bg-active' : 'hover:bg-bg-hover'
                                 }`}
                               >
@@ -864,13 +882,13 @@ export function ModelSettings() {
                                     e.stopPropagation()
                                     handleToggle(provider.id, !isEnabled)
                                   }}
-                                  className={`w-8 h-[18px] rounded-full transition-colors duration-[120ms] cursor-pointer shrink-0 ${
+                                  className={`h-[24px] w-[40px] rounded-full transition-colors duration-[120ms] cursor-pointer shrink-0 ${
                                     isEnabled ? 'bg-accent' : 'bg-border'
                                   }`}
                                 >
                                   <div
-                                    className={`w-3.5 h-3.5 rounded-full bg-white shadow-sm transition-transform duration-[120ms] mt-[2px] ${
-                                      isEnabled ? 'translate-x-[15px]' : 'translate-x-[3px]'
+                                    className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-[120ms] mt-1 ${
+                                      isEnabled ? 'translate-x-[20px]' : 'translate-x-1'
                                     }`}
                                   />
                                 </div>
@@ -905,7 +923,7 @@ export function ModelSettings() {
                               <button
                                 key={provider.id}
                                 onClick={() => setSelectedId(provider.id)}
-                                className={`w-full flex items-center gap-2.5 px-3 py-3 text-left transition-all duration-[120ms] active:scale-[0.98] ${
+                                className={`w-full min-h-[var(--size-touch-min)] flex items-center gap-2.5 px-3 py-3 text-left transition-all duration-[120ms] active:scale-[0.98] ui-focus ${
                                   isSelected ? 'bg-bg-active' : 'hover:bg-bg-hover'
                                 }`}
                               >
@@ -948,13 +966,13 @@ export function ModelSettings() {
                                     e.stopPropagation()
                                     handleToggle(provider.id, !isEnabled)
                                   }}
-                                  className={`w-8 h-[18px] rounded-full transition-colors duration-[120ms] cursor-pointer shrink-0 ${
+                                  className={`h-[24px] w-[40px] rounded-full transition-colors duration-[120ms] cursor-pointer shrink-0 ${
                                     isEnabled ? 'bg-accent' : 'bg-border'
                                   }`}
                                 >
                                   <div
-                                    className={`w-3.5 h-3.5 rounded-full bg-white shadow-sm transition-transform duration-[120ms] mt-[2px] ${
-                                      isEnabled ? 'translate-x-[15px]' : 'translate-x-[3px]'
+                                    className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-[120ms] mt-1 ${
+                                      isEnabled ? 'translate-x-[20px]' : 'translate-x-1'
                                     }`}
                                   />
                                 </div>
@@ -975,7 +993,7 @@ export function ModelSettings() {
             {/* 添加自定义 Provider 按钮 */}
             <button
               onClick={() => setShowAddProvider(true)}
-              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-[10px] border border-dashed border-border text-[12px] text-text-tertiary hover:border-accent hover:text-accent transition-all duration-[120ms] active:scale-[0.96]"
+              className="flex min-h-[var(--size-control-min)] items-center justify-center gap-1.5 px-3 py-2 rounded-[8px] border border-dashed border-border text-[12px] text-text-tertiary hover:border-accent hover:text-accent transition-all duration-[120ms] active:scale-[0.96] ui-focus"
             >
               <Plus size={13} />
               <span>{t('modelSettings.addCustom')}</span>
@@ -1000,7 +1018,7 @@ export function ModelSettings() {
             />
           ) : (
             // 未选中时占位
-            <div className="flex-1 rounded-[14px] bg-bg-card border border-border flex items-center justify-center py-20">
+            <div className="ui-card flex min-w-0 items-center justify-center py-20">
               <span className="text-[13px] text-text-tertiary">
                 {t('modelSettings.selectProvider')}
               </span>

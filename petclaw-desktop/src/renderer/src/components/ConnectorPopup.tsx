@@ -86,7 +86,7 @@ export function ConnectorPopup({ open, onClose }: ConnectorPopupProps) {
       {/* 弹窗本体，右下角定位留给调用方通过 className/style 覆盖 */}
       <div
         ref={panelRef}
-        className="pointer-events-auto mb-[72px] ml-4 w-[260px] bg-bg-card rounded-[14px] shadow-[var(--shadow-dropdown)] border border-border overflow-hidden"
+        className="pointer-events-auto mb-[72px] ml-4 w-[260px] bg-bg-card rounded-[12px] shadow-[var(--shadow-dropdown)] border border-border overflow-hidden"
       >
         {/* 顶栏 */}
         <div className="flex items-center gap-2 px-3.5 py-3 border-b border-border">
@@ -96,7 +96,7 @@ export function ConnectorPopup({ open, onClose }: ConnectorPopupProps) {
           </span>
           <button
             onClick={onClose}
-            className="w-6 h-6 flex items-center justify-center rounded-[10px] text-text-tertiary hover:text-text-secondary hover:bg-bg-input transition-all duration-[120ms] ease active:scale-[0.96]"
+            className="w-6 h-6 flex items-center justify-center rounded-[8px] text-text-tertiary hover:text-text-secondary hover:bg-bg-input transition-all duration-[120ms] ease active:scale-[0.96]"
             aria-label={t('common.close')}
           >
             <X size={13} strokeWidth={2} />
@@ -104,7 +104,7 @@ export function ConnectorPopup({ open, onClose }: ConnectorPopupProps) {
         </div>
 
         {/* 服务器列表 */}
-        <div className="max-h-[240px] overflow-y-auto py-1">
+        <div className="ui-contained-scroll max-h-[240px] overflow-y-auto py-1">
           {loading ? (
             <div className="flex items-center justify-center gap-2 py-6 text-text-tertiary">
               <Loader2 size={14} strokeWidth={2} className="animate-spin" />

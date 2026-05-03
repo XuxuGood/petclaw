@@ -146,29 +146,29 @@ export function ImConfigDialog({ isOpen, initialPlatform, onClose, onSaved }: Im
   const currentPlatformInfo = PLATFORMS.find((p) => p.key === selectedPlatform)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay">
-      <div className="bg-bg-root rounded-[14px] shadow-lg w-[680px] h-[520px] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-6">
+      <div className="bg-bg-root rounded-[12px] shadow-lg w-[min(680px,calc(100vw-48px))] h-[min(520px,calc(100vh-48px))] flex flex-col overflow-hidden">
         {/* 标题栏 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 className="text-[15px] font-semibold text-text-primary">{t('imConfig.title')}</h2>
           <button
             onClick={onClose}
-            className="p-1 rounded-[8px] hover:bg-bg-hover transition-colors"
+            className="min-h-[var(--size-control-min)] min-w-[var(--size-control-min)] rounded-[8px] hover:bg-bg-hover transition-colors ui-focus"
           >
             <X size={16} className="text-text-tertiary" />
           </button>
         </div>
 
         {/* 两栏内容区 */}
-        <div className="flex-1 flex min-h-0">
+        <div className="flex-1 flex min-h-0 flex-col sm:flex-row">
           {/* 左侧平台列表 */}
-          <div className="w-[200px] shrink-0 border-r border-border flex flex-col">
-            <div className="flex-1 overflow-y-auto py-2">
+          <div className="shrink-0 border-b border-border flex flex-col sm:w-[200px] sm:border-b-0 sm:border-r">
+            <div className="ui-contained-scroll max-h-[120px] overflow-y-auto py-2 sm:max-h-none sm:flex-1">
               {PLATFORMS.map(({ key, icon }) => (
                 <button
                   key={key}
                   onClick={() => handlePlatformChange(key)}
-                  className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-[13px] transition-colors ${
+                  className={`w-full min-h-[var(--size-control-min)] flex items-center gap-2.5 px-4 py-2.5 text-[13px] transition-colors ui-focus ${
                     selectedPlatform === key
                       ? 'bg-bg-active text-text-primary font-medium'
                       : 'text-text-secondary hover:bg-bg-hover'
@@ -181,7 +181,7 @@ export function ImConfigDialog({ isOpen, initialPlatform, onClose, onSaved }: Im
             </div>
             {/* 底部引导创建按钮 */}
             <div className="p-3 border-t border-border">
-              <button className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-[12px] text-text-tertiary hover:text-text-secondary bg-bg-hover hover:bg-bg-active rounded-[8px] transition-colors">
+              <button className="w-full min-h-[var(--size-control-min)] flex items-center justify-center gap-1.5 px-3 py-2 text-[12px] text-text-tertiary hover:text-text-secondary bg-bg-hover hover:bg-bg-active rounded-[8px] transition-colors ui-focus">
                 <Plus size={13} />
                 {t('imConfig.scanToCreate')}
               </button>
@@ -190,14 +190,14 @@ export function ImConfigDialog({ isOpen, initialPlatform, onClose, onSaved }: Im
 
           {/* 右侧配置面板 */}
           <div className="flex-1 flex flex-col min-w-0">
-            <div className="flex-1 overflow-y-auto px-5 py-4">
+            <div className="ui-contained-scroll flex-1 overflow-y-auto px-5 py-4">
               {/* 平台名称 + 连接状态 */}
-              <div className="flex items-center gap-2 mb-5">
+              <div className="flex flex-wrap items-center gap-2 mb-5">
                 <span className="text-[20px]">{currentPlatformInfo?.icon}</span>
                 <h3 className="text-[16px] font-semibold text-text-primary">
                   {t(`im.${selectedPlatform}`)}
                 </h3>
-                <span className="px-2 py-0.5 text-[11px] text-text-tertiary bg-bg-hover rounded-full">
+                <span className="px-2 py-0.5 text-[11px] text-text-tertiary bg-bg-hover rounded-[8px]">
                   {t('imConfig.notConnected')}
                 </span>
               </div>
@@ -226,13 +226,13 @@ export function ImConfigDialog({ isOpen, initialPlatform, onClose, onSaved }: Im
                           setFormData((prev) => ({ ...prev, [field.key]: e.target.value }))
                         }
                         placeholder={t(field.placeholderKey)}
-                        className="w-full px-3 py-2 text-[13px] rounded-[10px] bg-bg-hover border border-border text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent/40 pr-10"
+                        className="w-full px-3 py-2 text-[13px] rounded-[8px] bg-bg-hover border border-border text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent/40 pr-10"
                       />
                       {/* 密码字段显示/隐藏切换 */}
                       {field.type === 'password' && (
                         <button
                           onClick={() => toggleSecret(field.key)}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-text-tertiary hover:text-text-secondary transition-colors"
+                          className="absolute right-1.5 top-1/2 min-h-[var(--size-control-min)] min-w-[var(--size-control-min)] -translate-y-1/2 rounded-[8px] text-text-tertiary hover:text-text-secondary transition-colors ui-focus"
                         >
                           {showSecrets[field.key] ? <EyeOff size={14} /> : <Eye size={14} />}
                         </button>
@@ -244,17 +244,17 @@ export function ImConfigDialog({ isOpen, initialPlatform, onClose, onSaved }: Im
             </div>
 
             {/* 底部操作按钮 */}
-            <div className="flex justify-end gap-2 px-5 py-4 border-t border-border">
+            <div className="flex flex-wrap justify-end gap-2 px-5 py-4 border-t border-border">
               <button
                 onClick={onClose}
-                className="px-4 py-2 text-[13px] rounded-[10px] text-text-secondary hover:bg-bg-hover transition-colors active:scale-[0.96] duration-[120ms]"
+                className="min-h-[var(--size-control-min)] px-4 py-2 text-[13px] rounded-[8px] text-text-secondary hover:bg-bg-hover transition-colors active:scale-[0.96] duration-[120ms] ui-focus"
               >
                 {t('common.cancel')}
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="px-4 py-2 text-[13px] rounded-[10px] bg-accent text-white hover:bg-accent-hover transition-colors active:scale-[0.96] duration-[120ms] disabled:opacity-50"
+                className="min-h-[var(--size-control-min)] px-4 py-2 text-[13px] rounded-[8px] bg-accent text-white hover:bg-accent-hover transition-colors active:scale-[0.96] duration-[120ms] disabled:opacity-50 ui-focus"
               >
                 {saving ? t('common.saving') : t('common.save')}
               </button>

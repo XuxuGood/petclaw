@@ -33,7 +33,7 @@ export function EngineSettings() {
       <p className="text-[13px] text-text-tertiary mb-6">{t('engineSettings.subtitle')}</p>
 
       {/* 状态卡片 */}
-      <div className="rounded-[14px] bg-bg-card border border-border overflow-hidden mb-4">
+      <div className="rounded-[12px] bg-bg-card border border-border overflow-hidden mb-4">
         {/* 运行状态 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <span className="text-[14px] text-text-primary">{t('engineSettings.status')}</span>

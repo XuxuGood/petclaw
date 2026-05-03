@@ -3,24 +3,43 @@
 @theme {
   /* ── 亮色主题 ── */
   --color-bg-root: #f8f8fa;
-  --color-bg-sidebar: #f1f1f4;
-  --color-bg-card: #ffffff;
+  --color-bg-sidebar: #ebecef;
+  --color-bg-card: rgba(255, 255, 255, 0.72);
+  /* 浮层背景：必须纯白不透明。
+     原为 rgba(255,255,255,0.96)（留 4% 透明追求“纸感”），但当触发元素
+     自带强描边（如输入框聚焦态近黑 border）位于弹窗下方时，其颜色会
+     透过 4% 蔓延至弹窗内部，与 .ui-popover-divider / row:hover / badge 等
+     多层半透明近黑叠加后出现“分割线变深、hover 辨识度消失”的
+     视觉穿帮。改为纯白后，内部所有 rgba token 的色值语义重新锁定在
+     “白色底”这一唯一参照系，与 Notion / Linear / Raycast 等桌面弹窗传统一致。 */
+  --color-bg-popover: #ffffff;
   --color-bg-input: #f6f6f8;
-  --color-bg-hover: rgba(0, 0, 0, 0.025);
-  --color-bg-active: rgba(0, 0, 0, 0.05);
+  --color-bg-hover: rgba(24, 24, 27, 0.052);
+  --color-bg-active: rgba(24, 24, 27, 0.082);
   --color-bg-bubble-ai: #ffffff;
   --color-bg-bubble-user: #18181b;
 
   --color-text-primary: #18181b;
   --color-text-secondary: #52525b;
-  --color-text-tertiary: #a1a1aa;
+  /* tertiary 仅用于装饰性弱辅助文本（副标题/区段标题/badge/meta/empty-desc）。
+     #71717a 在白底上对比度 4.6:1，满足 WCAG AA 正文最低要求。
+     可交互文本/图标必须使用 secondary 或 primary，不要回落到 tertiary。
+     原值 #a1a1aa 已迁移到 --color-text-disabled，专门承接禁用语义。 */
+  --color-text-tertiary: #71717a;
+  /* 禁用态文本/图标专用：低对比度刻意表达"不可交互"，不可用于普通辅助文本。 */
+  --color-text-disabled: #a1a1aa;
   --color-text-bubble-ai: #27272a;
   --color-text-bubble-user: #ffffff;
 
   --color-accent: #18181b;
   --color-accent-hover: #27272a;
+  --color-brand: #4f8deb;
+  --color-brand-hover: #3f7bd8;
+  --color-brand-soft: rgba(79, 141, 235, 0.12);
+  --color-warm: #f6a72a;
+  --color-warm-soft: rgba(246, 167, 42, 0.14);
 
-  --color-border: #e8e8ec;
+  --color-border: rgba(24, 24, 27, 0.08);
   --color-border-input: #e4e4e7;
 
   --color-success: #16a34a;
@@ -41,14 +60,80 @@
   --color-safe-bg: rgba(22, 163, 74, 0.06);
   --color-safe-border: rgba(22, 163, 74, 0.18);
   --color-safe-icon: #16a34a;
+  /* safe 语义文字色：#15803d 在白底上对比度 ≈4.7:1，满足 12px 正文 WCAG AA。
+     直接使用 --color-safe-icon (#16a34a) 仅 ≈3:1，仅适合作为图标/边框，不可承载文本。 */
+  --color-safe-text: #15803d;
+  /* safe chip 强调态背景（hover/active）：与 danger 体系命名一致，用于在 safe-bg 之上叠加感知层级。 */
+  --color-safe-bg-hover: rgba(22, 163, 74, 0.18);
 
-  --color-overlay: rgba(0, 0, 0, 0.4);
+  --color-overlay: rgba(18, 24, 33, 0.16);
+  --color-glass: rgba(238, 240, 243, 0.58);
+  --color-glass-strong: rgba(255, 255, 255, 0.78);
+  --color-workspace-base: rgba(238, 241, 239, 0.66);
+  --color-workspace-panel: rgba(232, 234, 237, 0.2);
+  --color-workspace-main: rgba(255, 255, 255, 0.76);
+  --color-workspace-state-hover: rgba(24, 24, 27, 0.036);
+  --color-workspace-state-active: rgba(24, 24, 27, 0.068);
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 4px rgba(0, 0, 0, 0.02);
   --shadow-dropdown: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
+  --shadow-workspace:
+    0 16px 38px rgba(15, 23, 42, 0.06), 0 4px 14px rgba(15, 23, 42, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.52);
 
-  --radius-default: 10px;
-  --radius-lg: 14px;
+  /* ── 桌面工作台布局 token ── */
+  --size-titlebar: 44px;
+  --size-sidebar: 216px;
+  --size-sidebar-compact: 204px;
+  --size-monitor-panel: 248px;
+  --size-traffic-safe: 92px;
+  --size-control-min: 32px;
+  --size-touch-min: 44px;
+  /* ── 工作台布局间距 Token（职责单一来源） ──
+     架构原则：workspace-window 内的间距责任严格分层，严禁使用 flex gap。
+       1. canvas-inset：workspace-window.padding，负责"画布四边 → 面板外缘"的留白。
+          这是唯一控制"主画布到窗口边"距离的变量，保证四边对称。
+       2. panel-gutter：面板自身 margin，负责"面板 ↔ 主画布"的间隔。
+          sidebar 用 margin-inline-end、monitor 用 margin-inline-start；
+          折叠态（width:0）时 margin 同步归零，彻底消除残留间距。
+     为什么不用 flex gap：gap 在"条件渲染 + width:0 子元素"下会留下
+     不对称的视觉残差（例如非 Chat 页 monitor 不渲染，但折叠的 sidebar gap 仍占 5px，
+     导致左右差 5px）。拆成 padding + per-panel margin 后，左右对称仅依赖
+     padding-inline，与任何面板开合状态解耦。
+     兼容别名 --space-workspace-inset：旧代码（AppTopBar absolute 定位等）
+     仍在使用，保留为 canvas-inset 的别名，值必须一致。 */
+  --space-canvas-inset: 5px;
+  --space-panel-gutter: 5px;
+  --space-workspace-inset: var(--space-canvas-inset);
+  --space-top-controls-left: 126px;
+  /* 页面内容到主画布边界的水平/垂直内边距。
+     设计决策：四边对称（24px / 20px），让页面主体相对最底层容器
+     的上下左右距离统一，避免侧栏折叠后视觉失衡。 */
+  --space-page-x: 24px;
+  --space-page-y: 20px;
+  --content-readable-max: 760px;
+  --content-wide-max: 1040px;
+  --content-workbench-max: 1180px;
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-slow: 240ms;
+
+  /* ── 控件尺寸三级 ── */
+  --ctrl-sm: 28px;
+  --ctrl-md: 32px;
+  --ctrl-lg: 36px;
+
+  /* ── 圆角四级 ── */
+  --radius-chip: 6px;
+  --radius-default: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  /* ── 间距 ── */
+  --gap-topbar-tools: 8px;
+  --gap-card: 12px;
+  --gap-card-inner: 16px;
+  --gap-section: 20px;
 
   --font-sans:
     'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC', system-ui, sans-serif;
@@ -79,8 +164,32 @@ body,
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.08);
-  border-radius: 10px;
+  background: var(--scrollbar-thumb-bg, transparent);
+  border-radius: 8px;
+  transition: background-color var(--motion-fast) ease;
+}
+/* 滚动条默认退场，只有鼠标进入滚动容器或键盘焦点进入容器时显现。
+   WebKit 滚动条伪元素对“容器:hover 直接改 thumb”重绘不稳定；
+   用 CSS 变量从滚动容器继承给 thumb，hover/focus 只更新变量，更可靠。 */
+.overflow-y-auto,
+.overflow-auto,
+.ui-contained-scroll,
+.composer-context-strip,
+.composer-textarea {
+  --scrollbar-thumb-bg: transparent;
+}
+
+.overflow-y-auto:hover,
+.overflow-y-auto:focus-within,
+.overflow-auto:hover,
+.overflow-auto:focus-within,
+.ui-contained-scroll:hover,
+.ui-contained-scroll:focus-within,
+.composer-context-strip:hover,
+.composer-context-strip:focus-within,
+.composer-textarea:hover,
+.composer-textarea:focus {
+  --scrollbar-thumb-bg: rgba(0, 0, 0, 0.08);
 }
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.14);
@@ -97,6 +206,1718 @@ body,
 }
 .no-drag {
   -webkit-app-region: no-drag;
+}
+
+.app-shell {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+  background: transparent;
+}
+
+.workspace-window {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  /* 架构约束：绝不使用 flex gap。面板间距由面板自身的 margin-inline-start/end 负责，
+     以避免折叠态和条件渲染导致的左右不对称残差（详见顶部 Token 区注释）。 */
+  overflow: hidden;
+  padding: var(--space-canvas-inset);
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background:
+    linear-gradient(180deg, rgba(248, 249, 247, 0.58), rgba(233, 237, 235, 0.52)),
+    var(--color-workspace-base);
+  /* 不再使用 CSS backdrop-filter：主进程已通过 BrowserWindow 的
+     vibrancy: 'under-window' 在 macOS 原生层提供毛玻璃，再叠 CSS backdrop-filter 会：
+     1. 将 .workspace-window 强制提升为独立 GPU composited layer；
+     2. 把 .app-topbar（absolute 子元素）绑进同一合成层；
+     3. 在 transparent:true 窗口上，Chromium 向 AppKit 上报 -webkit-app-region: drag
+        区域时对合成层识别不稳定，导致顶栏整片区域无法拖动。
+     结论：renderer 不再参与毛玻璃绘制，视觉由 vibrancy 原生提供，窗口 drag 稳定生效。 */
+  box-shadow: var(--shadow-workspace);
+}
+
+/* ── AppTopBar 统一顶栏 ── */
+/* 关键：不要设 pointer-events: none，否则容器本身会先消费/吞掉事件（继承到子级会有一些奇怪表现）。
+   topbar 盖住的区域下方是 workspace-main-surface 的 padding-top，本就没有业务内容，不需要事件穿透。
+
+   窗口拖拽策略：主窗口是 frame:false + transparent:true + vibrancy 的无边框透明窗口，
+   macOS 并不会暴露原生可拖拽的 titlebar 区域，必须显式用 -webkit-app-region: drag 提供拖拽。
+   这里让 .app-topbar 整体成为拖拽区，再通过下面的规则把内部的交互元素（button/input/a/
+   [contenteditable]/[role="button"] 等）显式标记为 no-drag，避免历史上按钮被 drag 拦截的坑。
+   注意：只能对 .app-topbar 自身加 drag，不能对 Sidebar/WorkspaceHeader 等屏幕坐标会错位覆盖
+   到按钮上的容器加 drag（Electron drag hit-area 不受 CSS overflow/z-index/pointer-events 控制）。 */
+.app-topbar {
+  position: absolute;
+  /* 位置基准对齐 workspace-window 的画布内边（padding），因此用 canvas-inset。 */
+  top: var(--space-canvas-inset);
+  left: var(--space-canvas-inset);
+  right: var(--space-canvas-inset);
+  z-index: 30;
+  height: var(--size-titlebar);
+  display: grid;
+  align-items: center;
+  -webkit-app-region: drag;
+  /* Electron transparent 窗口兜底：完全透明的 drag 层会被 Chromium compositor 在
+     hit-test 阶段漏掉（Electron issue #18961 等），必须给一个近不可见但非 null 的
+     背景色，让 drag region 稳定生效。这里用 rgba 0.001，视觉上完全看不出来。 */
+  background-color: rgba(0, 0, 0, 0.001);
+  /* 折叠/展开切换时，顶栏 left 边界与 .workspace-sidebar-shell 的 width 共用同一条
+     motion token（--motion-base + 同款 cubic-bezier），保证空间连续性：
+     侧栏宽度渐变时，顶栏左边界同步跟随，而不是瞬时跳变——这是消除
+     rightSlot 按钮（问题反馈等）位置跳跃的关键。
+     注意：grid-template-columns 的过渡在 Chromium 支持不稳定，这里不依赖它；
+     通过 DOM 统一 + display 切换让列数变化瞬时完成，视觉连续性由 left 过渡承担。 */
+  transition: left var(--motion-base) cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* 顶栏内所有交互元素自动 no-drag，防止 drag-region 拦截点击。
+   新增交互控件时若不是标准语义元素（如用 div 包装的点击区），需显式加 role="button" 或 .no-drag 类。 */
+.app-topbar button,
+.app-topbar a,
+.app-topbar input,
+.app-topbar textarea,
+.app-topbar select,
+.app-topbar label,
+.app-topbar [contenteditable='true'],
+.app-topbar [role='button'],
+.app-topbar [role='textbox'],
+.app-topbar [role='combobox'],
+.app-topbar [role='menu'],
+.app-topbar [role='menuitem'],
+.app-topbar [role='tab'] {
+  -webkit-app-region: no-drag;
+}
+
+/* 侧栏展开时：顶栏右移到侧栏之后，只有两段 [1fr center] [auto right] */
+.app-topbar-sidebar-open {
+  /* 让出 = 画布 padding + sidebar 宽 + 面板间隙（与 .workspace-sidebar-shell.margin-inline-end 同源）。 */
+  left: calc(var(--space-canvas-inset) + var(--size-sidebar) + var(--space-panel-gutter));
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+/* 展开态下，前两个 zone（traffic-safe、left-controls）通过 display:none 完全退出 grid 流，
+   让剩余两个 zone（center、right）自然按 minmax(0,1fr) auto 铺开。
+   架构选择：不用 visibility:hidden + width:0 是因为那样会留下空 grid 列占位，
+   反而增加 grid 复杂度；display:none 是最干净的列数缩减方式，且不会触发 React 重建。 */
+.app-topbar-sidebar-open .topbar-left-safe,
+.app-topbar-sidebar-open .topbar-left-controls {
+  display: none;
+}
+
+/* 侧栏折叠时四段：[traffic-safe] [controls] [1fr center] [auto right] */
+.app-topbar-sidebar-collapsed {
+  grid-template-columns: var(--size-traffic-safe) auto minmax(0, 1fr) auto;
+}
+
+/* 任务监控面板打开时：顶栏右边界向内退让一个面板宽 + 间隙，对称于侧栏展开时的 left 避让。
+   避免 rightSlot（问题反馈、监控切换等）与监控面板横向重叠，转而对齐主画布的右边界。 */
+.app-topbar-monitor-open {
+  right: calc(var(--space-canvas-inset) + var(--size-monitor-panel) + var(--space-panel-gutter));
+}
+
+.topbar-zone {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  /* 不再设 position:relative + z-index:1。这两个属性会把每个 zone 提升成独立
+     paint layer，Chromium 在收集 -webkit-app-region 时可能对层边界做额外切分，
+     导致 zone 空白处的 drag 区域不稳定。zones 内部也没有需要 z-index 分层的元素。 */
+}
+
+.topbar-left-safe {
+  padding-left: var(--size-traffic-safe);
+  gap: 6px;
+  justify-content: flex-end;
+  padding-right: 8px;
+}
+
+.topbar-left-controls {
+  /* 折叠态下 PanelLeftOpen / Plus 按钮本身为 28×28px 且已被设为 no-drag。
+     可拖区仅存在于按钮之间与两侧 padding，旧值 gap:6 / padding-left:4 太窄，
+     用户体感上“按钮周围拖不动”。扩到 gap:12 / padding:0 12 后，
+     按钮间留 12px、两侧各 12px 明确可感知的 drag 空白，器映上仍在
+     auto 栏内自然扩宽，不影响其他栏目。 */
+  gap: 12px;
+  padding: 0 12px;
+}
+
+.topbar-center {
+  justify-content: center;
+  overflow: hidden;
+  padding: 0 16px;
+}
+
+.topbar-center:has(.topbar-workbench-search) {
+  justify-content: flex-start;
+  padding-left: 8px;
+}
+
+.topbar-right {
+  gap: var(--gap-topbar-tools);
+  padding-right: 16px;
+  justify-content: flex-end;
+}
+
+.workspace-layout-compact .topbar-center,
+.workspace-layout-single .topbar-center {
+  padding-inline: 10px;
+}
+
+.workspace-layout-compact .topbar-right,
+.workspace-layout-single .topbar-right {
+  padding-right: 10px;
+}
+
+.topbar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.topbar-workbench-tools {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* 顶栏页面操作按钮家族（.topbar-btn*）：统一 32 高，
+   在同一 app-topbar 内跨视图（Chat/Cron/Skills/IM）建立一致的交互语言。
+   圆角分层：base r8 方正（ghost 无底色 / icon-only），pill/primary 显式 r999
+   胶囊以表达“有底色的强调 CTA”语义，避免 icon-only 按钮被撑成椭圆。
+   与 .panel-toggle（28×28, r7）形成“外壳控制 vs 页面操作”的层级区分。 */
+.topbar-btn {
+  height: 30px;
+  min-width: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 11px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: transparent;
+  white-space: nowrap;
+  transition:
+    color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease,
+    transform var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
+}
+
+/* ghost：辅助操作（刷新/反馈等），无底色、r10 方正（icon-only 自动成 32×32 方形）；
+   字重略轻避免与主 CTA 抢夺视觉 */
+.topbar-btn-ghost {
+  padding: 0 9px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.topbar-btn-ghost:hover {
+  color: var(--color-text-primary);
+  background: var(--color-workspace-state-hover);
+}
+
+.topbar-btn-ghost:active {
+  color: var(--color-text-primary);
+  background: var(--color-workspace-state-active);
+}
+
+/* icon-only 修饰：去掉横向 padding，固定 32×32 正方形；
+   用于纯图标按钮（如 Cron 刷新），避免被文字 padding 撑长。 */
+.topbar-btn-icon {
+  width: 30px;
+  padding: 0;
+}
+
+/* pill：带底色的次要 CTA（例如“通过+创建”双路径入口），
+   r999 胶囊作为“有底色强调”的视觉语义。 */
+.topbar-btn-pill {
+  border-radius: 999px;
+  border-color: rgba(24, 24, 27, 0.07);
+  color: var(--color-text-secondary);
+  background: rgba(255, 255, 255, 0.52);
+  font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.66);
+}
+
+.topbar-btn-pill:hover {
+  color: var(--color-text-primary);
+  border-color: rgba(24, 24, 27, 0.11);
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.topbar-btn-pill:active {
+  transform: scale(0.98);
+}
+
+/* primary：当前视图唯一主 CTA（新建任务/安装技能），r999 实色胶囊 + 轻阴影 */
+.topbar-btn-primary {
+  border-radius: 999px;
+  color: #ffffff;
+  background: var(--color-accent);
+  font-weight: 650;
+  box-shadow:
+    0 2px 8px rgba(15, 23, 42, 0.11),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.topbar-btn-primary:hover {
+  background: var(--color-accent-hover);
+}
+
+.topbar-btn-primary:active {
+  transform: scale(0.98);
+}
+
+/* 工作台页面搜索区：Skills / Expert Kits / Cron 共享同一套 topbar 语言。
+   搜索框背景比普通 input 更实，避免在透明窗口和浅色主画布上显得发虚。 */
+.topbar-workbench-tools .topbar-search-field {
+  width: clamp(180px, 24vw, 300px);
+  flex: 0 1 auto;
+}
+
+.topbar-workbench-search {
+  width: min(100%, 300px);
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topbar-search-field {
+  position: relative;
+  min-width: 168px;
+  flex: 1;
+}
+
+.topbar-search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  color: var(--color-text-secondary);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.topbar-search-input {
+  width: 100%;
+  height: 30px;
+  border: 1px solid rgba(24, 24, 27, 0.12);
+  border-radius: 999px;
+  padding: 0 14px 0 38px;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 1px 2px rgba(15, 23, 42, 0.04);
+  color: var(--color-text-primary);
+  font-size: 12.5px;
+  font-weight: 600;
+  outline: none;
+  -webkit-app-region: no-drag;
+  transition:
+    border-color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
+}
+
+.topbar-search-input::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 0.7;
+}
+
+.topbar-search-input:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(24, 24, 27, 0.14);
+}
+
+.topbar-search-input:focus {
+  background: #ffffff;
+  border-color: rgba(24, 24, 27, 0.22);
+  box-shadow:
+    0 0 0 2px rgba(24, 24, 27, 0.08),
+    0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+.workspace-layout-compact .topbar-workbench-search,
+.workspace-layout-single .topbar-workbench-search {
+  width: min(100%, 252px);
+  gap: 6px;
+}
+
+.workspace-layout-compact .topbar-workbench-tools .topbar-search-field,
+.workspace-layout-single .topbar-workbench-tools .topbar-search-field {
+  width: clamp(132px, 22vw, 210px);
+}
+
+.workspace-layout-compact .topbar-btn-pill span,
+.workspace-layout-single .topbar-btn-pill span {
+  display: none;
+}
+
+.workspace-layout-compact .topbar-actions,
+.workspace-layout-single .topbar-actions {
+  gap: 6px;
+}
+
+.workspace-layout-compact .topbar-workbench-tools,
+.workspace-layout-single .topbar-workbench-tools {
+  gap: 6px;
+}
+
+.workspace-sidebar-shell,
+.workspace-monitor-shell {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: transparent;
+  /* margin 也加入过渡：折叠时 width 从面板宽→ 0 的同时，margin 从 panel-gutter → 0，
+     确保动画平滑且不产生视觉卡顿。 */
+  transition:
+    width var(--motion-base) cubic-bezier(0.22, 1, 0.36, 1),
+    margin var(--motion-base) cubic-bezier(0.22, 1, 0.36, 1),
+    opacity var(--motion-fast) ease;
+}
+
+.workspace-center-column {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  padding: 0;
+}
+
+.workspace-main-surface {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 12px 12px 14px 14px;
+  background: var(--color-workspace-main);
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.035),
+    inset 0 1px 0 rgba(255, 255, 255, 0.52);
+  /* 为 AppTopBar 腾出高度 */
+  padding-top: var(--size-titlebar);
+}
+
+/* 侧栏展开时 topbar 已右移不覆盖 sidebar，所以不需要顶部留白 */
+.workspace-sidebar-shell {
+  flex-shrink: 0;
+  /* 面板展开态：与主画布之间插入 panel-gutter。
+     折叠态（见 .workspace-sidebar-shell-collapsed）会覆盖为 0。 */
+  margin-inline-end: var(--space-panel-gutter);
+}
+
+.workspace-sidebar-shell > * {
+  width: var(--size-sidebar);
+  min-width: var(--size-sidebar);
+  transition:
+    opacity var(--motion-fast) ease,
+    transform var(--motion-base) cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.workspace-sidebar-shell-collapsed {
+  pointer-events: none;
+  /* 折叠时面板宽度→ 0 同时 margin → 0，彻底消除间隙 5px 残留。 */
+  margin-inline-end: 0;
+}
+
+.workspace-sidebar-shell-collapsed > * {
+  /* 折叠态必须把 sidebar 子树从布局流物理移除，而不是仅靠外层 width:0 + overflow:hidden 遮挡。
+     原因：Electron drag hit-test 不读 CSS（忽略 overflow / width / opacity / transform / pointer-events），
+     只看 DOM 布局盒的屏幕坐标。子元素仍被 .workspace-sidebar-shell > * 固定在 240px 宽，
+     其内部所有 button/input 被 .workspace-panel-header button 等规则显式标为 no-drag，
+     这些 no-drag 矩形物理覆盖在 .app-topbar.topbar-left-controls 的全段上，
+     Chromium 合成 drag region 时 no-drag 优先，导致折叠按钮和新建按钮周围的空白都无法拖动。
+     display:none 是唯一能让 Chromium 从 drag hit-test 中完全剥离这些元素的方式，
+     同时保留 React DOM / state。width 过渡仍在 shell 本层生效，视觉上 sidebar 仍是平滑收起。
+     对称对照：右侧 .workspace-monitor-shell 在 WorkspaceFrame 中使用
+     {rightOpen && rightPane} 条件渲染，从根上规避同类问题；左侧保持 {leftPane} 永远挂载
+     以保留状态，因此在 CSS 层用 display:none 实现等效解耦。 */
+  display: none;
+}
+
+.workspace-sidebar-shell-drawer {
+  position: absolute;
+  inset-block: var(--space-canvas-inset);
+  inset-inline-start: var(--space-canvas-inset);
+  z-index: 60;
+  margin-inline-end: 0;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(180deg, rgba(244, 245, 247, 0.54), rgba(226, 229, 234, 0.48)),
+    var(--color-workspace-base);
+  box-shadow: var(--shadow-dropdown);
+}
+
+.workspace-sidebar-shell-drawer > * {
+  display: flex;
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.workspace-sidebar-shell-open > * {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* 监控面板与 sidebar 对称：AppTopBar 通过 app-topbar-monitor-open 已把右边界向内退让
+   一个面板宽 + inset，不再覆盖监控区域，因此面板 header 不需要顶部留白，
+   与 sidebar-header / AppTopBar 同坐在 y=inset 那一行。 */
+.workspace-monitor-shell {
+  flex-shrink: 0;
+  /* 面板展开态：与主画布之间插入 panel-gutter（与 sidebar 对称）。
+     折叠态（见 .workspace-monitor-shell-collapsed）会覆盖为 0。 */
+  margin-inline-start: var(--space-panel-gutter);
+}
+
+.workspace-monitor-shell-collapsed {
+  pointer-events: none;
+  /* 与 sidebar 折叠规则严格对称：width→0 的同时 margin→0，保证左右对称。 */
+  margin-inline-start: 0;
+}
+
+.workspace-monitor-shell-drawer {
+  position: absolute;
+  inset-block: var(--space-canvas-inset);
+  inset-inline-end: var(--space-canvas-inset);
+  z-index: 60;
+  margin-inline-start: 0;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(180deg, rgba(244, 245, 247, 0.54), rgba(226, 229, 234, 0.48)),
+    var(--color-workspace-base);
+  box-shadow: var(--shadow-dropdown);
+}
+
+.workspace-drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  border: 0;
+  padding: 0;
+  background: var(--color-overlay);
+}
+
+.settings-sidebar-shell {
+  width: var(--size-sidebar);
+  min-width: var(--size-sidebar);
+  min-height: 0;
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  background: transparent;
+}
+
+.settings-compact-topbar {
+  display: none;
+}
+
+.settings-sidebar-backdrop {
+  display: none;
+}
+
+@media (max-width: 719px) {
+  .settings-compact-topbar {
+    position: absolute;
+    top: var(--space-canvas-inset);
+    right: var(--space-canvas-inset);
+    left: var(--space-canvas-inset);
+    z-index: 30;
+    height: var(--size-titlebar);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px;
+    -webkit-app-region: drag;
+    background-color: rgba(0, 0, 0, 0.001);
+  }
+
+  .settings-compact-topbar button {
+    -webkit-app-region: no-drag;
+  }
+
+  .settings-sidebar-shell {
+    position: absolute;
+    inset-block: var(--space-canvas-inset);
+    inset-inline-start: var(--space-canvas-inset);
+    z-index: 60;
+    width: var(--size-sidebar);
+    min-width: var(--size-sidebar);
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    background:
+      linear-gradient(180deg, rgba(244, 245, 247, 0.54), rgba(226, 229, 234, 0.48)),
+      var(--color-workspace-base);
+    box-shadow: var(--shadow-dropdown);
+    transform: translateX(calc(-100% - var(--space-canvas-inset)));
+    transition: transform var(--motion-base) cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .settings-sidebar-shell-open {
+    transform: translateX(0);
+  }
+
+  .settings-sidebar-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: 50;
+    display: block;
+    border: 0;
+    padding: 0;
+    background: var(--color-overlay);
+  }
+}
+
+.workspace-panel-header {
+  height: var(--size-titlebar);
+  flex-shrink: 0;
+}
+
+.workspace-panel-header {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.26);
+}
+
+.workspace-sidebar-header {
+  padding: 0 14px 0 var(--size-traffic-safe);
+}
+
+.workspace-monitor-header {
+  padding: 0 16px;
+}
+
+/* 面板 header 作为拖拽补充区：sidebar 展开时其顶部条、监控面板展开时其顶部条
+   都与 AppTopBar 同坐在窗口顶部，应保持可拖拽。 */
+.workspace-sidebar-header,
+.workspace-monitor-header {
+  -webkit-app-region: drag;
+}
+
+/* 关键的历史坑规避：sidebar 折叠时 shell 虽然 width 动画到 0 且 overflow:hidden，
+   但 Electron 的 drag hit-area 不受 CSS overflow/width/pointer-events 控制，
+   子元素会按它本来的屏幕坐标继续拦截点击，导致折叠瞬间 AppTopBar 按钮被 drag 吞掉。
+   折叠态下显式把 sidebar-header 设为 no-drag，Chromium 会在 style 重算后立刻更新
+   drag hit-test，避免错位拦截。 */
+.workspace-sidebar-shell-collapsed .workspace-sidebar-header {
+  -webkit-app-region: no-drag;
+}
+
+/* 面板 header 内的交互元素自动 no-drag，与 .app-topbar 的策略保持一致。
+   新增自定义点击区（非标准语义元素）时需显式加 role="button" 或 .no-drag。 */
+.workspace-panel-header button,
+.workspace-panel-header a,
+.workspace-panel-header input,
+.workspace-panel-header textarea,
+.workspace-panel-header select,
+.workspace-panel-header label,
+.workspace-panel-header [contenteditable='true'],
+.workspace-panel-header [role='button'],
+.workspace-panel-header [role='textbox'],
+.workspace-panel-header [role='combobox'],
+.workspace-panel-header [role='menu'],
+.workspace-panel-header [role='menuitem'],
+.workspace-panel-header [role='tab'] {
+  -webkit-app-region: no-drag;
+}
+
+.workspace-header-title {
+  min-width: 0;
+  height: var(--size-control-min);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-back-button {
+  min-width: 0;
+  width: 100%;
+  height: var(--size-control-min);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: 8px;
+  padding: 0 8px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  transition:
+    color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease;
+}
+
+.settings-back-button:hover {
+  color: var(--color-text-primary);
+  background: var(--color-workspace-state-hover);
+}
+
+.workspace-header-actions {
+  position: relative;
+  z-index: 2;
+  height: var(--size-control-min);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.workspace-panel-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--color-text-primary);
+}
+
+.workspace-header-title-centered {
+  position: absolute;
+  left: 50%;
+  z-index: 1;
+  width: min(560px, max(180px, calc(100% - 320px)));
+  max-width: min(560px, max(180px, calc(100% - 320px)));
+  justify-content: center;
+  transform: translateX(-50%);
+}
+
+.workspace-layout-compact .workspace-header-title-centered,
+.workspace-layout-single .workspace-header-title-centered {
+  /* 紧凑模式下右侧监控已经退出占位，标题安全区也同步收窄；
+     这样顶部搜索/标题不会因为继续预留三栏宽度而过早缩成窄条。 */
+  width: min(460px, max(160px, calc(100% - 240px)));
+  max-width: min(460px, max(160px, calc(100% - 240px)));
+}
+
+.workspace-header-title-centered.chat-title-control {
+  z-index: 9;
+  pointer-events: auto;
+}
+
+.chat-title-control input {
+  width: 100%;
+}
+
+.page-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* 架构约定：主画布（workspace-main-surface）内所有页面容器的左右留白
+   **只能**由 padding-inline: var(--space-page-x) 单一来源承担。
+   禁止再叠加 max-width + margin: 0 auto 的二次居中，否则大窗口下会产生
+   额外的 auto margin，让左右间距大于上下，破坏“上下左右对称”的视觉契约。
+
+   可读宽度（长文/消息气泡）由**内部子元素**自行限宽（如消息气泡 max-w-[75%]、
+   正文 prose-readable），不能通过页面容器居中限宽来实现。
+
+   三个类名保留是为了语义标识和未来扩展点，当前视觉表现一致：四边对称 padding + 铺满父宽度。 */
+.page-container {
+  width: 100%;
+  padding: var(--space-page-y) var(--space-page-x);
+}
+
+.page-container-readable {
+  width: 100%;
+  padding: var(--space-page-y) var(--space-page-x);
+}
+
+.page-container-workbench {
+  width: 100%;
+  padding: var(--space-page-y) var(--space-page-x);
+}
+
+/* 顶栏下方的页面内容区域：main-surface 已通过 padding-top 给 titlebar 让位，
+   此处不再追加额外顶部间距，保证与左右/底部的 --space-page-y 完全对称。 */
+.workspace-page-container {
+  padding-top: var(--space-page-y);
+}
+
+.page-hero {
+  margin-bottom: 28px;
+}
+
+.page-title {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+
+.page-subtitle {
+  margin: 12px 0 0;
+  max-width: 780px;
+  color: var(--color-text-tertiary);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.ui-card {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-card);
+}
+
+.ui-glass {
+  background: var(--color-glass);
+  backdrop-filter: blur(18px) saturate(135%);
+  -webkit-backdrop-filter: blur(18px) saturate(135%);
+}
+
+.panel-toggle,
+.ui-icon-button,
+.ui-primary-icon-button {
+  height: var(--size-control-min);
+  min-width: var(--size-control-min);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  /* 默认基线为 secondary（7.5:1）：所有 ghost 风格图标按钮在静态下也满足 WCAG AA 图标对比度要求，
+     与 ModelSelector 等显式使用 secondary 的触发器保持视觉权重对齐。
+     hover 升至 primary 形成清晰的状态层级；ui-primary-icon-button 在下方覆盖为白字，不受影响。 */
+  color: var(--color-text-secondary);
+  background: transparent;
+  transition:
+    color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
+}
+
+/* panel-toggle：外壳控制按钮（侧栏折叠/监控切换/标题编辑等），
+   28×28 r7 是 app 内统一的“窗口/面板控制”语言，与页面操作 .topbar-btn 形成层级区分。 */
+.panel-toggle {
+  height: var(--ctrl-sm);
+  min-width: var(--ctrl-sm);
+  border-radius: 7px;
+}
+
+.panel-toggle:hover,
+.ui-icon-button:hover {
+  /* 默认基线已升至 secondary，hover 相应升一档到 primary，保证有可感知的状态变化。 */
+  color: var(--color-text-primary);
+  background: var(--color-workspace-state-hover);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.panel-toggle:active,
+.ui-icon-button:active {
+  color: var(--color-text-primary);
+  background: var(--color-workspace-state-active);
+  transform: none;
+}
+
+/* 用于 ui-icon-button 的 active/selected 常驻态（如 Sidebar 里选中 Settings） */
+.ui-icon-button-active {
+  color: var(--color-text-primary);
+  background: var(--color-workspace-state-active);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.ui-row-button {
+  min-height: 32px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  transition:
+    color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
+}
+
+.ui-row-button:hover {
+  color: var(--color-text-primary);
+  background: var(--color-workspace-state-hover);
+}
+
+.ui-row-button-active {
+  color: var(--color-text-primary);
+  background: var(--color-workspace-state-active);
+  font-weight: 600;
+}
+
+.ui-segment {
+  display: flex;
+  gap: 2px;
+  width: calc(100% - 8px);
+  margin-inline: 4px;
+  border-radius: 9px;
+  padding: 2px;
+  background: rgba(24, 24, 27, 0.036);
+}
+
+.ui-segment-button {
+  min-height: 26px;
+  flex: 1;
+  border-radius: 7px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  transition:
+    color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
+}
+
+.ui-segment-button:hover {
+  color: var(--color-text-primary);
+}
+
+.ui-segment-button-active {
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.32);
+}
+
+.ui-primary-icon-button {
+  border-radius: 999px;
+  color: white;
+  background: var(--color-accent);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.1);
+}
+
+.ui-primary-icon-button:hover,
+.ui-primary-icon-button:active {
+  color: white;
+  background: var(--color-accent-hover);
+}
+
+.ui-primary-icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.3;
+  box-shadow: none;
+}
+
+.ui-card-action {
+  border-radius: 12px;
+  border: 1px solid rgba(24, 24, 27, 0.075);
+  background: rgba(255, 255, 255, 0.64);
+  box-shadow: var(--shadow-card);
+  transition:
+    background-color var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease;
+}
+
+.ui-card-action:hover {
+  border-color: rgba(24, 24, 27, 0.14);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: var(--shadow-dropdown);
+}
+
+/* 聊天输入壳：五态语义化（rest / hover / focus ring / disabled / dragging）
+   全部走 CSS token，方便未来接深色模式；聚焦态用 3px 外发光 ring 替代
+   单纯加深阴影，兼顾键盘可达性（WCAG 2.4.7 Focus Visible）。 */
+.composer-shell {
+  /* 输入框外边距与页面容器对齐，保证 Chat 页面和工作台页面
+     在主画布内的上下左右距离一致。 */
+  margin: 0 var(--space-page-x) var(--space-page-y);
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
+  transition:
+    border-color var(--motion-fast) ease,
+    box-shadow var(--motion-fast) ease,
+    background-color var(--motion-fast) ease;
+}
+
+/* 悬停（未聚焦）：边框切 --color-border-input（#e4e4e7），比常态更清晰，
+   告知"此处可交互"；已聚焦时由 :focus-within 覆盖优先级。 */
+.composer-shell:hover:not(:focus-within) {
+  border-color: var(--color-border-input);
+}
+
+/* 聚焦态：用低饱和灰绿色弱化品牌蓝存在感，保留键盘可达性但不抢聊天内容。 */
+.composer-shell:focus-within {
+  border-color: rgba(91, 122, 111, 0.34);
+  box-shadow:
+    0 4px 18px rgba(15, 23, 42, 0.06),
+    0 0 0 3px rgba(91, 122, 111, 0.07);
+}
+
+/* 禁用态：整体降透明 + 禁用指针；通过 aria-disabled 标记触发，不侵入布局。 */
+.composer-shell[aria-disabled='true'] {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* 拖放高亮：整壳切灰绿色虚线 + 浅色背景高亮，告知"松手即可投放"。
+   虚线 + bg 组合避免与聚焦态视觉冲突（聚焦是实线 + ring）。 */
+.composer-shell--dragging,
+.composer-shell--dragging:hover:not(:focus-within) {
+  border-style: dashed;
+  border-color: rgba(91, 122, 111, 0.42);
+  background: var(--color-warm-soft);
+}
+
+/* 上方 chip/附件条：紧凑、与 resource-chip 同节奏。
+   文件/文件夹过多时限制在输入框内部滚动，避免无限换行把底部工具条挤出视口。 */
+.composer-context-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: min(188px, 32dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 10px 12px 8px;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 局部内缩滚动条轨道：WebKit 默认会把 thumb 贴到滚动容器边缘，
+   在输入壳圆角内滚到顶/底时视觉上像“越界”。只限制聊天输入内部两个滚动区，
+   避免改变全局列表和页面滚动条的行为。 */
+.composer-context-strip::-webkit-scrollbar-track,
+.composer-textarea::-webkit-scrollbar-track {
+  margin-block: 8px;
+}
+
+.ui-contained-scroll {
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+
+/* 圆角弹窗/短列表内部滚动条统一内缩，避免滚到顶/底时 thumb 贴出圆角容器边界。 */
+.ui-contained-scroll::-webkit-scrollbar-track {
+  margin-block: 8px;
+}
+
+.composer-textarea {
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+/* 附件卡片：双行展示——文件名 + 扩展名徽章（对应设计稿大卡片规范） */
+.composer-file-card {
+  min-width: 132px;
+  max-width: 220px;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(24, 24, 27, 0.08);
+  background: rgba(255, 255, 255, 0.7);
+  position: relative;
+  transition:
+    border-color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease;
+}
+
+.composer-file-card:hover {
+  border-color: rgba(24, 24, 27, 0.14);
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.composer-file-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* 卡片头部图标：与文件名同行，中性灊色避免引入新语义色 */
+.composer-file-card-icon {
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+}
+
+.composer-file-card-name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* 扩展名徽章：MD / PNG / PDF 等，圆角小胶囊 */
+.composer-file-card-badge {
+  align-self: flex-start;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: rgba(24, 24, 27, 0.06);
+  color: var(--color-text-tertiary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* 卡片右上角关闭按钮：18×18 圆形 ghost，常态隠藏，悬停卡片时以浅灰圆底浮现，避免裸 X 视觉杂乱 */
+.composer-file-card-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--color-text-tertiary);
+  background: rgba(24, 24, 27, 0.06);
+  opacity: 0;
+  transition:
+    opacity var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease,
+    transform var(--motion-fast) ease;
+}
+
+.composer-file-card:hover .composer-file-card-remove,
+.composer-file-card-remove:focus-visible {
+  opacity: 1;
+}
+
+.composer-file-card-remove:hover {
+  color: var(--color-text-primary);
+  background: rgba(24, 24, 27, 0.12);
+  transform: scale(1.06);
+}
+
+.composer-resource-chip {
+  max-width: 230px;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+  padding: 4px 4px 4px 8px;
+  color: var(--color-text-primary);
+  background: rgba(24, 24, 27, 0.05);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* 已启用技能 chip：复用 safe 语义 token，与 InitiativeCard 等安全态视觉语言对齐，
+   不再硬编码绿色十六进制。文字使用 --color-safe-text 保证 12px 字号 ≥4.5:1 对比度。 */
+.composer-resource-chip--skill {
+  background: var(--color-safe-bg);
+  color: var(--color-safe-text);
+  border: 1px solid var(--color-safe-border);
+}
+
+.composer-resource-chip--skill .composer-chip-remove {
+  /* 默认低强度：通过 opacity 让删除按钮退至次要焦点，与文字色保持同源 */
+  color: var(--color-safe-text);
+  opacity: 0.6;
+}
+
+.composer-resource-chip--skill .composer-chip-remove:hover {
+  color: var(--color-safe-text);
+  opacity: 1;
+  background: var(--color-safe-bg-hover);
+}
+
+.composer-chip-remove {
+  min-width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  color: var(--color-text-tertiary);
+  transition:
+    color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease;
+}
+
+.composer-chip-remove:hover {
+  color: var(--color-text-primary);
+  background: rgba(24, 24, 27, 0.08);
+}
+
+/* ============================================
+ * 统一引用 chip（composer-ref-chip）
+ * 技能 chip 共享同一 height/padding/radius；文件/目录/图片已改用 composer-file-card 大卡片。
+ * 定位：28px 高小 pill + 尾部常态可见的 remove 按钮（opacity 0.55 → hover 1.0）
+ * ============================================ */
+.composer-ref-chip {
+  height: 28px;
+  max-width: 240px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px 0 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(24, 24, 27, 0.08);
+  background: rgba(24, 24, 27, 0.04);
+  color: var(--color-text-primary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  transition:
+    border-color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease;
+}
+
+.composer-ref-chip:hover {
+  border-color: rgba(24, 24, 27, 0.14);
+  background: rgba(24, 24, 27, 0.07);
+}
+
+/* 图片 chip 左侧缩略图变体：放弃左 padding，缩略图贴边使视觉更紧凑 */
+.composer-ref-chip--image {
+  padding-left: 4px;
+}
+
+.composer-ref-chip-icon {
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+}
+
+.composer-ref-chip-thumb {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  background-color: rgba(24, 24, 27, 0.06);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.composer-ref-chip-label {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 常态 opacity 0.55——保证可见但不抓眼；悬停或 focus 升到 1.0（解决原“关闭按钮不明显”问题） */
+.composer-ref-chip-remove {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  color: var(--color-text-tertiary);
+  background: transparent;
+  opacity: 0.55;
+  transition:
+    opacity var(--motion-fast) ease,
+    color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease;
+}
+
+.composer-ref-chip:hover .composer-ref-chip-remove,
+.composer-ref-chip-remove:focus-visible {
+  opacity: 1;
+}
+
+.composer-ref-chip-remove:hover {
+  color: var(--color-text-primary);
+  background: rgba(24, 24, 27, 0.1);
+}
+
+/* 技能 chip：复用 safe 语义 token，与原 composer-resource-chip--skill 保持相同的视觉语言 */
+.composer-ref-chip--skill {
+  background: var(--color-safe-bg);
+  color: var(--color-safe-text);
+  border: 1px solid var(--color-safe-border);
+}
+
+.composer-ref-chip--skill .composer-ref-chip-icon {
+  color: var(--color-safe-text);
+}
+
+.composer-ref-chip--skill .composer-ref-chip-remove {
+  color: var(--color-safe-text);
+}
+
+.composer-ref-chip--skill .composer-ref-chip-remove:hover {
+  background: var(--color-safe-bg-hover);
+}
+
+/* 一键清空按钮：ghost 风格，高度与技能 chip 对齐，默认 tertiary 色避免与附件卡片竞争注意力 */
+.composer-context-strip-clear {
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: var(--color-text-tertiary);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  transition:
+    color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease;
+}
+
+.composer-context-strip-clear:hover {
+  color: var(--color-danger-text, #b91c1c);
+  background: rgba(185, 28, 28, 0.08);
+}
+
+/* ============================================
+ * 统一 Popover 设计 token
+ * 替代原先 composer-popover / ModelSelector / CwdSelector 三套各异实现
+ * 使用方：外层加 absolute + 自定位（bottom-full / left 等），内层行用 .ui-popover-row
+ * ============================================ */
+.ui-popover {
+  z-index: 60;
+  overflow: hidden;
+  min-width: 200px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-popover);
+  box-shadow:
+    0 12px 32px rgba(15, 23, 42, 0.08),
+    0 2px 8px rgba(15, 23, 42, 0.04);
+  padding: 5px;
+}
+
+.composer-action-popover {
+  width: min(208px, calc(100vw - 16px));
+}
+
+.composer-action-flyout {
+  width: 224px;
+  overflow-y: auto;
+}
+
+.composer-action-list {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 5px;
+}
+
+.composer-action-empty {
+  padding: 12px;
+}
+
+.ui-popover-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px 3px;
+  color: var(--color-text-tertiary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ui-popover-row {
+  min-height: 32px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+  padding: 0 8px;
+  color: var(--color-text-primary);
+  font-size: 12.5px;
+  font-weight: 500;
+  text-align: left;
+  transition:
+    background-color var(--motion-fast) ease,
+    color var(--motion-fast) ease;
+}
+
+.ui-popover-row:hover {
+  background: var(--color-workspace-state-hover);
+}
+
+.ui-popover-row-active {
+  background: var(--color-workspace-state-active);
+  color: var(--color-text-primary);
+}
+
+.ui-popover-row:disabled {
+  cursor: default;
+  /* 真正的禁用语义改用 disabled token（#a1a1aa），与装饰性弱辅助 tertiary（#71717a）区分；
+     刻意低于 WCAG AA 以表达"不可交互"。 */
+  color: var(--color-text-disabled);
+}
+
+.ui-popover-row:disabled:hover {
+  background: transparent;
+}
+
+/* 双行变体：主名称 + 描述，用于 skill picker 等 */
+.ui-popover-row-2l {
+  min-height: 40px;
+  padding: 5px 8px;
+}
+
+.ui-popover-badge {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(24, 24, 27, 0.05);
+  color: var(--color-text-tertiary);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.ui-popover-divider {
+  height: 1px;
+  margin: 3px 2px;
+  background: rgba(24, 24, 27, 0.06);
+}
+
+/* 一级菜单项尾部的 > 箭头：表示该项展开二级菜单 */
+.ui-popover-row-chevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--color-text-tertiary);
+}
+
+/* 二级菜单空态：专家套件/连接器暂未接入时的占位（即将上线） */
+.ui-popover-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px;
+  text-align: center;
+}
+
+.ui-popover-empty-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.ui-popover-empty-desc {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-tertiary);
+  max-width: 220px;
+}
+
+/* 一级菜单项 hover/active：一级菜单的右箭头项在二级展开时高亮 */
+.ui-popover-row-flyout-open {
+  background: var(--color-workspace-state-hover);
+}
+
+/* CWD 触发器选中态：已选工作目录时使用项目中性 token（灰底就地锁定），
+   保持整体中性设计语言。禁止使用品牌绿色等硬编码色，所有颜色必须走 CSS 变量。 */
+.cwd-trigger-filled {
+  background: var(--color-workspace-state-active);
+  color: var(--color-text-primary);
+}
+
+.cwd-trigger-filled:hover {
+  background: var(--color-workspace-state-active);
+  color: var(--color-text-primary);
+}
+
+/* 选中态图标颜色随文字统一到 primary，比默认 tertiary 更深表达"已锁定" */
+.cwd-trigger-filled .cwd-trigger-icon {
+  color: var(--color-text-primary);
+}
+
+/* × 清除按钮：默认宽度 0 折叠隐藏，hover 或键盘聚焦 chip 时从右侧展开。
+   用 max-width + opacity + margin-left 过渡，避免"凭空闪现"；160ms ease-out 与项目 motion-fast 对齐。
+   focus-within 兼顾键盘用户可达性。 */
+.cwd-trigger-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 0;
+  margin-left: 0;
+  padding: 3px;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: 4px;
+  color: var(--color-text-secondary);
+  transition:
+    max-width 160ms ease-out,
+    opacity 160ms ease-out,
+    margin-left 160ms ease-out,
+    background-color var(--motion-fast) ease,
+    color var(--motion-fast) ease;
+}
+
+.cwd-trigger-filled:hover .cwd-trigger-clear,
+.cwd-trigger-filled:focus-within .cwd-trigger-clear {
+  max-width: 22px;
+  margin-left: 2px;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.cwd-trigger-clear:hover {
+  background: var(--color-workspace-state-hover);
+  color: var(--color-text-primary);
+}
+
+.task-monitor-section {
+  padding: 4px 0 8px;
+}
+
+.task-monitor-section-header {
+  min-height: 34px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+  padding: 6px 8px;
+  color: var(--color-text-secondary);
+  transition:
+    color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease;
+}
+
+.task-monitor-section-header:hover {
+  color: var(--color-text-primary);
+  background: var(--color-workspace-state-hover);
+}
+
+.task-monitor-section-title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+/* ── 上下文用量内联指示器（输入框附近） ── */
+.ctx-indicator-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.ctx-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--ctrl-sm);
+  padding: 0 8px 0 6px;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  transition:
+    background-color var(--motion-fast) ease,
+    color var(--motion-fast) ease;
+}
+
+.ctx-indicator:hover {
+  background: var(--color-workspace-state-hover);
+}
+
+.ctx-indicator-pct {
+  font-size: 11px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* 三级语义色：圆环与文本同色，避免链路分散。
+   warn 阶段（60-80%）刻意使用 secondary 而非 tertiary：11px 小字号对比度必须 ≥7:1，
+   且与 .ctx-popover-pct--warn 保持同源；tertiary 是装饰弱辅助色，承担"开始关注"语义会偏弱。 */
+.ctx-indicator--warn {
+  color: var(--color-text-secondary);
+}
+.ctx-indicator--danger {
+  color: var(--color-warning);
+}
+.ctx-indicator--critical {
+  color: var(--color-error);
+}
+
+/* >=95% 脉动动画：2s 循环阐释紧急程度 */
+.ctx-ring--pulse {
+  animation: ctx-pulse 2s ease-in-out infinite;
+}
+
+@keyframes ctx-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* popover：距指示器 6px 间隙；与 .ui-popover 共享圆角/阴影/边框 token，保持整体一致 */
+.ctx-indicator-popover {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 20;
+  min-width: 188px;
+  max-width: 240px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--color-bg-popover);
+  box-shadow:
+    0 12px 32px rgba(15, 23, 42, 0.08),
+    0 2px 8px rgba(15, 23, 42, 0.04);
+  border: 1px solid var(--color-border);
+  pointer-events: none;
+}
+
+.ctx-popover-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.ctx-popover-title {
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--color-text-primary);
+}
+
+.ctx-popover-pct {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+}
+
+.ctx-popover-pct--warn {
+  color: var(--color-text-secondary);
+}
+.ctx-popover-pct--danger {
+  color: var(--color-warning);
+}
+.ctx-popover-pct--critical {
+  color: var(--color-error);
+}
+
+.ctx-popover-detail {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.ctx-popover-hint {
+  margin-top: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-chip);
+  font-size: 11.5px;
+  line-height: 1.5;
+  font-weight: 600;
+}
+
+.ctx-popover-hint--warn {
+  color: var(--color-caution-icon);
+  background: var(--color-caution-bg);
+  border: 1px solid var(--color-caution-border);
+}
+
+.ctx-popover-hint--danger {
+  color: var(--color-caution-icon);
+  background: var(--color-caution-bg);
+  border: 1px solid var(--color-caution-border);
+}
+
+.ctx-popover-hint--critical {
+  color: var(--color-danger-icon);
+  background: var(--color-danger-bg);
+  border: 1px solid var(--color-danger-border);
+}
+
+.ui-focus {
+  outline: none;
+}
+
+.ui-focus:focus-visible {
+  box-shadow: 0 0 0 2px rgba(24, 24, 27, 0.28);
+}
+
+@media (max-width: 900px) {
+  .app-shell {
+    padding: 0;
+  }
+
+  .workspace-window {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+
+  /* 窄窗口下整体收紧到 16px，仍保持四边对称 */
+  .composer-shell {
+    margin-left: 16px;
+    margin-right: 16px;
+  }
+
+  .page-container,
+  .page-container-readable,
+  .page-container-workbench {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  /* 极窄窗口：进一步收紧到 12px */
+  .composer-shell {
+    margin-left: 12px;
+    margin-right: 12px;
+    margin-bottom: 12px;
+  }
+
+  .page-container,
+  .page-container-readable,
+  .page-container-workbench {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
 }
 
 /* All interactive elements show pointer cursor */
@@ -164,4 +1985,61 @@ a {
 }
 .animate-fade-in {
   animation: fade-in 0.3s ease-out;
+}
+
+/* ── 全局 Tooltip（Radix Tooltip 样式层） ──
+   深色背景 + 白字，与 .ui-popover（白底卡片）形成语义区分：
+   popover 承载操作菜单，tooltip 承载瞬态提示信息（完整路径、截断全文等）。
+   样式依赖 Radix 暴露的 data-state / data-side / --radix-tooltip-content-transform-origin。 */
+.ui-tooltip {
+  z-index: 100;
+  max-width: 360px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--color-text-primary);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+  /* 长路径需要能够断行，不让 tooltip 撑出屏幕 */
+  word-break: break-all;
+  box-shadow:
+    0 4px 14px rgba(15, 23, 42, 0.18),
+    0 1px 3px rgba(15, 23, 42, 0.08);
+  user-select: none;
+  transform-origin: var(--radix-tooltip-content-transform-origin);
+  will-change: transform, opacity;
+}
+
+.ui-tooltip[data-state='delayed-open'],
+.ui-tooltip[data-state='instant-open'] {
+  animation: ui-tooltip-in 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ui-tooltip[data-state='closed'] {
+  animation: ui-tooltip-out 80ms ease-in;
+}
+
+.ui-tooltip-arrow {
+  fill: var(--color-text-primary);
+}
+
+@keyframes ui-tooltip-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes ui-tooltip-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }

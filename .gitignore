@@ -35,6 +35,12 @@ build-tar/
 # Editor / local tool state
 .claude/
 .openclaw/
+.gitnexus/
+.petclaw/
+.qoder/
+.serena/
+.superpowers/
+.mcp.json
 .idea/
 .vscode/settings.json
 

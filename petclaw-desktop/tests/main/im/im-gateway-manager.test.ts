@@ -58,6 +58,24 @@ describe('ImGatewayManager', () => {
       manager.deleteInstance(inst.id)
       expect(changes).toBe(3)
     })
+
+    it('should reject creating a second wechat instance', () => {
+      manager.createInstance('wechat', { accountId: 'first' }, 'First WeChat')
+
+      expect(() => {
+        manager.createInstance('wechat', { accountId: 'second' }, 'Second WeChat')
+      }).toThrow('微信最多只能创建 1 个实例')
+    })
+
+    it('should reject creating more than three dingtalk instances', () => {
+      manager.createInstance('dingtalk', { appKey: 'a' }, 'DingTalk A')
+      manager.createInstance('dingtalk', { appKey: 'b' }, 'DingTalk B')
+      manager.createInstance('dingtalk', { appKey: 'c' }, 'DingTalk C')
+
+      expect(() => {
+        manager.createInstance('dingtalk', { appKey: 'd' }, 'DingTalk D')
+      }).toThrow('钉钉最多只能创建 3 个实例')
+    })
   })
 
   describe('conversation binding', () => {

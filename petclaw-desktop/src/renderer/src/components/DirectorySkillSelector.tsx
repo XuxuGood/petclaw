@@ -52,16 +52,16 @@ export function DirectorySkillSelector({ selectedIds, onChange }: DirectorySkill
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder={t('skills.searchPlaceholder')}
-        className="w-full px-3 py-2 text-[13px] rounded-[10px] bg-bg-hover border border-border text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent/40"
+        className="w-full px-3 py-2 text-[13px] rounded-[8px] bg-bg-hover border border-border text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent/40"
       />
-      <div className="max-h-[300px] overflow-y-auto space-y-1">
+      <div className="ui-contained-scroll max-h-[300px] overflow-y-auto space-y-1">
         {filtered.map((skill) => {
           const isSelected = selectedIds.includes(skill.id)
           return (
             <button
               key={skill.id}
               onClick={() => toggle(skill.id)}
-              className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-[10px] text-[13px] transition-colors duration-[120ms] ${
+              className={`w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-[8px] text-[13px] transition-colors duration-[120ms] ${
                 isSelected ? 'bg-accent/10 text-accent' : 'text-text-secondary hover:bg-bg-hover'
               }`}
             >

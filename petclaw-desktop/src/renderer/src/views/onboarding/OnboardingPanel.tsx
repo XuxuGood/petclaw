@@ -72,7 +72,7 @@ function CatMascot({ bubbleText }: { bubbleText?: string }) {
     <div className="relative flex flex-col items-center justify-center h-full">
       {bubbleText && (
         <div className="absolute top-[22%] right-[8%] max-w-[260px] animate-fade-in">
-          <div className="bg-text-primary text-white text-[13px] leading-[1.6] px-4 py-3 rounded-[10px]">
+          <div className="bg-text-primary text-white text-[13px] leading-[1.6] px-4 py-3 rounded-[8px]">
             {bubbleText}
           </div>
           {/* Tail */}
@@ -121,14 +121,14 @@ function NavFooter({
         {showPrev && (
           <button
             onClick={onPrev}
-            className="px-5 py-2 text-[14px] text-text-primary bg-bg-card border border-border rounded-[10px] hover:bg-bg-hover active:scale-[0.96] transition-all duration-[120ms]"
+            className="px-5 py-2 text-[14px] text-text-primary bg-bg-card border border-border rounded-[8px] hover:bg-bg-hover active:scale-[0.96] transition-all duration-[120ms]"
           >
             {t('common.prevStep')}
           </button>
         )}
         <button
           onClick={onNext}
-          className="px-5 py-2 text-[14px] text-white bg-accent rounded-[10px] hover:bg-accent-hover active:scale-[0.96] transition-all duration-[120ms]"
+          className="px-5 py-2 text-[14px] text-white bg-accent rounded-[8px] hover:bg-accent-hover active:scale-[0.96] transition-all duration-[120ms]"
         >
           {nextLabel}
         </button>
@@ -163,7 +163,7 @@ function PermissionsStep() {
         {/* Accessibility */}
         <button
           onClick={() => handlePermission('accessibility')}
-          className="w-full flex items-center justify-between p-4 border border-border-input rounded-[10px] hover:bg-bg-hover transition-colors text-left"
+          className="w-full flex items-center justify-between p-4 border border-border-input rounded-[8px] hover:bg-bg-hover transition-colors text-left"
         >
           <span className="text-[15px] text-text-primary font-medium">
             {t('onboarding.accessibility')}
@@ -182,7 +182,7 @@ function PermissionsStep() {
         {/* Microphone */}
         <button
           onClick={() => handlePermission('microphone')}
-          className="w-full flex items-center justify-between p-4 border border-border-input rounded-[10px] hover:bg-bg-hover transition-colors text-left"
+          className="w-full flex items-center justify-between p-4 border border-border-input rounded-[8px] hover:bg-bg-hover transition-colors text-left"
         >
           <span className="text-[15px] text-text-primary font-medium">
             {t('onboarding.microphone')}
@@ -260,7 +260,7 @@ function ProfileStep() {
             value={nickname}
             onChange={(e) => setNickname(e.target.value.slice(0, 20))}
             disabled={profileSubmitted}
-            className="w-full px-4 py-3 bg-bg-input rounded-[10px] text-[15px] text-text-primary outline-none focus:ring-2 focus:ring-accent/10 disabled:opacity-60 transition-all"
+            className="w-full px-4 py-3 bg-bg-input rounded-[8px] text-[15px] text-text-primary outline-none focus:ring-2 focus:ring-accent/10 disabled:opacity-60 transition-all"
             autoFocus
           />
         </div>
@@ -272,7 +272,7 @@ function ProfileStep() {
           </label>
           <div
             onClick={() => !profileSubmitted && setDropdownOpen(!dropdownOpen)}
-            className={`w-full flex items-center flex-wrap gap-1.5 px-3 py-2.5 min-h-[48px] bg-bg-input rounded-[10px] cursor-pointer border border-transparent transition-all ${
+            className={`w-full flex items-center flex-wrap gap-1.5 px-3 py-2.5 min-h-[48px] bg-bg-input rounded-[8px] cursor-pointer border border-transparent transition-all ${
               dropdownOpen ? 'ring-2 ring-accent/10' : ''
             } ${profileSubmitted ? 'opacity-60 cursor-default' : ''}`}
           >
@@ -304,7 +304,7 @@ function ProfileStep() {
 
           {/* Dropdown options */}
           {dropdownOpen && (
-            <div className="mt-1 bg-bg-card border border-border-input rounded-[10px] shadow-dropdown overflow-hidden animate-fade-in z-50 relative">
+            <div className="mt-1 bg-bg-card border border-border-input rounded-[8px] shadow-dropdown overflow-hidden animate-fade-in z-50 relative">
               {USER_ROLES.map(({ value, label }) => {
                 const isSelected = roles.includes(value)
                 return (
@@ -336,7 +336,7 @@ function ProfileStep() {
         {!profileSubmitted && nickname.trim() && roles.length > 0 && (
           <button
             onClick={handleSubmit}
-            className="w-full py-3 bg-accent text-white text-[15px] font-semibold rounded-[10px] hover:bg-accent-hover active:scale-[0.96] transition-all duration-[120ms]"
+            className="w-full py-3 bg-accent text-white text-[15px] font-semibold rounded-[8px] hover:bg-accent-hover active:scale-[0.96] transition-all duration-[120ms]"
           >
             {t('common.submit')}
           </button>
@@ -344,7 +344,7 @@ function ProfileStep() {
         {profileSubmitted && (
           <button
             onClick={handleResubmit}
-            className="w-full py-3 bg-accent text-white text-[15px] font-semibold rounded-[10px] hover:bg-accent-hover active:scale-[0.96] transition-all duration-[120ms]"
+            className="w-full py-3 bg-accent text-white text-[15px] font-semibold rounded-[8px] hover:bg-accent-hover active:scale-[0.96] transition-all duration-[120ms]"
           >
             {t('common.resubmit')}
           </button>
@@ -368,14 +368,14 @@ function SkillsStep() {
       </h1>
       <p className="mt-2 text-[14px] text-text-tertiary italic">{t('onboarding.skillsSubtitle')}</p>
 
-      <div className="mt-5 flex-1 overflow-y-auto border border-border-input rounded-[14px] divide-y divide-border">
+      <div className="ui-contained-scroll mt-5 flex-1 overflow-y-auto border border-border-input rounded-[12px] divide-y divide-border">
         {skills.map((skill) => (
           <div
             key={skill.id}
             className="flex items-center gap-3.5 px-4 py-3.5 hover:bg-bg-hover transition-colors"
           >
             {/* Icon */}
-            <div className="w-10 h-10 rounded-[10px] bg-bg-input flex items-center justify-center text-[20px] shrink-0">
+            <div className="w-10 h-10 rounded-[8px] bg-bg-input flex items-center justify-center text-[20px] shrink-0">
               {skill.icon}
             </div>
 
@@ -433,12 +433,12 @@ function ShortcutStep() {
       </p>
 
       {/* Shortcut display */}
-      <div className="mt-8 flex items-center justify-between p-4 border border-border-input rounded-[10px]">
+      <div className="mt-8 flex items-center justify-between p-4 border border-border-input rounded-[8px]">
         <div className="flex items-center gap-3">
           <Keyboard size={20} className="text-text-secondary" />
           <span className="text-[15px] text-text-primary">{t('onboarding.keyboardShortcut')}</span>
         </div>
-        <span className="px-3 py-1 bg-bg-input rounded-[10px] text-[14px] font-mono text-text-secondary">
+        <span className="px-3 py-1 bg-bg-input rounded-[8px] text-[14px] font-mono text-text-secondary">
           {shortcut}
         </span>
       </div>
@@ -454,7 +454,7 @@ function ShortcutStep() {
 
         <button
           onClick={() => setIsRecording(!isRecording)}
-          className={`mt-4 w-full flex items-center gap-3 p-4 border rounded-[10px] transition-all ${
+          className={`mt-4 w-full flex items-center gap-3 p-4 border rounded-[8px] transition-all ${
             isRecording ? 'border-error bg-[#fef2f2]' : 'border-border-input hover:bg-bg-hover'
           }`}
         >
@@ -522,7 +522,7 @@ function StarterCardsStep({ onSelectCard }: { onSelectCard: (message: string) =>
           <button
             key={card.title}
             onClick={() => onSelectCard(card.message)}
-            className="flex flex-col items-start p-4 border border-border rounded-[14px] hover:bg-bg-hover hover:border-text-tertiary/30 transition-all active:scale-[0.96] duration-[120ms] text-left"
+            className="flex flex-col items-start p-4 border border-border rounded-[12px] hover:bg-bg-hover hover:border-text-tertiary/30 transition-all active:scale-[0.96] duration-[120ms] text-left"
           >
             <span className="text-[24px] mb-2">{card.icon}</span>
             <h3 className="text-[14px] font-semibold text-text-primary mb-1">{card.title}</h3>

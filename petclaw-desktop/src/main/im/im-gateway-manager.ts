@@ -4,7 +4,7 @@
 import { EventEmitter } from 'events'
 
 import type { ImStore } from '../data/im-store'
-import type { ImConversationBinding, ImInstance, Platform } from './types'
+import { PLATFORM_INFO, type ImConversationBinding, type ImInstance, type Platform } from './types'
 
 function normalizeEnvToken(value: string): string {
   return value.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()
@@ -38,6 +38,15 @@ export class ImGatewayManager extends EventEmitter {
     credentials: Record<string, unknown>,
     name?: string
   ): ImInstance {
+    // 平台实例数量是后端能力约束，不能只依赖 UI 隐藏入口；微信必须保持单实例模型。
+    const existingCount = this.store
+      .listInstances()
+      .filter((inst) => inst.platform === platform).length
+    const platformInfo = PLATFORM_INFO[platform]
+    if (existingCount >= platformInfo.maxInstances) {
+      throw new Error(`${platformInfo.name}最多只能创建 ${platformInfo.maxInstances} 个实例`)
+    }
+
     const id = crypto.randomUUID()
     this.store.insertInstance(id, platform, credentials, name ?? null)
     this.emit('change')

@@ -102,9 +102,9 @@ export async function runBootCheck(
     // 确保 gateway 进程 spawn 时能拿到 API Key 等明文值
     engineManager.setSecretEnvVars(configSync.collectSecretEnvVars())
 
-    // EngineManager 启动 gateway 进程并等待就绪
+    // EngineManager 启动 gateway 进程并等待就绪；重试时健康进程会返回 running。
     const status = await engineManager.startGateway()
-    if (status.phase !== 'ready') {
+    if (status.phase !== 'ready' && status.phase !== 'running') {
       throw new Error(status.message || t('boot.gatewayFailed'))
     }
 

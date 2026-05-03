@@ -170,11 +170,10 @@ function LogoArea({ success }: { success: boolean }) {
 /* ── Step row ── */
 function StepRow({ step }: { step: BootStep }) {
   const rightText = step.hint || STEP_ESTIMATES[step.id] || ''
-  const showRight = (step.status === 'running' || step.status === 'pending') && rightText
   const label = step.label
 
   return (
-    <div className="flex items-center gap-3.5">
+    <div className="flex min-h-[28px] items-center gap-3.5">
       {/* Icon area — fixed size, content crossfades via opacity */}
       <div className="w-6 h-6 flex items-center justify-center shrink-0 relative">
         {/* Pending dot */}
@@ -219,7 +218,7 @@ function StepRow({ step }: { step: BootStep }) {
 
       {/* Label — smooth color/weight transition */}
       <span
-        className="text-[15px] flex-1 transition-all duration-300"
+        className="text-[15px] flex-1 min-w-0 truncate transition-all duration-300"
         style={{
           color:
             step.status === 'error'
@@ -233,12 +232,17 @@ function StepRow({ step }: { step: BootStep }) {
         {label}
       </span>
 
-      {/* Right-side hint / estimate — fade transition */}
+      {/* 右侧列始终占位，避免错误态隐藏时间后整行宽度跳动。 */}
       <span
-        className="text-[13px] shrink-0 tabular-nums transition-opacity duration-300"
+        className="w-[52px] text-right text-[13px] shrink-0 tabular-nums transition-opacity duration-300"
         style={{
-          opacity: showRight ? 1 : 0,
-          color: step.status === 'running' ? 'var(--color-text-tertiary)' : 'var(--color-border)'
+          opacity: rightText ? 1 : 0,
+          color:
+            step.status === 'error'
+              ? 'var(--color-error)'
+              : step.status === 'running'
+                ? 'var(--color-text-tertiary)'
+                : 'var(--color-border)'
         }}
       >
         {rightText}
@@ -251,12 +255,11 @@ export function BootCheckPanel({ onRetry }: { onRetry?: () => void }) {
   const [steps, setSteps] = useState<BootStep[]>([])
   const [hasError, setHasError] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
+  const [isRetrying, setIsRetrying] = useState(false)
   const { t } = useI18n()
 
   const handleRetry = (): void => {
-    setSteps([])
-    setHasError(false)
-    setShowSuccess(false)
+    setIsRetrying(true)
     onRetry?.()
   }
 
@@ -264,13 +267,16 @@ export function BootCheckPanel({ onRetry }: { onRetry?: () => void }) {
     const unsub = window.api.onBootStepUpdate((newSteps) => {
       setSteps([...newSteps])
       setHasError(newSteps.some((s) => s.status === 'error'))
+      setIsRetrying(false)
     })
     return unsub
   }, [])
 
   const doneCount = steps.filter((s) => s.status === 'done').length
-  const progress = steps.length > 0 ? (doneCount / steps.length) * 100 : 0
   const errorStep = steps.find((s) => s.status === 'error')
+  const errorIndex = steps.findIndex((s) => s.status === 'error')
+  const progressCount = errorIndex >= 0 ? errorIndex + 1 : doneCount
+  const progress = steps.length > 0 ? (progressCount / steps.length) * 100 : 0
   const allDone = steps.length > 0 && doneCount === steps.length
 
   // Choreographed success transition
@@ -344,6 +350,7 @@ export function BootCheckPanel({ onRetry }: { onRetry?: () => void }) {
 
         {/* Steps + Progress — fade out as a group on success */}
         <div
+          className="w-full max-w-[400px]"
           style={{
             opacity: stepsVisible ? 1 : 0,
             transform: stepsVisible ? 'translateY(0)' : 'translateY(8px)',
@@ -352,22 +359,24 @@ export function BootCheckPanel({ onRetry }: { onRetry?: () => void }) {
           }}
         >
           {/* Steps */}
-          <div className="w-full max-w-[400px] mt-8 space-y-5 mx-auto">
+          <div className="w-full mt-8 space-y-5 mx-auto">
             {steps.map((step) => (
               <StepRow key={step.id} step={step} />
             ))}
           </div>
 
-          {/* Progress bar */}
-          {!hasError && steps.length > 0 && (
-            <div className="w-full max-w-[400px] mt-8 h-[5px] bg-border-input rounded-full overflow-hidden mx-auto">
+          {/* 错误态也保留进度条，让用户知道失败发生在哪个阶段。 */}
+          {steps.length > 0 && (
+            <div className="w-full mt-8 h-[5px] bg-border-input rounded-full overflow-hidden mx-auto">
               <div
                 className="h-full rounded-full transition-all duration-700 ease-out"
                 style={{
                   width: `${progress}%`,
-                  background: allDone
-                    ? 'linear-gradient(to right, var(--color-text-primary), var(--color-success))'
-                    : 'var(--color-success)'
+                  background: hasError
+                    ? 'var(--color-error)'
+                    : allDone
+                      ? 'linear-gradient(to right, var(--color-text-primary), var(--color-success))'
+                      : 'var(--color-success)'
                 }}
               />
             </div>
@@ -375,17 +384,24 @@ export function BootCheckPanel({ onRetry }: { onRetry?: () => void }) {
 
           {/* Error message + retry */}
           {errorStep && (
-            <div className="w-full max-w-[400px] mt-8 flex flex-col items-center gap-4 mx-auto">
-              <div className="w-full rounded-[10px] bg-danger-bg border border-danger-border px-4 py-3">
-                <p className="text-[13px] text-error leading-relaxed">{errorStep.error}</p>
+            <div className="w-full mt-8 flex flex-col items-center gap-4 mx-auto">
+              <div className="w-full rounded-[8px] bg-danger-bg border border-danger-border px-4 py-3">
+                <p className="max-h-[92px] overflow-y-auto break-words text-[13px] text-error leading-relaxed">
+                  {errorStep.error}
+                </p>
               </div>
               {onRetry && (
                 <button
                   onClick={handleRetry}
-                  className="flex items-center justify-center gap-2 w-full py-3 bg-accent text-white text-[14px] font-medium rounded-[10px] hover:bg-accent-hover active:scale-[0.96] transition-all duration-[120ms] cursor-pointer shadow-sm"
+                  disabled={isRetrying}
+                  className="flex min-h-[44px] items-center justify-center gap-2 w-full py-3 bg-accent text-white text-[14px] font-medium rounded-[8px] hover:bg-accent-hover active:scale-[0.96] transition-all duration-[120ms] cursor-pointer shadow-sm disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100"
                   style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
                 >
-                  <RefreshCw size={15} strokeWidth={2.5} />
+                  <RefreshCw
+                    size={15}
+                    strokeWidth={2.5}
+                    className={isRetrying ? 'animate-spin' : undefined}
+                  />
                   {t('common.retry')}
                 </button>
               )}

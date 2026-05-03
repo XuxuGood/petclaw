@@ -1,0 +1,2 @@
+# 切换分支后代码图谱可能过期，自动检查 GitNexus 索引；脚本只在 stale 时刷新，不强制全量重建。
+node scripts/ai/gitnexus-refresh.cjs --reason post-checkout

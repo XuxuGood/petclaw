@@ -12,10 +12,10 @@ class FakeWindow {
   }
 }
 
-function createEngineManager(baseDir: string) {
+function createEngineManager(baseDir: string, phase: 'ready' | 'running' = 'ready') {
   return {
     getBaseDir: vi.fn(() => baseDir),
-    startGateway: vi.fn(async () => ({ phase: 'ready' })),
+    startGateway: vi.fn(async () => ({ phase })),
     getGatewayConnectionInfo: vi.fn(() => ({ port: 18789, token: 'token' })),
     setSecretEnvVars: vi.fn()
   }
@@ -62,5 +62,17 @@ describe('runBootCheck', () => {
     expect(result.success).toBe(true)
     expect(fs.existsSync(skillsRoot)).toBe(true)
     expect(fs.existsSync(path.join(baseDir, 'skills'))).toBe(false)
+  })
+
+  it('treats an already running gateway as boot success', async () => {
+    const result = await runBootCheck(
+      new FakeWindow() as never,
+      createEngineManager(baseDir, 'running') as never,
+      createConfigSync() as never
+    )
+
+    expect(result.success).toBe(true)
+    expect(result.port).toBe(18789)
+    expect(result.token).toBe('token')
   })
 })

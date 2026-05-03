@@ -6,6 +6,16 @@
     "pnpm": ">=9.0.0"
   },
   "scripts": {
+    "ai:bootstrap": "node scripts/ai/bootstrap-tools.cjs",
+    "ai:index": "node scripts/ai/gitnexus-refresh.cjs",
+    "ai:impact": "node scripts/ai/gitnexus-impact.cjs",
+    "ai:mcp:guide": "node scripts/ai/guide-mcp-config.cjs",
+    "ai:mcp:install": "node scripts/ai/install-mcp-config.cjs",
+    "ai:mcp:write": "node scripts/ai/write-mcp-config.cjs",
+    "ai:prepare-change": "node scripts/ai/prepare-change.cjs",
+    "ai:serena:dashboard": "node scripts/ai/serena-dashboard.cjs",
+    "ai:setup": "node scripts/ai/setup-ai-context.cjs",
+    "ai:tools:check": "node scripts/ai/check-ai-tools.cjs",
     "dev:desktop": "pnpm --filter petclaw-desktop dev",
     "build:desktop": "pnpm --filter petclaw-desktop build",
     "test": "pnpm -r test",

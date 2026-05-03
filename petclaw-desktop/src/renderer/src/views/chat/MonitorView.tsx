@@ -33,7 +33,7 @@ export function MonitorView() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
-      <div className="drag-region h-[52px] shrink-0 flex items-center px-6">
+      <div className="h-[52px] shrink-0 flex items-center px-6">
         <div className="w-[70px]" />
         <h2 className="text-[13px] font-semibold text-text-primary">{t('monitor.title')}</h2>
       </div>
@@ -71,7 +71,7 @@ function SessionCard({ session }: { session: AgentSession }) {
   const elapsedStr = elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`
 
   return (
-    <div className="p-4 bg-bg-card rounded-[10px] shadow-[var(--shadow-card)] border border-border">
+    <div className="p-4 bg-bg-card rounded-[8px] shadow-[var(--shadow-card)] border border-border">
       <div className="flex items-center gap-3">
         <div
           className={`w-2 h-2 rounded-full shrink-0 ${

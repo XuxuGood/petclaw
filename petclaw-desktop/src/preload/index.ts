@@ -101,12 +101,31 @@ const api = {
     return () => ipcRenderer.removeListener('pet:toggle-pause', handler)
   },
 
+  // ── Chat (附件对话框) ──
+  chat: {
+    // 调用原生对话框选择文件和/或目录绝对路径；返回空数组即表示取消。
+    // kind='image' 的条目额外带 base64Data+mimeType，供 chip 内联缩略图预览。
+    selectAttachments: (options?: {
+      defaultPath?: string
+      mode?: 'auto' | 'file' | 'directory'
+    }): Promise<
+      Array<{
+        path: string
+        kind: 'file' | 'directory' | 'image'
+        mimeType?: string
+        base64Data?: string
+      }>
+    > => ipcRenderer.invoke('dialog:select-attachments', options)
+  },
+
   // ── Cowork ──
   cowork: {
     startSession: (options: {
       prompt: string
       cwd?: string
       systemPrompt?: string
+      imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>
+      pathReferences?: Array<{ path: string; kind: 'file' | 'directory' }>
       skillIds?: string[]
       selectedModel?: { providerId: string; modelId: string }
     }) => ipcRenderer.invoke('cowork:session:start', options),
@@ -114,6 +133,8 @@ const api = {
       sessionId: string
       prompt: string
       systemPrompt?: string
+      imageAttachments?: Array<{ name: string; mimeType: string; base64Data: string }>
+      pathReferences?: Array<{ path: string; kind: 'file' | 'directory' }>
       skillIds?: string[]
       selectedModel?: { providerId: string; modelId: string }
     }) => ipcRenderer.invoke('cowork:session:continue', options),
@@ -212,7 +233,10 @@ const api = {
     updateModel: (agentId: string, model: string) =>
       ipcRenderer.invoke('directory:update-model', agentId, model),
     updateSkills: (agentId: string, skillIds: string[]) =>
-      ipcRenderer.invoke('directory:update-skills', agentId, skillIds)
+      ipcRenderer.invoke('directory:update-skills', agentId, skillIds),
+    // 调用系统原生目录选择对话框；用户取消返回 null
+    selectDirectory: (options?: { defaultPath?: string }): Promise<string | null> =>
+      ipcRenderer.invoke('dialog:select-directory', options)
   },
   models: {
     providers: () => ipcRenderer.invoke('models:providers'),

@@ -24,17 +24,17 @@ export interface Point {
 
 export const PET_W = 180
 export const PET_H = 145
-export const CHAT_W_MIN = 800
-export const CHAT_H_MIN = 560
+export const CHAT_W_MIN = 760
+export const CHAT_H_MIN = 460
 
 const PET_ANCHOR_OFFSET_X = 150
 const PET_ANCHOR_OFFSET_Y = 200
 const PET_SCREEN_MARGIN_X = 220
 const PET_SCREEN_MARGIN_Y = 185
-const CHAT_W_RATIO = 0.55
-const CHAT_W_MAX = 1200
+const CHAT_W_RATIO = 0.72
+const CHAT_W_MAX = 1440
 const CHAT_H_RATIO = 0.7
-const CHAT_H_MAX = 900
+const CHAT_H_MAX = 960
 
 export function resolveChatSize(screenSize: ScreenSize): WindowSize {
   return {
@@ -54,20 +54,23 @@ export function resolveMainWindowBounds(options: {
   let initialX: number | undefined
   let initialY: number | undefined
 
-  if (saved && saved.width >= CHAT_W_MIN && saved.height >= CHAT_H_MIN) {
+  if (saved) {
+    // 旧版本可能保存过极小窗口，恢复时夹到移动式紧凑尺寸，避免内容被挤爆。
+    const restoredW = Math.min(Math.max(saved.width, CHAT_W_MIN), options.screen.width)
+    const restoredH = Math.min(Math.max(saved.height, CHAT_H_MIN), options.screen.height)
     if (
       saved.x >= 0 &&
       saved.y >= 0 &&
-      saved.x + saved.width <= options.screen.width + 100 &&
-      saved.y + saved.height <= options.screen.height + 100
+      saved.x + restoredW <= options.screen.width + 100 &&
+      saved.y + restoredH <= options.screen.height + 100
     ) {
-      initialW = saved.width
-      initialH = saved.height
+      initialW = restoredW
+      initialH = restoredH
       initialX = saved.x
       initialY = saved.y
     } else {
-      initialW = Math.min(saved.width, options.screen.width)
-      initialH = Math.min(saved.height, options.screen.height)
+      initialW = restoredW
+      initialH = restoredH
     }
   }
 

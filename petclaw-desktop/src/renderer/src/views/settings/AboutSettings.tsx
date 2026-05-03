@@ -19,7 +19,7 @@ export function AboutSettings() {
       <p className="text-[13px] text-text-tertiary mb-6">{t('about.subtitle')}</p>
 
       {/* 版本信息卡片 */}
-      <div className="rounded-[14px] bg-bg-card border border-border overflow-hidden mb-4">
+      <div className="rounded-[12px] bg-bg-card border border-border overflow-hidden mb-4">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <span className="text-[14px] text-text-primary">{t('about.version')}</span>
           <span className="text-[14px] text-text-secondary font-mono">{version}</span>
@@ -31,7 +31,7 @@ export function AboutSettings() {
       </div>
 
       {/* 外部链接 */}
-      <div className="rounded-[14px] bg-bg-card border border-border overflow-hidden">
+      <div className="rounded-[12px] bg-bg-card border border-border overflow-hidden">
         <a
           href="https://github.com/petclaw"
           target="_blank"
