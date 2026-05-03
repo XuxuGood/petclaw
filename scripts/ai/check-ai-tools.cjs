@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-// AI 工具链只读检查脚本。
+// AI 工具链只读快检脚本。
 // 使用场景：
 // - 新机器或新仓库拉取后运行 pnpm ai:tools:check。
-// - 排查 GitNexus / Serena / MCP 模板为什么不可用。
+// - 快速确认 GitNexus / Serena / MCP 模板是否存在；更完整诊断使用 pnpm ai:doctor。
 // 设计原则：
 // - 只检查，不安装、不写文件。
 // - 缺失项用可执行建议提示，避免开发者猜下一步。
@@ -75,7 +75,7 @@ function main() {
 
   if (!hasGitNexus || !hasSerena) {
     // 检查脚本只负责告诉开发者缺什么，不执行安装；安装由 setup/bootstrap 的显式初始化流程触发。
-    logWarn('AI 工具链尚未完整。首次接入推荐运行：pnpm ai:setup -- --client codex')
+    logWarn('AI 工具链尚未完整。首次接入推荐运行：pnpm ai:setup -- --client codex；深度诊断运行：pnpm ai:doctor')
   }
 }
 

@@ -57,7 +57,8 @@ function runCommand(command, args, options = {}) {
   const result = spawnSync(command, args, {
     cwd: PROJECT_ROOT,
     encoding: 'utf8',
-    stdio: options.inherit ? 'inherit' : ['ignore', 'pipe', 'pipe']
+    stdio: options.inherit ? 'inherit' : ['ignore', 'pipe', 'pipe'],
+    timeout: options.timeoutMs
   })
 
   return {
@@ -299,7 +300,8 @@ function runGitNexus(args, options = {}) {
   const result = spawnSync(gitnexus.command, [...gitnexus.argsPrefix, ...args], {
     cwd: PROJECT_ROOT,
     encoding: 'utf8',
-    stdio: options.inherit ? 'inherit' : ['ignore', 'pipe', 'pipe']
+    stdio: options.inherit ? 'inherit' : ['ignore', 'pipe', 'pipe'],
+    timeout: options.timeoutMs
   })
 
   return {
