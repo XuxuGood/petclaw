@@ -320,6 +320,18 @@ export const zh: Record<string, string> = {
   'tray.monitor': 'AI 工具监控',
   'tray.quit': '退出 PetClaw',
 
+  // ── system integration ──
+  'system.about': '关于 PetClaw',
+  'system.openPetClaw': '打开 PetClaw',
+  'system.showPet': '显示宠物',
+  'system.hidePet': '隐藏宠物',
+  'system.togglePet': '显示/隐藏宠物',
+  'system.settings': '设置...',
+  'system.quit': '退出 PetClaw',
+  'system.pausePet': '暂停宠物',
+  'system.resumePet': '继续宠物',
+  'system.window': '窗口',
+
   // ── pet context menu ──
   'pet.resume': '继续',
   'pet.pause': '停一下',

@@ -320,6 +320,18 @@ export const en: Record<string, string> = {
   'tray.monitor': 'AI Tool Monitor',
   'tray.quit': 'Quit PetClaw',
 
+  // ── system integration ──
+  'system.about': 'About PetClaw',
+  'system.openPetClaw': 'Open PetClaw',
+  'system.showPet': 'Show Pet',
+  'system.hidePet': 'Hide Pet',
+  'system.togglePet': 'Show/Hide Pet',
+  'system.settings': 'Settings...',
+  'system.quit': 'Quit PetClaw',
+  'system.pausePet': 'Pause Pet',
+  'system.resumePet': 'Resume Pet',
+  'system.window': 'Window',
+
   // ── pet context menu ──
   'pet.resume': 'Resume',
   'pet.pause': 'Pause',
