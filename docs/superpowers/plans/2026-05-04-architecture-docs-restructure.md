@@ -4,7 +4,7 @@
 
 **Goal:** Reorganize PetClaw architecture and design documentation so the root architecture document becomes a map, desktop details move into function-module documents, engineering workflows are separated, and external design references are clearly distinguished from PetClaw visual facts.
 
-**Architecture:** Current facts remain in existing docs until migrated. The new structure introduces explicit document ownership: `PetClaw架构总览.md` for system-level navigation, `desktop/` for detailed desktop modules, `engineering/` for repository engineering workflows, and `docs/设计/{references,specs,snapshots}` for UI design sources.
+**Architecture:** Current facts remain in existing docs until migrated. The new structure introduces explicit document ownership: `PetClaw架构总览.md` for system-level navigation, `desktop/` for detailed desktop modules and Desktop UI specifications, `engineering/` for repository engineering workflows, and local-only `docs/设计参考/{references,snapshots}` for UI reference assets.
 
 **Tech Stack:** Markdown documentation, Git file moves, repository-wide reference checks with `rg`.
 
@@ -15,18 +15,20 @@
 - Create: `docs/架构设计/README.md` — architecture docs entry and reading routes.
 - Create: `docs/架构设计/PetClaw架构总览.md` — system map replacing the root-level meaning of the old overall doc.
 - Create: `docs/架构设计/shared/README.md` — shared package boundary.
-- Create: `docs/架构设计/desktop/Desktop架构设计.md` — desktop domain overview.
-- Create: `docs/架构设计/desktop/Renderer架构设计.md` — migrated role of the current frontend architecture doc.
-- Create: `docs/架构设计/desktop/*.md` — module document skeletons for core desktop modules.
+- Create: `docs/架构设计/desktop/README.md` — desktop layered documentation entry.
+- Create: `docs/架构设计/desktop/overview/Desktop架构设计.md` — desktop domain overview.
+- Create: `docs/架构设计/desktop/foundation/Renderer架构设计.md` — migrated role of the current frontend architecture doc.
+- Create: `docs/架构设计/desktop/{foundation,runtime,domains,ui}/*.md` — module documents for core desktop layers.
 - Create: `docs/架构设计/web/README.md` — reserved workspace boundary.
 - Create: `docs/架构设计/api/README.md` — reserved workspace boundary.
 - Create: `docs/架构设计/engineering/CI-CD架构设计.md` — GitHub Actions workflow architecture.
 - Move: `docs/架构设计/AI代码上下文工程设计.md` → `docs/架构设计/engineering/AI代码上下文工程设计.md`.
 - Create: `docs/架构设计/decisions/ADR-0001-architecture-docs-restructure.md` — decision record for this split.
 - Use: `docs/架构设计/legacy/` — target for obsolete or historical docs when migration happens.
-- Create: `docs/设计/README.md` — design source boundaries.
-- Create directories: `docs/设计/references/`, `docs/设计/specs/`, `docs/设计/snapshots/`.
-- Move existing external design reference folders under `docs/设计/references/`.
+- Keep `docs/设计参考/` local-only for design reference assets.
+- Do not commit external reference images or local screenshot baselines.
+- Move Desktop UI specification docs under `docs/架构设计/desktop/`.
+- Move existing external design reference folders under `docs/设计参考/references/`.
 - Modify: `AGENTS.md`, `CLAUDE.md`, `README.md`, and other current docs that point to renamed architecture facts.
 
 ---
@@ -35,11 +37,11 @@
 
 **Files:**
 - Create directories under `docs/架构设计/`
-- Create directories under `docs/设计/`
+- Keep local-only directories under `docs/设计参考/` when needed.
 
 - [ ] **Step 1: Create architecture directories**
 
-Run:
+Run locally when reference assets are needed:
 
 ```bash
 mkdir -p docs/架构设计/shared docs/架构设计/desktop docs/架构设计/web docs/架构设计/api docs/架构设计/engineering docs/架构设计/decisions docs/架构设计/legacy
@@ -52,10 +54,10 @@ Expected: all architecture directories exist.
 Run:
 
 ```bash
-mkdir -p docs/设计/references docs/设计/specs docs/设计/snapshots
+mkdir -p docs/设计参考/references docs/设计参考/snapshots
 ```
 
-Expected: all design directories exist.
+Expected: local design reference directories exist but are ignored by git.
 
 ---
 
@@ -152,8 +154,8 @@ OpenClaw 集成校验: .github/workflows/openclaw-check.yml
 ## Task 4: Create Desktop Architecture Documents
 
 **Files:**
-- Create: `docs/架构设计/desktop/Desktop架构设计.md`
-- Create: `docs/架构设计/desktop/Renderer架构设计.md`
+- Create: `docs/架构设计/desktop/overview/Desktop架构设计.md`
+- Create: `docs/架构设计/desktop/foundation/Renderer架构设计.md`
 - Create module skeletons under `docs/架构设计/desktop/`
 
 - [ ] **Step 1: Create desktop overview**
@@ -187,20 +189,20 @@ It should cover:
 Create these files with the standard module template:
 
 ```text
-docs/架构设计/desktop/IPCPreload架构设计.md
-docs/架构设计/desktop/DataStorage架构设计.md
-docs/架构设计/desktop/RuntimeGateway架构设计.md
-docs/架构设计/desktop/ConfigSync架构设计.md
-docs/架构设计/desktop/Cowork架构设计.md
-docs/架构设计/desktop/Pet事件架构设计.md
-docs/架构设计/desktop/IM架构设计.md
-docs/架构设计/desktop/Cron架构设计.md
-docs/架构设计/desktop/Skills架构设计.md
-docs/架构设计/desktop/Models架构设计.md
-docs/架构设计/desktop/MCP架构设计.md
-docs/架构设计/desktop/Memory架构设计.md
-docs/架构设计/desktop/SystemIntegration架构设计.md
-docs/架构设计/desktop/Desktop打包架构设计.md
+docs/架构设计/desktop/foundation/IPCPreload架构设计.md
+docs/架构设计/desktop/foundation/DataStorage架构设计.md
+docs/架构设计/desktop/runtime/RuntimeGateway架构设计.md
+docs/架构设计/desktop/runtime/ConfigSync架构设计.md
+docs/架构设计/desktop/domains/Cowork架构设计.md
+docs/架构设计/desktop/domains/Pet事件架构设计.md
+docs/架构设计/desktop/domains/IM架构设计.md
+docs/架构设计/desktop/domains/Cron架构设计.md
+docs/架构设计/desktop/domains/Skills架构设计.md
+docs/架构设计/desktop/domains/Models架构设计.md
+docs/架构设计/desktop/domains/MCP架构设计.md
+docs/架构设计/desktop/domains/Memory架构设计.md
+docs/架构设计/desktop/runtime/SystemIntegration架构设计.md
+docs/架构设计/desktop/runtime/Desktop打包架构设计.md
 ```
 
 Each module document must use this structure:
@@ -254,36 +256,35 @@ Do not leave empty sections. If a section has no direct dependency, state that e
 ## Task 6: Reorganize Design Docs
 
 **Files:**
-- Create: `docs/设计/README.md`
-- Move current external reference folders into `docs/设计/references/`
-- Create: `docs/设计/specs/`
-- Create: `docs/设计/snapshots/`
+- Keep local-only `docs/设计参考/references/`
+- Keep local-only `docs/设计参考/snapshots/`
 
-- [ ] **Step 1: Write design README**
+- [ ] **Step 1: Document design reference boundary in architecture docs**
 
-`docs/设计/README.md` must define:
+Architecture docs must define:
 
 - `references/`: external product references only, not PetClaw facts.
-- `specs/`: PetClaw visual, component, and page layout specifications.
 - `snapshots/`: PetClaw current implementation screenshots and visual regression baseline.
+- Desktop visual, component, and page layout specifications live under `docs/架构设计/desktop/`.
+- `docs/设计参考/` is local-only and ignored by git.
 
 - [ ] **Step 2: Move external reference assets**
 
-Move current external reference folders under `docs/设计/references/`.
+Move current external reference folders under local `docs/设计参考/references/`.
 
 Preserve file names and directory names. Do not rewrite image files.
 
 - [ ] **Step 3: Create visual spec placeholders**
 
-Create:
+Create under `docs/架构设计/desktop/`:
 
 ```text
-docs/设计/specs/Desktop视觉设计规范.md
-docs/设计/specs/Desktop组件规范.md
-docs/设计/specs/Desktop页面布局规范.md
+Desktop视觉规范.md
+Desktop组件规范.md
+Desktop页面布局规范.md
 ```
 
-Each file should start with scope, source-of-truth rules, and relationship to `docs/架构设计/desktop/Renderer架构设计.md`.
+Each file should start with scope, source-of-truth rules, and relationship to `docs/架构设计/desktop/foundation/Renderer架构设计.md`.
 
 ---
 
@@ -316,7 +317,7 @@ The ADR must record:
 Run:
 
 ```bash
-rg "PetClaw总体架构设计|PetClaw前端架构设计|AI代码上下文工程设计|docs/设计/" AGENTS.md CLAUDE.md README.md docs/架构设计 docs/superpowers/specs
+rg "PetClaw总体架构设计|PetClaw前端架构设计|AI代码上下文工程设计|docs/设计参考" AGENTS.md CLAUDE.md README.md docs/架构设计 docs/superpowers/specs
 ```
 
 Expected: all current references are known before editing.
@@ -327,7 +328,7 @@ Use these new current paths:
 
 ```text
 docs/架构设计/PetClaw架构总览.md
-docs/架构设计/desktop/Renderer架构设计.md
+docs/架构设计/desktop/foundation/Renderer架构设计.md
 docs/架构设计/engineering/AI代码上下文工程设计.md
 docs/架构设计/engineering/CI-CD架构设计.md
 ```
@@ -348,11 +349,11 @@ Run:
 ```bash
 test -f docs/架构设计/README.md
 test -f docs/架构设计/PetClaw架构总览.md
-test -f docs/架构设计/desktop/Desktop架构设计.md
-test -f docs/架构设计/desktop/Renderer架构设计.md
+test -f docs/架构设计/desktop/overview/Desktop架构设计.md
+test -f docs/架构设计/desktop/foundation/Renderer架构设计.md
 test -f docs/架构设计/engineering/AI代码上下文工程设计.md
 test -f docs/架构设计/engineering/CI-CD架构设计.md
-test -f docs/设计/README.md
+git check-ignore -q docs/设计参考/references/example.png
 ```
 
 Expected: command exits 0.
@@ -372,7 +373,7 @@ Expected: no active references to stale paths.
 Run:
 
 ```bash
-rg "references/.*事实源|外部产品参考.*事实源" docs/设计 docs/架构设计
+rg "references/.*事实源|外部产品参考.*事实源" docs/设计参考 docs/架构设计
 ```
 
 Expected: no wording that treats external references as PetClaw facts.

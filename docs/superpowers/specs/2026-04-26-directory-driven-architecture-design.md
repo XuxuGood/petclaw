@@ -581,7 +581,7 @@ OpenClaw config-reload-plan 中 bindings 变更的 action 是 `none`（热重载
 | isolated | 新建独立会话执行 | 任务绑定的 agent |
 | main | 注入到已有会话 | 同上 |
 
-### 10.5 前端 UI（参考设计稿 `docs/设计/定时任务/`）
+### 10.5 前端 UI（参考设计稿 `docs/设计参考/references/定时任务/`）
 
 - 任务列表：显示所有定时任务，状态/下次执行/最近结果
 - 创建/编辑表单：cron 表达式（可视化选择器）、prompt、目录选择、IM 推送配置

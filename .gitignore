@@ -38,7 +38,8 @@ build-tar/
 .gitnexus/
 .petclaw/*
 !.petclaw/ai-tools/
-!.petclaw/ai-tools/*
+.petclaw/ai-tools/*
+!.petclaw/ai-tools/mcp.*.example.*
 .qoder/
 .serena/
 .superpowers/
@@ -57,5 +58,5 @@ Thumbs.db
 # Logs
 **/*.log
 
-# Design mockups (images & videos, stored in docs/设计/)
-docs/设计/
+# Design reference assets are local-only. Architecture/UI specs live under docs/架构设计/.
+docs/设计参考/

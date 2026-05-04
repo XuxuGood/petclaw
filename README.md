@@ -33,20 +33,17 @@ cd petclaw
 # 安装依赖
 pnpm install
 
-# 启动桌面应用开发环境
-pnpm --filter petclaw-desktop dev
-
-# 首次运行需要构建 OpenClaw runtime
-pnpm --filter petclaw-desktop dev:openclaw
-
-# 可选：首次拉取项目后初始化一次 AI 代码上下文工具链并接入 AI 客户端
+# 首次拉取项目后必须执行一次：初始化 AI 代码上下文工具链并接入 AI 客户端
 pnpm ai:setup -- --client codex
 
-# 可选：诊断 GitNexus / Serena / MCP / 锁 / 权限
-pnpm ai:doctor
+# 首次启动桌面开发环境：构建/检查 OpenClaw runtime 后启动
+pnpm --filter petclaw-desktop dev:openclaw
 
-# 可选：仅查看某个 AI 客户端的接入说明
-pnpm ai:mcp:guide -- --client claude-code
+# 后续日常启动桌面应用开发环境
+pnpm --filter petclaw-desktop dev
+
+# 可选：AI 工具链异常时诊断 GitNexus / Serena / MCP / 锁 / 权限
+pnpm ai:doctor
 ```
 
 更多开发细节请查看 [petclaw-desktop/README.md](./petclaw-desktop/README.md)。
@@ -65,10 +62,10 @@ pnpm -r lint                      # workspace 全量 lint
 |------|------|
 | [`CLAUDE.md`](./CLAUDE.md) | Claude Code 工作指南 |
 | [`AGENTS.md`](./AGENTS.md) | Codex 工作指南 |
-| [`docs/架构设计/PetClaw总体架构设计.md`](./docs/架构设计/PetClaw总体架构设计.md) | PetClaw 总体架构事实源 |
-| [`docs/架构设计/PetClaw前端架构设计.md`](./docs/架构设计/PetClaw前端架构设计.md) | 渲染进程、Preload API 和桌面 UI/UX 架构事实源 |
-| [`docs/架构设计/AI代码上下文工程设计.md`](./docs/架构设计/AI代码上下文工程设计.md) | AI 代码上下文工具链、MCP 客户端适配与自动化变更影响分析设计 |
-| [`docs/架构设计/`](./docs/架构设计/) | 总体架构与模块设计 |
+| [`docs/架构设计/README.md`](./docs/架构设计/README.md) | 架构文档入口和阅读路径 |
+| [`docs/架构设计/PetClaw架构总览.md`](./docs/架构设计/PetClaw架构总览.md) | PetClaw 总体架构地图 |
+| [`docs/架构设计/desktop/README.md`](./docs/架构设计/desktop/README.md) | desktop 分层架构入口 |
+| [`docs/架构设计/desktop/foundation/Renderer架构设计.md`](./docs/架构设计/desktop/foundation/Renderer架构设计.md) | desktop renderer、Preload API 使用方式和 UI/UX 架构事实源 |
+| [`docs/架构设计/engineering/AI代码上下文工程设计.md`](./docs/架构设计/engineering/AI代码上下文工程设计.md) | AI 代码上下文工具链、MCP 客户端适配与自动化变更影响分析设计 |
 | [`docs/superpowers/specs/`](./docs/superpowers/specs/) | 阶段性设计规格 |
 | [`docs/superpowers/plans/`](./docs/superpowers/plans/) | 实施计划 |
-| [`docs/设计/`](./docs/设计/) | UI 设计稿与素材 |

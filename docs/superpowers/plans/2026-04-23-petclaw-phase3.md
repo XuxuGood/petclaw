@@ -2080,7 +2080,7 @@ git commit -m "feat(ui): add CoworkPermissionModal with standard, confirm, and m
 - Create: `src/renderer/src/chat/components/AgentSkillSelector.tsx`
 - Modify: `src/renderer/src/chat/components/settings/AgentSettings.tsx`
 
-参考设计稿 `docs/设计/设置/agent配置.png`，实现三 Tab（基础信息/技能/IM 渠道）的 Agent 配置对话框。
+参考设计稿 `docs/设计参考/references/设置/agent配置.png`，实现三 Tab（基础信息/技能/IM 渠道）的 Agent 配置对话框。
 
 **设计稿关键布局要求：**
 - 标题栏：icon emoji + Agent 名称同行（如 `📈 股票助手`），右侧关闭按钮
@@ -2594,7 +2594,7 @@ git commit -m "feat(ui): add AgentConfigDialog with basic/skills/IM tabs and 4-b
 - Modify: `src/renderer/src/chat/components/CronPage.tsx`
 - Create: `src/renderer/src/chat/components/CronEditDialog.tsx`
 
-替换占位页面为完整的定时任务管理 UI。参考设计稿 `docs/设计/定时任务/` 目录下的 4 张截图。
+替换占位页面为完整的定时任务管理 UI。参考设计稿 `docs/设计参考/references/定时任务/` 目录下的 4 张截图。
 
 **设计稿关键布局要求：**
 
@@ -2943,7 +2943,7 @@ git commit -m "feat(ui): replace CronPage placeholder with full scheduler manage
 - Modify: `src/renderer/src/chat/ChatApp.tsx` — 新增 ViewType `'im-channels'` + 路由
 - Modify: `src/renderer/src/chat/components/Sidebar.tsx` — 新增 IM 频道导航项
 
-参考设计稿 `docs/设计/IM/` 目录下的截图。IM 频道是**主内容区视图**（与 chat/skills/cron 同级），不在 Settings 页中。
+参考设计稿 `docs/设计参考/references/IM/` 目录下的截图。IM 频道是**主内容区视图**（与 chat/skills/cron 同级），不在 Settings 页中。
 
 **设计稿关键布局要求：**
 
@@ -3161,8 +3161,8 @@ export function ImChannelsPage() {
 按设计稿实现两栏布局弹窗。左侧平台列表（可展开多实例）+ 右侧配置面板。
 
 由于此文件代码量较大（约 350 行），subagent 实现时应参考：
-- 设计稿 `docs/设计/IM/xw_20260423210030.png`（飞书配置面板）
-- 设计稿 `docs/设计/IM/xw_20260423210045.png`（微信配置面板）
+- 设计稿 `docs/设计参考/references/IM/xw_20260423210030.png`（飞书配置面板）
+- 设计稿 `docs/设计参考/references/IM/xw_20260423210045.png`（微信配置面板）
 - LobsterAI 的 IM 配置对话框交互模式
 
 核心结构：

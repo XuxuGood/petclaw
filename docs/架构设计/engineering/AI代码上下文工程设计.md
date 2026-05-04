@@ -12,7 +12,7 @@ AI 代码上下文工程解决的是这个开发基础设施问题：
 - 让 AI 在写文件前自动准备上下文，不把命令负担转给用户。
 - 让不同 AI 客户端优先共享项目级 `.mcp.json`，并在不支持项目级配置时使用模板 fallback。
 
-本文只描述 AI 自动化上下文系统本身，不复写 PetClaw 的业务开发规则。IPC、ConfigSync、SQLite、i18n、Openclaw Runtime 等业务链路规则仍以 `AGENTS.md`、`CLAUDE.md` 和 `docs/架构设计/PetClaw总体架构设计.md` 为准。
+本文只描述 AI 自动化上下文系统本身，不复写 PetClaw 的业务开发规则。IPC、ConfigSync、SQLite、i18n、Openclaw Runtime 等业务链路规则仍以 `AGENTS.md`、`CLAUDE.md`、`docs/架构设计/PetClaw架构总览.md` 和 `docs/架构设计/desktop/` 下的对应模块文档为准。
 
 ## 2. 设计目标
 
@@ -109,6 +109,7 @@ pnpm ai:bootstrap -- --install --write-mcp
 pnpm ai:index
 pnpm ai:impact
 pnpm ai:prepare-change -- --target <target>
+pnpm ai:prepare-change -- --from-git
 ```
 
 这些命令分别由 Husky 或 AI 自动调用：
@@ -117,7 +118,8 @@ pnpm ai:prepare-change -- --target <target>
 |---|---|
 | `pnpm ai:index` | Husky post hooks 间接触发 |
 | `pnpm ai:impact` | Husky pre-commit 间接触发 |
-| `pnpm ai:prepare-change -- --target <target>` | AI 在写文件前自动触发 |
+| `pnpm ai:prepare-change -- --target <target>` | AI 在写文件前按明确目标自动触发 |
+| `pnpm ai:prepare-change -- --from-git` | AI 无法可靠推断目标时，从 staged / worktree 自动推断 |
 
 ### 4.3 故障排查
 
@@ -289,6 +291,8 @@ pnpm --silent ai:impact -- --json
 - 有变更时运行 GitNexus `detect_changes --scope staged`。
 - 输出提交前影响分析。
 - `--json` 输出 repo、scope、strict、stagedChanges、toolingDegraded、risk、changedCount、affectedCount、changedFiles。
+- GitNexus 失败时自动运行轻量 `ai:doctor`，把锁、权限、命令缺失、索引异常等工具链原因附加到报告中。
+- 每次运行都会写入 `.petclaw/ai-tools/logs/impact-*.json`，并更新 `.petclaw/ai-tools/state.json`。
 
 该命令只分析暂存区，不分析未暂存草稿。它主要由 `.husky/pre-commit` 触发。
 
@@ -303,11 +307,16 @@ AI 使用 GitNexus MCP 时也必须遵守同一边界：脏工作区内不要默
 ```bash
 pnpm ai:prepare-change -- --target <target>
 pnpm --silent ai:prepare-change -- --target <target> --json
+pnpm --silent ai:prepare-change -- --from-git --json
+pnpm --silent ai:prepare-change -- --from-staged --json
+pnpm --silent ai:prepare-change -- --from-files <file...> --json
 ```
 
 职责：
 
 - 检查 GitNexus 索引是否 stale。
+- 记录当前 HEAD、分支、staged 文件、worktree 文件和工作区指纹。
+- 未传 `--target` 时，支持从 staged、worktree 或显式文件列表自动推断目标。
 - 优先复用 `gitnexus list` 中与当前仓库路径匹配的既有 alias。
 - 当前路径未注册时，生成当前仓库唯一 GitNexus repo alias，避免多个同名仓库共享默认索引。
 - 当前 alias 未注册时，先用 `gitnexus analyze --name <alias>` 建立本仓库索引。
@@ -316,9 +325,11 @@ pnpm --silent ai:prepare-change -- --target <target> --json
 - 用 `gitnexus context -r <alias>` 获取 target 的 context。
 - 用 `gitnexus impact -r <alias>` 获取 target 的 impact。
 - 当 target 不是代码 symbol（例如 CSS 变量、设计 token、Tailwind token、IPC channel、配置 key、i18n key、数据库字段）导致 GitNexus 返回 `UNKNOWN` / `not_found` 时，自动使用 `rg` 分组扫描全仓、前端、样式、主进程、preload、共享层、测试和文档引用面。
+- 对文件路径、IPC channel、配置 key、i18n key、env key、CSS token 等高漏报目标，即使 GitNexus 返回成功，也强制补充 `rg` 使用面扫描。
 - 输出 PetClaw 改动前核对清单。
 - 提醒工作区已有未提交变更。
 - `--json` 输出 target、repo、GitNexus 状态、fallback 分组命中、工作区状态和核对清单，供 AI 客户端稳定消费。
+- 每次运行都会写入 `.petclaw/ai-tools/logs/prepare-change-*.json` 和 `.petclaw/ai-tools/state.json`，供后续 AI 复用，不需要重复跑重任务。
 
 `target` 可以是文件路径、symbol、模块名、错误信息中的关键对象、IPC channel、配置 key 或其它任务目标。
 
@@ -435,6 +446,7 @@ Hook 约束：
 - 所有 GitNexus 调用必须支持缺失降级。
 - 所有 GitNexus 调用必须识别索引锁、registry 权限、沙箱 `EPERM/EACCES` 和数据库 busy/locked；这些情况属于工具链环境异常，不得误判为业务代码风险。
 - 给 AI 或 CI 消费的命令必须提供 `--json`，人类日志只用于终端阅读，不作为自动化解析来源。
+- 所有 AI harness 结果必须写入 `.petclaw/ai-tools/logs/*.json`；最近一次关键状态写入 `.petclaw/ai-tools/state.json`。这些是本地运行产物，不纳入版本控制。
 - GitNexus 调用必须先按当前仓库路径复用既有 alias；新仓库才生成唯一 alias。
 - GitNexus `analyze` 使用 `--name`，查询/影响分析使用 `-r`。
 - 项目级 MCP 配置只写入仓库根目录 `.mcp.json`。
@@ -657,7 +669,7 @@ node scripts/ai/write-mcp-config.cjs --client all
 node scripts/ai/guide-mcp-config.cjs --client claude-code
 node scripts/ai/install-mcp-config.cjs --client codex --dry-run
 node scripts/ai/setup-ai-context.cjs --client codex --dry-run
-git diff --check -- scripts/ai .husky .mcp.json .petclaw/ai-tools docs/架构设计/AI代码上下文工程设计.md
+git diff --check -- scripts/ai .husky .mcp.json .petclaw/ai-tools docs/架构设计/engineering/AI代码上下文工程设计.md
 ```
 
 如果本地没有 pnpm、GitNexus、Serena 或 uv，验证输出允许显示缺失提示，但脚本必须正常退出。缺失提示是宽松降级的一部分，不视为业务失败。

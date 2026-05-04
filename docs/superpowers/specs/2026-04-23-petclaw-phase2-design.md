@@ -1248,7 +1248,7 @@ activeSessionId 变化
 
 ## 13. Settings 页面（全页面）
 
-参考设计稿：`docs/设计/设置页面.png`
+参考设计稿：`docs/设计参考/references/设置页面.png`
 
 ### 13.1 设计变更
 

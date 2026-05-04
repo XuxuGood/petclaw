@@ -1,238 +1,189 @@
-# PetClaw — Claude Code 工作指南
+# PetClaw — Claude 工作入口
 
-本文件是 Claude Code 在 PetClaw 仓库中的执行入口。Claude 即使只读取本文件，也必须能正确开发、排查和验证本项目。
+本文件是 Claude 在 PetClaw 仓库中的执行入口。入口文件只保留必须遵守的规则、常用命令、查找路由和高频架构边界；完整事实以文档和代码为准。
 
-架构事实源：`docs/架构设计/PetClaw总体架构设计.md`；前端事实源：`docs/架构设计/PetClaw前端架构设计.md`。本文件写执行规则和高频项目上下文，架构文档写完整原理、数据模型和模块设计。
+- 总体架构事实源：`docs/架构设计/PetClaw架构总览.md`
+- Desktop 架构事实源：`docs/架构设计/desktop/`
+- 前端架构事实源：`docs/架构设计/desktop/foundation/Renderer架构设计.md`
+- AI 代码上下文事实源：`docs/架构设计/engineering/AI代码上下文工程设计.md`
+- Gateway 协议：`docs/openclaw-gateway-api.md`
 
-## 1. 构建与开发命令
+## 1. 基本原则
+
+- 始终中文回复。
+- 先读后改，不凭记忆修改代码。
+- 保持最小改动，不做无关重构。
+- 不回滚、不覆盖、不格式化用户已有改动。
+- 生产级实现，禁止 demo / MVP / TODO hack。
+- 不确定时先查本地文档、代码、调用方和测试，不要把仓库内可自行发现的问题丢给用户。
+- 修改核心模块前必须做影响分析和调用方扫描。
+- 涉及用户可见行为时，必须考虑错误态、权限、安全边界和验证方式。
+
+## 2. 写文件授权规则
+
+任何代码、文档、配置文件变更前，必须先列出：
+
+- 拟修改文件
+- 修改原因
+- 预期影响
+- 验证方式
+
+然后等待用户明确确认。
+
+如果用户明确说“直接改”“修复”“实现”“提交”“加下”“改下”，视为已授权本次相关改动。
+
+用户只是在提问、排查、解释或要求运行命令时，只能执行只读检查和用户明确要求的命令，不得顺手修改文件。
+
+自动格式化、生成文件、删除文件也视为写操作。
+
+## 3. 不确定时的默认动作
+
+如果当前任务涉及某个模块，而本文件没有足够细节，AI 必须自行执行：
+
+1. 读对应设计文档。
+2. 用 `rg` 查相关 symbol / IPC channel / config key / table / 文件名。
+3. 必要时读调用方和测试。
+4. 再提出修改边界或实现。
+
+不要要求用户手动指出本仓库中可通过搜索获得的信息。
+
+## 4. 信息查找路由
+
+- 总体架构不清楚：读 `docs/架构设计/PetClaw架构总览.md`
+- Desktop 模块不清楚：先读 `docs/架构设计/desktop/README.md` 和 `docs/架构设计/desktop/overview/Desktop架构设计.md`，再读对应模块文档。
+- 前端状态、UI、preload、renderer 不清楚：读 `docs/架构设计/desktop/foundation/Renderer架构设计.md`
+- AI 代码上下文工具不清楚：读 `docs/架构设计/engineering/AI代码上下文工程设计.md`
+- Gateway 协议不清楚：读 `docs/openclaw-gateway-api.md`
+- 启动链路不清楚：查 `petclaw-desktop/src/main/index.ts`、`bootcheck.ts`、`runtime-services.ts`
+- IPC 不清楚：查 `petclaw-desktop/src/main/ipc/`、`petclaw-desktop/src/preload/index.ts`、`petclaw-desktop/src/preload/index.d.ts`
+- SQLite 表结构不清楚：查 `petclaw-desktop/src/main/data/db.ts`
+- ConfigSync 不清楚：查 `petclaw-desktop/src/main/ai/config-sync.ts`
+- Cowork 不清楚：查 `petclaw-desktop/src/main/ai/cowork-*`、`petclaw-desktop/src/renderer/src/views/chat/`
+- Openclaw runtime 不清楚：查 `petclaw-desktop/src/main/ai/engine-manager.ts`、`gateway.ts`
+- IM 不清楚：查 `petclaw-desktop/src/main/im/`、`petclaw-desktop/src/renderer/src/views/im/`
+- Cron 不清楚：查 `petclaw-desktop/src/main/scheduler/`、`petclaw-desktop/src/renderer/src/views/cron/`
+- Pet 事件不清楚：查 `petclaw-desktop/src/main/pet/`
+- i18n key 不清楚：查 `petclaw-shared/src/i18n/locales/{zh,en}.ts`
+
+## 5. 常用命令
 
 从 monorepo 根目录执行：
 
 ```bash
-pnpm --filter petclaw-desktop dev              # 启动 Electron + Vite 开发模式
-pnpm --filter petclaw-desktop dev:openclaw     # 构建/检查 Openclaw runtime 后启动
-pnpm --filter petclaw-desktop typecheck        # desktop 类型检查
-pnpm --filter petclaw-desktop test             # desktop 单元测试
-pnpm --filter petclaw-desktop lint             # ESLint
-pnpm --filter petclaw-desktop build            # 生产构建
+pnpm --filter petclaw-desktop typecheck
+pnpm --filter petclaw-desktop test
+pnpm --filter petclaw-desktop lint
+pnpm --filter petclaw-desktop build
 
-npm run typecheck                              # workspace 类型检查
-npm test                                       # workspace 全量测试
+npm run typecheck
+npm test
 ```
 
-Openclaw runtime：
+开发调试需要启动应用时：
 
 ```bash
-pnpm --filter petclaw-desktop openclaw:ensure
-pnpm --filter petclaw-desktop openclaw:patch
-pnpm --filter petclaw-desktop openclaw:runtime:host
-pnpm --filter petclaw-desktop openclaw:plugins
-pnpm --filter petclaw-desktop openclaw:extensions:local
+pnpm --filter petclaw-desktop dev
+pnpm --filter petclaw-desktop dev:openclaw
 ```
 
-打包：
-
-```bash
-pnpm --filter petclaw-desktop dist:mac:arm64
-pnpm --filter petclaw-desktop dist:mac:x64
-pnpm --filter petclaw-desktop dist:win:x64
-pnpm --filter petclaw-desktop dist:linux:x64
-```
-
-启动 dev server 前先清理旧进程，避免 Electron/Vite 多实例冲突：
+启动 dev 前先清理旧进程，避免 Electron/Vite 多实例冲突：
 
 ```bash
 pkill -f electron
 pkill -f vite
 ```
 
-## 2. 架构总览
+沙箱环境可能禁止监听端口或 Unix socket，表现为 `listen EPERM` 或端口测试超时。遇到这种情况应说明环境限制，并在允许的环境下重跑测试，不要误判为业务失败。
 
-PetClaw 是 Electron 桌面宠物应用。主进程负责窗口、系统集成、本地持久化和 Openclaw runtime 管理；渲染进程负责 UI；AI 能力由随应用捆绑的 Openclaw Runtime 提供。
+## 6. 架构边界摘要
 
-```text
-Electron Main Process
-├── Pet/Main 双窗口
-├── SQLite / app_config / settings
-├── ConfigSync → openclaw.json / main workspace AGENTS.md / exec-approvals.json
-├── OpenclawEngineManager → utilityProcess.fork()
-└── OpenclawGateway → GatewayClient → Openclaw Runtime
+PetClaw 是 Electron 桌面宠物应用：
 
-Renderer Process
-├── Chat / Settings / Skills / Cron / IM / Onboarding
-├── Zustand stores
-└── preload contextBridge API
-```
+- Main Process：窗口、系统集成、SQLite、本地配置、Openclaw runtime 管理。
+- Renderer Process：Chat、Settings、Skills、Cron、IM、Pet UI。
+- Preload：通过 contextBridge 暴露受控 API。
+- Openclaw Runtime：由主进程管理，动态端口和 token 认证。
 
-核心原则：
+不可触碰的隔离红线：
 
-- Electron 进程隔离红线不可触碰：`nodeIntegration: false`、`contextIsolation: true`。
-- Openclaw runtime 由主进程管理，使用动态端口和 token 认证。
-- ConfigSync 是 OpenClaw runtime 配置同步入口，负责 `openclaw.json`、main workspace `AGENTS.md`、exec approvals。它聚合 Directory、Model、Skill、MCP、IM、Cron、memorySearch 等配置；敏感信息只能通过 env placeholder 写入 runtime 配置。
-- Cowork 是核心协作领域，所有会话、消息、审批、流式事件使用 Cowork 命名。
+- `nodeIntegration: false`
+- `contextIsolation: true`
+- Renderer 不直接访问 Node / Electron 主进程能力。
+- IPC 必须通过 preload 暴露的受控 API。
 
-## 3. 进程模型
-
-主进程入口和关键模块：
-
-```text
-petclaw-desktop/src/main/
-├── index.ts              启动编排、BootCheck、IPC 注册时机
-├── windows.ts            Pet/Main 窗口创建、持久化、切换
-├── window-layout.ts      窗口尺寸/位置纯计算
-├── runtime-services.ts   Gateway / Cowork / Cron 服务组装
-├── bootcheck.ts          启动检查和 runtime 初始化前置校验
-├── ai/
-│   ├── engine-manager.ts Openclaw runtime 生命周期
-│   ├── gateway.ts        GatewayClient 动态加载和 RPC/事件分发
-│   ├── config-sync.ts    openclaw.json 与 AGENTS.md 同步
-│   ├── cowork-controller.ts
-│   ├── cowork-session-manager.ts
-│   └── system-prompt.ts
-├── data/                 SQLite repository 层
-├── ipc/                  模块化 IPC handlers
-├── scheduler/            定时任务 Gateway RPC 代理
-├── im/                   IM 平台配置和会话路由
-└── pet/                  PetEventBridge 多源事件聚合
-```
-
-渲染进程：
-
-```text
-petclaw-desktop/src/renderer/src/
-├── views/chat/                       Cowork 对话主界面
-│   └── CoworkQuestionWizard.tsx      多问题分步向导（AskUserQuestion）
-├── views/settings/                   设置
-├── views/cron/                       定时任务
-├── views/im/                         IM 频道
-├── views/onboarding/                 初始化引导
-├── pet/                              宠物窗口 UI 和状态机
-├── stores/                           Zustand stores
-│   └── permission-store.ts           权限请求 FIFO 队列（usePermissionStore）
-├── hooks/
-│   └── use-permission-listener.ts    全局权限 IPC 监听（usePermissionListener）
-├── components/                       共享组件
-└── i18n.ts                           renderer i18n service / useI18n
-```
-
-权限弹窗渲染模式：`CoworkPermissionModal` 由 `App.tsx` 在全局根层统一渲染（而非 ChatView 内），通过 `usePermissionStore` FIFO 队列驱动，支持 Exec Approval 和 AskUserQuestion 两种来源的请求串行展示。
-
-Preload：
-
-```text
-petclaw-desktop/src/preload/
-├── index.ts
-└── index.d.ts
-```
-
-新增或修改 IPC 必须同步 `src/main/ipc/*.ts`、`src/preload/index.ts`、`src/preload/index.d.ts`。
-
-## 4. 关键目录
-
-```text
-petclaw/
-├── CLAUDE.md                         Claude Code 工作入口
-├── AGENTS.md                         Codex 工作入口
-├── docs/架构设计/
-│   ├── PetClaw总体架构设计.md          架构事实源
-│   ├── PetClaw前端架构设计.md          前端架构事实源
-│   ├── 模块设计/                      后续模块级详细设计
-│   └── 决策记录/                      后续架构决策记录
-├── docs/superpowers/specs/           阶段性设计 spec
-├── docs/superpowers/plans/           实施计划
-├── petclaw-desktop/                  Electron 桌面应用
-├── petclaw-shared/                   共享类型、常量、i18n 翻译资源
-├── petclaw-web/                      官网
-├── petclaw-api/                      后端服务
-└── docs/设计/                         UI 设计稿和素材
-```
-
-## 5. 核心数据流
-
-启动流程：
-
-1. `index.ts` 初始化 logger、SQLite、i18n、EngineManager、各 Manager。
-2. 创建 Main Window，显示 BootCheck UI。
-3. `runBootCheck()` 创建 runtime 目录、同步 ConfigSync、启动 Openclaw gateway。
-4. boot 成功后 `initializeRuntimeServices()` 创建 Gateway、CoworkController、CoworkSessionManager、CronJobService。
-5. renderer 通知 `app:pet-ready` 后创建 Pet Window，注册完整 IPC、Tray、Shortcuts、PetEventBridge。
-
-Cowork session：
-
-1. Renderer 通过 preload 调用 `cowork:session:start` 或 `cowork:session:continue`。
-2. 主进程读取 `CoworkConfigStore`、目录配置、模型配置和会话参数。
-3. `mergeCoworkSystemPrompt()` 合并 scheduled task prompt 和用户 system prompt。
-4. `CoworkSessionManager` 创建或读取 session，固化 `system_prompt`。
-5. `CoworkController` 通过 GatewayClient 调用 Openclaw，转发流式事件到 renderer。
-6. Renderer 更新 Zustand 状态和消息 UI。
+## 7. 核心领域边界
 
 ConfigSync：
 
-- 聚合 Directory、Model、Skill、MCP、IM、Cron、memorySearch 配置。
-- 写入 `{userData}/openclaw/state/openclaw.json`。
-- 写入 `{userData}/openclaw/.openclaw/exec-approvals.json`。
-- `agents.defaults` 由 ConfigSync 组合：workspace 使用 `{userData}/openclaw/workspace`，model 使用 `ModelRegistry` 当前 active model 或默认启用模型。
-- `DirectoryManager` 只输出 `agents.list`，不负责全局 defaults。
-- 同步 main agent workspace 的 `AGENTS.md`。
-- 只变更 `AGENTS.md` 时也必须返回 changed，确保 boot/reload 链路感知变化。
+- 是 Openclaw runtime 配置同步入口。
+- 聚合 Directory、Model、Skill、MCP、IM、Cron、memorySearch 等配置。
+- 写入 `openclaw.json`、main workspace `AGENTS.md`、exec approvals。
 - 敏感信息只能通过 env placeholder 写入 runtime 配置。
+- 只变更 main workspace `AGENTS.md` 时也必须返回 changed，确保 boot/reload 链路感知变化。
+- DirectoryManager 只输出 `agents.list`，不负责全局 defaults。
+
+Cowork：
+
+- 是核心协作领域。
+- 所有会话、消息、审批、流式事件使用 Cowork 命名。
+- Cowork 配置通过 `CoworkConfigStore` 读写，不在业务代码散落裸 key。
+- Session 必须固化 `system_prompt`、目录和模型上下文。
+- 前端状态必须以 `sessionId` 建模。
+- 消息、流式输出和错误只写入当前打开的会话详情；后台会话事件只更新运行状态、未读或列表摘要。
+- 切换会话时必须从主进程重新加载历史，并防止旧请求覆盖新会话。
+- 禁止使用无 session 归属的全局消息数组或单一 loading boolean。
+- 权限审批使用全局 FIFO 队列串行展示，每个请求必须保留 `sessionId`、`requestId`、`toolUseId` 和 tool 上下文。
+
+当前目录：
+
+- 当前目录只能有一个事实源。
+- 禁止侧栏目录状态和 Chat 发送 `cwd` 脱节。
+- Chat 发送、会话启动、继续会话、目录展示必须从同一状态源读取。
+- 如需缓存，只能缓存 `sessionId -> directoryId/cwd` 这类已固化会话上下文。
+
+IM：
+
+- 前端必须围绕 `im_instances` 建模。
+- `platform` 只是筛选、分组和创建入口。
+- 禁止把 platform key 当 instance id 使用。
+- 会话绑定、凭据、启停状态、配置编辑必须指向具体 `im_instances.id`。
 
 Pet 事件：
 
-- Chat、Cowork、IM、定时任务、HookServer 事件汇聚到 `PetEventBridge`。
+- Chat、Cowork、IM、Cron、HookServer 事件汇聚到 `PetEventBridge`。
 - Pet 窗口只消费统一事件，不直接理解各业务域内部状态。
 
-## 6. 持久化与配置
+## 8. IPC 规则
 
-主要持久化位置：
+- Channel 使用 `模块:动作`，例如 `cowork:session:start`。
+- 禁止驼峰 channel。
+- 新增或修改 IPC 必须同步：
+  - `petclaw-desktop/src/main/ipc/*.ts`
+  - `petclaw-desktop/src/preload/index.ts`
+  - `petclaw-desktop/src/preload/index.d.ts`
+  - renderer 调用点
+- 所有 IPC 注册必须通过 `safeHandle` / `safeOn`。
+- 禁止裸 `ipcMain.handle/on`。
+- IPC 分两阶段注册：
+  - Phase A：boot 前，仅依赖 db。
+  - Phase B：pet-ready 后，可依赖 runtimeServices。
 
-- SQLite：应用业务数据、`app_config`、Cowork sessions/messages、目录、模型、MCP、IM、定时任务元数据。
-- `app_config`：通用配置 KV，领域代码必须通过 typed store 访问，Cowork 使用 `CoworkConfigStore`。
-- `{userData}/openclaw/`：Openclaw runtime 状态、workspace、logs。
-- `{userData}/SKILLs/`：用户/应用同步后的 skills 根目录。
-- `resources/SYSTEM_PROMPT.md`：Cowork 默认 systemPrompt 资源；KV 未持久化时由 `CoworkConfigStore` 读取。
-- app settings 文件：窗口位置、宠物位置、auto-launch 等本地设置。
+## 9. 前端规则
 
-SQLite 表结构速查（完整注释见 `src/main/data/db.ts`）：
+前端改动前必须阅读：
 
-| 表 | 用途 | 关键 JSON 字段 |
-|---|---|---|
-| `app_config` | 全局 KV 配置 | value 为 JSON 字符串或纯文本。已知 key：`language`、`onboardingComplete`、`nickname`、`roles`、`selectedSkills`、`userMdSyncedFrom`、`cowork.defaultDirectory`、`cowork.systemPrompt`、`cowork.memory` |
-| `directories` | 工作区目录 | `skill_ids` → `string[]`（Skill ID 白名单）；`model_override` → `"providerId/modelId"` 或空字符串；`agent_id` → `ws-{SHA256前12位}` |
-| `model_providers` | 模型供应商 | `models_json` → `ModelDefinition[]`（`{ id, name, reasoning, supportsImage, contextWindow, maxTokens }`）；`api_format` → `'openai-completions'` \| `'anthropic'` \| `'google-generative-ai'` |
-| `model_provider_secrets` | 供应商密钥（隔离） | — |
-| `cowork_sessions` | AI 协作会话 | `selected_model_json` → `{ providerId, modelId }` \| null；`status` → `'idle'` \| `'running'` \| `'completed'` \| `'error'` |
-| `cowork_messages` | 会话消息 | `metadata` → `CoworkMessageMetadata`（含 `toolName`/`toolInput`/`toolResult`/`toolUseId`/`error`/`isStreaming`/`isThinking`/`isTimeout`/`isFinal`/`imageAttachments`/`skillIds`）；`type` → `'user'` \| `'assistant'` \| `'tool_use'` \| `'tool_result'` \| `'system'` |
-| `im_instances` | IM 平台实例 | `credentials` → 各平台不同（飞书 `{appId,appSecret,domain?}`、钉钉 `{appKey,appSecret}`、企微 `{corpId,agentId,secret}`、微信 `{accountId}`）；`config` → `{dmPolicy,groupPolicy,allowFrom,debug}` |
-| `im_conversation_bindings` | IM 对话级绑定（Tier 1） | `peer_kind` → `'dm'` \| `'group'` |
-| `im_session_mappings` | IM 对话→Cowork 会话映射 | — |
-| `scheduled_task_meta` | 定时任务本地元数据 | `origin`/`binding` 为预留字段 |
-| `mcp_servers` | MCP 服务器 | `config_json` → stdio: `{command,args,env?}`、sse/streamable-http: `{url,headers?}`；`transport_type` → `'stdio'` \| `'sse'` \| `'streamable-http'` |
+`docs/架构设计/desktop/foundation/Renderer架构设计.md`
 
 规则：
 
-- 新增配置默认值集中在对应配置模块，禁止魔法值散落。
-- Cowork 领域配置通过 `CoworkConfigStore` 读写，不在业务代码散落裸 key。
-- API Key 等敏感信息不得写入 `openclaw.json`。
-- 目录 Agent 不主动写用户项目目录下的 `AGENTS.md`，避免污染用户仓库。
-- 新增/修改表结构时，必须同步 `src/main/data/db.ts` 中的字段注释。
-
-## 7. 编码风格与命名
-
-通用：
-
-- 始终中文回复。
-- 生产级系统设计，禁止 demo / MVP / TODO hack。
-- 先读后改，改核心模块前用 `rg` 查调用方和影响范围。
-- 最小改动，不做无关重构，不回滚用户已有改动。
-- 禁止 `any`，使用 `unknown` + 类型收窄。
-- 不标注可推断类型。
-- 注释用中文，说明”为什么这样做”，不要复述代码。
-- 业务逻辑、条件分支、非显而易见的算法必须写注释，解释意图和上下文。
-- 函数/方法若逻辑超过 15 行或含多步骤，在函数体开头用注释概述整体流程。
-- 复杂条件判断（`if` 嵌套 ≥2 层、多条件组合）在判断前注释说明什么场景走这个分支。
-- 数据库/配置的 JSON 字段、枚举值、魔法数字必须注释取值范围和含义。
-- workaround、兼容处理、边界情况必须注释原因和背景，附 issue/文档链接（如有）。
+- 做实际可用界面，不做营销式占位页。
+- 所有可见按钮必须有真实行为。
+- 阶段性未接入能力必须 disabled 或隐藏，禁止空 `onClick`。
+- 用户可见操作失败必须展示错误态，禁止只 `console.warn/error` 后静默吞掉。
+- Runtime / Engine 状态页必须使用 snapshot 查询 + push 订阅。
+- 所有用户可见文案、状态、错误、aria-label、title、placeholder 必须走 i18n。
+- 新增前端 IPC 必须同步 main、preload、类型声明和 renderer 调用点。
+- 涉及 store、IPC、会话状态、权限队列、IM/Cron 契约时必须补针对性测试。
 
 React：
 
@@ -249,27 +200,12 @@ Zustand：
 
 Tailwind / CSS：
 
-- 样式写在 `className`，不抽自定义 CSS 类。
-- 使用 `index.css` token，禁止硬编码 hex。
-- 圆角默认用 `rounded-[8px]`，大卡片/弹窗用 `rounded-[12px]`；小图标、checkbox、气泡尾角和 pill 可使用更小圆角或 `rounded-full`。
-- 交互统一 `active:scale-[0.96]` + `duration-[120ms]`。
+- 样式优先写在 `className`，遵循现有组件和 `index.css` token。
+- 禁止硬编码 hex，除非设计 token 尚未覆盖且已说明原因。
+- 圆角、动效、间距优先复用现有同类组件规则，不在新组件中临时发明一套视觉语言。
+- 前端结构、状态和交互边界以 `docs/架构设计/desktop/foundation/Renderer架构设计.md` 为准；像素级视觉细节以 `docs/架构设计/desktop/ui/Desktop视觉规范.md`、`docs/架构设计/desktop/ui/Desktop组件规范.md`、`docs/架构设计/desktop/ui/Desktop页面布局规范.md` 和现有同类组件为准。
 
-文件命名：
-
-- `src/main/**` 使用 `kebab-case.ts`。
-- React 组件使用 `PascalCase.tsx`。
-- 非组件 renderer 文件使用 `kebab-case.ts`。
-- tests 镜像源码结构，后缀 `.test.ts`。
-
-## 8. IPC、i18n、日志
-
-IPC：
-
-- Channel 使用 `模块:动作`，例如 `cowork:session:start`。
-- 禁止驼峰 channel。
-- 新增/修改 channel 必须同步 main IPC、preload 实现、preload 类型声明。
-- 所有 IPC 注册必须通过 `safeHandle` / `safeOn`（`src/main/ipc/ipc-registry.ts`），禁止裸 `ipcMain.handle/on`。
-- IPC 分两阶段注册（见 `ipc/index.ts` 头部注释）：Phase A（boot 前，仅依赖 db）、Phase B（pet-ready 后，依赖 runtimeServices）。
+## 10. i18n 与日志
 
 i18n：
 
@@ -282,13 +218,26 @@ i18n：
 
 日志：
 
-- 主进程使用 `src/main/logger.ts`，基于 `electron-log` 拦截 `console.*`。
+- 主进程使用 `petclaw-desktop/src/main/logger.ts`。
 - 日志消息使用英文，前缀 `[ModuleName]`。
-- `console.log/warn/error` 是开发/生产日志，不是用户可见提示。
 - 错误日志保留 error 对象作为最后一个参数。
 - 高频轮询和心跳不得使用 info 级别刷屏。
 
-## 9. 测试与验证
+## 11. 编码风格
+
+- 禁止 `any`，使用 `unknown` + 类型收窄。
+- 不标注可推断类型。
+- 注释用中文，说明为什么这样做，不复述代码。
+- 复杂业务逻辑、边界情况、兼容处理、魔法值必须注释说明意图和背景。
+- 新增配置默认值集中在对应配置模块，禁止魔法值散落。
+- 新增或修改表结构时，必须同步 `petclaw-desktop/src/main/data/db.ts` 中的字段注释。
+- 文件命名：
+  - `src/main/**` 使用 `kebab-case.ts`
+  - React 组件使用 `PascalCase.tsx`
+  - 非组件 renderer 文件使用 `kebab-case.ts`
+  - tests 镜像源码结构，后缀 `.test.ts`
+
+## 12. 测试规则
 
 TDD：
 
@@ -296,14 +245,14 @@ TDD：
 - bug 修复先写复现测试。
 - 重构必须先确认现有测试通过，再改结构。
 
-必须验证：
+默认验证：
 
 ```bash
 npm run typecheck
 npm test
 ```
 
-针对性验证：
+针对性验证示例：
 
 ```bash
 pnpm --filter petclaw-desktop test -- tests/main/windows.test.ts
@@ -311,99 +260,88 @@ pnpm --filter petclaw-desktop test -- tests/main/bootcheck.test.ts
 pnpm --filter petclaw-desktop test -- tests/main/ai/config-sync.test.ts
 ```
 
-沙箱环境可能禁止监听本地端口或 Unix socket，表现为 `listen EPERM` 或端口测试超时。遇到这种情况，应说明原因并在允许的环境下重跑测试，不要把沙箱权限问题误判为业务失败。
+如果验证因沙箱、端口、依赖或系统权限限制无法运行，必须明确说明原因。
 
-## 10. 变更工作流
+## 13. AI 代码上下文规则
 
-1. 先读相关代码和文档。
-2. 用 `rg` 查调用方、旧路径、IPC channel、配置 key。
-3. 列清楚修改边界，保持改动最小。
-4. 先测试后实现；文档重组类任务至少做引用检查和 `typecheck`。
-5. 开发完成后同步 `CLAUDE.md` / `AGENTS.md` 中仍然有效的规则，以及 `petclaw-desktop/README.md`、`docs/架构设计/PetClaw总体架构设计.md`、`docs/架构设计/PetClaw前端架构设计.md` 的相关章节。
-6. 不回滚、不覆盖、不格式化无关用户改动。
+接到代码改动任务后，先从需求、文件、symbol、模块名、错误信息中推断 `target`。
 
-前端 UI/UX：
+写文件前必须主动运行：
 
-- 设计前端 UI/UX 时，先使用项目要求的 UI/UX skill。
-- 参考 `docs/设计/` 下的对应设计稿。
-- 做实际可用界面，不做营销式占位页。
-- 所有可见按钮必须有真实行为；阶段性未接入的能力必须 disabled 或隐藏，禁止空 `onClick`。
-- Cowork 消息、loading 和流式事件必须按 `sessionId` 隔离，禁止多会话共享单一消息数组。
-- 新增前端 IPC 必须同步 main handler、preload 实现、preload 类型声明和 renderer 调用点。
-- 前端架构、路由、状态、UI/UX 边界以 `docs/架构设计/PetClaw前端架构设计.md` 为准。
+```bash
+pnpm ai:prepare-change -- --target <target>
+```
 
-Git 提交：
+如果无法可靠推断单个 target，改用：
 
-- Commit message 使用英文，遵循 Conventional Commits（`feat:` / `fix:` / `refactor:` / `docs:` 等）。
-- Body 每行不超过 100 字符（commitlint `body-max-line-length` 规则）。
-- 不加 `Co-Authored-By` AI 署名行。
+```bash
+pnpm --silent ai:prepare-change -- --from-git --json
+```
 
-## 11. 参考文档
+或：
 
-- 总体架构：`docs/架构设计/PetClaw总体架构设计.md`
-- 前端架构：`docs/架构设计/PetClaw前端架构设计.md`
-- AI 代码上下文工程设计：`docs/架构设计/AI代码上下文工程设计.md`
-- 阶段性设计：`docs/superpowers/specs/`
-- 实施计划：`docs/superpowers/plans/`
-- Gateway 协议：`docs/openclaw-gateway-api.md`
-- UI 设计稿：`docs/设计/`
+```bash
+pnpm --silent ai:prepare-change -- --from-staged --json
+```
 
-## 12. AI 代码上下文执行规则
+规则：
 
-完整设计见 `docs/架构设计/AI代码上下文工程设计.md`。
-
-- 接到代码改动任务后，先从用户需求、已提到的文件、symbol、模块名和错误信息中自动推断 `target`。
-- 写文件前必须主动运行 `pnpm ai:prepare-change -- --target <target>` 获取代码图谱、调用链、影响面和符号上下文；不要要求用户手动运行。
-- 只有无法可靠推断 `target`，或 `prepare-change` 输出表明工具链不可用且无法降级时，才向用户提一个明确问题。
-- 不把 `npx gitnexus analyze` 当作默认入口；需要手动刷新索引时使用 `pnpm ai:index`，工具链异常时优先使用 `pnpm ai:doctor`，快速检查才使用 `pnpm ai:tools:check`。
-- 首次接入或 MCP 客户端配置问题使用 `pnpm ai:setup -- --client <client>`；只看说明用 `pnpm ai:mcp:guide -- --client <client>`；真正写客户端配置才用 `pnpm ai:mcp:install -- --client <client>`。
-- 不在脏工作区默认运行 `gitnexus.detect_changes({ scope: "all" })`；提交前使用 `pnpm ai:impact` 或 `scope: "staged"`，任务内排查只针对本次目标文件/符号。
-- AI 需要机器可读结果时使用 `pnpm --silent ai:prepare-change -- --target <target> --json`、`pnpm --silent ai:impact -- --json` 或 `pnpm --silent ai:doctor -- --json`；不要解析人类日志。
-- GitNexus `.gitnexus/lbug` 锁、`~/.gitnexus/registry.json` 权限、沙箱 `EPERM/EACCES` 属于工具链环境异常；AI 必须降级为 MCP 可用能力和本地 `rg` 使用面扫描，不得误判为业务代码风险或遗留给用户处理。
+- 不要求用户手动运行这些命令。
+- 不把 `npx gitnexus analyze` 当默认入口。
+- 需要刷新索引时使用 `pnpm ai:index`。
+- 工具链异常时优先使用 `pnpm ai:doctor`。
+- 机器可读结果使用 `--json`。
+- `prepare-change`、`impact`、`doctor` 产生的 `.petclaw/ai-tools/*` 运行产物不得提交。
+- GitNexus 锁、registry 权限、沙箱 `EPERM/EACCES` 属于工具链环境异常，应降级为 MCP 和本地 `rg` 扫描。
 - 核心模块改动前必须完成 impact analysis，尤其是 ConfigSync、Cowork、IPC、preload、SQLite、i18n、Openclaw runtime 链路。
 - 涉及 IPC、ConfigSync、SQLite、i18n、preload 的改动必须追踪完整链路，不能只做字符串搜索。
-- 提交或交付前确认 Husky/GitNexus 变更影响分析、对应 typecheck / test 和必要文档同步均已处理；如果验证因环境限制无法运行，必须说明原因。
 
-<!-- gitnexus:start -->
-# GitNexus — Code Intelligence
+## 14. GitNexus 规则
 
-This project is indexed by GitNexus as **petclaw** (6188 symbols, 10737 relationships, 300 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+本项目 GitNexus repo 名称：`petclaw`
 
-> If any GitNexus tool warns the index is stale, use the project wrapper `pnpm ai:index` instead of calling `npx gitnexus analyze` directly.
+修改 symbol 前必须运行影响分析：
 
-## Always Do
+```text
+gitnexus_impact({ target: "symbolName", direction: "upstream" })
+```
 
-- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
-- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.
-- **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
-- When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
-- When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
+并向用户报告：
 
-## Never Do
+- direct callers
+- affected processes
+- risk level
 
-- NEVER edit a function, class, or method without first running `gitnexus_impact` on it.
-- NEVER ignore HIGH or CRITICAL risk warnings from impact analysis.
-- NEVER rename symbols with find-and-replace — use `gitnexus_rename` which understands the call graph.
-- NEVER commit changes without running `gitnexus_detect_changes()` to check affected scope.
+如果风险为 HIGH 或 CRITICAL，必须先警告用户再继续。
 
-## Resources
+提交前必须运行：
 
-| Resource | Use for |
-|----------|---------|
-| `gitnexus://repo/petclaw/context` | Codebase overview, check index freshness |
-| `gitnexus://repo/petclaw/clusters` | All functional areas |
-| `gitnexus://repo/petclaw/processes` | All execution flows |
-| `gitnexus://repo/petclaw/process/{name}` | Step-by-step execution trace |
+```text
+gitnexus_detect_changes()
+```
 
-## CLI
+规则：
 
-| Task | Read this skill file |
-|------|---------------------|
-| Understand architecture / "How does X work?" | `.claude/skills/gitnexus/gitnexus-exploring/SKILL.md` |
-| Blast radius / "What breaks if I change X?" | `.claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md` |
-| Trace bugs / "Why is X failing?" | `.claude/skills/gitnexus/gitnexus-debugging/SKILL.md` |
-| Rename / extract / split / refactor | `.claude/skills/gitnexus/gitnexus-refactoring/SKILL.md` |
-| Tools, resources, schema reference | `.claude/skills/gitnexus/gitnexus-guide/SKILL.md` |
-| Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
+- 探索陌生代码优先使用 `gitnexus_query`。
+- 需要完整 symbol 上下文使用 `gitnexus_context`。
+- 不用 find-and-replace 重命名 symbol，使用 `gitnexus_rename`。
+- 如果 GitNexus 不可用，降级为 `pnpm ai:prepare-change`、MCP 可用能力和本地 `rg`，并说明原因。
 
-<!-- gitnexus:end -->
+## 15. 文档同步
+
+开发完成后，如改动影响架构、前端边界、IPC 契约、数据模型或工作规则，必须同步相关文档：
+
+- `AGENTS.md`
+- `CLAUDE.md`
+- `petclaw-desktop/README.md`
+- `docs/架构设计/PetClaw架构总览.md`
+- `docs/架构设计/desktop/`
+
+只同步仍然有效的规则，不复制过时实现细节。
+
+## 16. Git 提交
+
+- Commit message 使用英文。
+- 遵循 Conventional Commits：`feat:` / `fix:` / `refactor:` / `docs:` 等。
+- Body 每行不超过 100 字符。
+- 不加 `Co-Authored-By` AI 署名行。
