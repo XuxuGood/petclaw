@@ -180,6 +180,30 @@ export function toggleMainWindow(): void {
   }
 }
 
+export function showMainWindow(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  if (chatBoundsBeforeHide && !mainWindow.isVisible()) {
+    mainWindow.setBounds(chatBoundsBeforeHide)
+  }
+  mainWindow.show()
+  mainWindow.focus()
+}
+
+export function focusMainWindow(): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  mainWindow.focus()
+}
+
+export function showPetWindow(): void {
+  if (!petWindow || petWindow.isDestroyed()) return
+  petWindow.show()
+}
+
+export function hidePetWindow(): void {
+  if (!petWindow || petWindow.isDestroyed()) return
+  petWindow.hide()
+}
+
 export function getPetWindow(): BrowserWindow | null {
   return petWindow
 }
