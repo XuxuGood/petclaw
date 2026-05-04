@@ -327,7 +327,7 @@ pnpm --filter petclaw-desktop test -- tests/main/system
 - Modify: `petclaw-desktop/electron-builder.json`
 - Optional Add: `docs/设计/app-icon/`
 
-- [ ] **Step 1: 资产确认**
+- [x] **Step 1: 资产确认**
 
 确认图标源文件是否已存在。方向必须符合架构文档：
 
@@ -336,16 +336,16 @@ pnpm --filter petclaw-desktop test -- tests/main/system
 - 不用 `PC` 文字。
 - 不用机器人头或复杂代码符号。
 
-- [ ] **Step 2: 资源接入**
+- [x] **Step 2: 资源接入**
 
 如果只有 PNG，先保证 `electron-builder.json` 指向真实存在路径。若产出 `.icns`，优先使用
 macOS 原生 `.icns`。
 
-- [ ] **Step 3: 尺寸人工检查**
+- [x] **Step 3: 尺寸人工检查**
 
 检查 16、32、128、512/1024px。小尺寸必须仍能识别爪痕轮廓。
 
-- [ ] **Step 4: 验证**
+- [x] **Step 4: 验证**
 
 ```bash
 pnpm --filter petclaw-desktop build
