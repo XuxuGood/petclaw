@@ -10,7 +10,7 @@ SystemIntegration：macOS 不默认创建 Menu Bar Extra / Tray，新增标准 A
 和 Dock Menu，统一系统动作，清理 Pet Context Menu，不让 Task Monitor 进入系统外壳。
 
 **Architecture:** 主进程新增 `system-actions.ts` 和 `macos-integration.ts`。Dock Menu、
-Application Menu、Pet Context Menu、renderer IPC 复用同一组系统动作。`tray.ts` 仅作为
+Application Menu、非 macOS tray fallback 复用同一组系统动作；Pet Context Menu 只保留宠物暂停/继续和退出。`tray.ts` 仅作为
 非 macOS fallback，macOS 第一版不调用。
 
 **Tech Stack:** Electron Main Process, TypeScript, safeHandle/safeOn IPC, Vitest
@@ -246,22 +246,23 @@ pnpm ai:prepare-change -- --target registerWindowIpcHandlers
 
 覆盖：
 
-- Pet Context Menu 包含 Open PetClaw、Hide/Show Pet、Pause/Resume Pet、Settings...、Quit。
-- 不包含 Task Monitor / Runtime Monitor / 模型 / 技能 / 目录 / IM / Cron。
+- Pet Context Menu 只包含 Pause/Resume Pet、Quit。
+- 不包含 Open PetClaw / Settings / Task Monitor / Runtime Monitor / 模型 / 技能 / 目录 / IM / Cron。
 - Pause/Resume 只发送 `pet:toggle-pause`，不停止 runtime。
 
 - [x] **Step 3: 改造 IPC deps**
 
-`registerWindowIpcHandlers` 注入 `SystemActions`，让 pet 右键菜单复用统一动作：
+`registerWindowIpcHandlers` 注入 `SystemActions` 和 `toggleMainWindow`，让 pet 右键菜单只处理宠物控制和退出，点击猫仍可切换主窗口：
 
 ```ts
 export interface WindowIpcDeps {
   getPetWindow: () => BrowserWindow | null
   actions: SystemActions
+  toggleMainWindow: () => void
 }
 ```
 
-保留 `window:move` 和 `chat:toggle` 的兼容入口，但内部调用 actions。
+保留 `window:move` 和 `chat:toggle` 的兼容入口，`chat:toggle` 继续执行显示/隐藏主窗口。
 
 - [x] **Step 4: 验证**
 

@@ -44,6 +44,7 @@ export function createPetWindow(): BrowserWindow {
     backgroundColor: '#00000000',
     hasShadow: false,
     alwaysOnTop: true,
+    focusable: false,
     skipTaskbar: true,
     resizable: false,
     show: false,

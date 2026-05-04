@@ -1,6 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { beforeEach, describe, it, expect, vi } from 'vitest'
 
 import { resolveMainWindowBounds, resolvePetWindowBounds } from '../../src/main/window-layout'
+
+beforeEach(() => {
+  vi.resetModules()
+  vi.clearAllMocks()
+})
 
 describe('windows layout helpers', () => {
   it('restores saved main window bounds when they are valid', () => {
@@ -59,5 +64,53 @@ describe('windows layout helpers', () => {
     })
 
     expect(bounds).toEqual({ x: 40, y: 50 })
+  })
+
+  it('creates the pet window as a non-focusable floating overlay', async () => {
+    const petWindow = {
+      setVisibleOnAllWorkspaces: vi.fn(),
+      setAlwaysOnTop: vi.fn(),
+      on: vi.fn(),
+      webContents: {
+        setWindowOpenHandler: vi.fn()
+      },
+      loadFile: vi.fn()
+    }
+    const BrowserWindow = vi.fn(() => petWindow)
+
+    vi.doMock('electron', () => ({
+      app: {
+        getPath: vi.fn(() => '/tmp')
+      },
+      BrowserWindow,
+      shell: {
+        openExternal: vi.fn()
+      },
+      screen: {
+        getPrimaryDisplay: vi.fn(() => ({
+          workAreaSize: { width: 1440, height: 900 }
+        }))
+      }
+    }))
+    vi.doMock('@electron-toolkit/utils', () => ({
+      is: { dev: false }
+    }))
+    vi.doMock('../../src/main/app-settings', () => ({
+      readAppSettings: vi.fn(() => ({})),
+      writeAppSettings: vi.fn()
+    }))
+
+    const { createPetWindow } = await import('../../src/main/windows')
+
+    createPetWindow()
+
+    expect(BrowserWindow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        alwaysOnTop: true,
+        focusable: false,
+        transparent: true
+      })
+    )
+    expect(petWindow.setAlwaysOnTop).toHaveBeenCalledWith(true, 'floating')
   })
 })

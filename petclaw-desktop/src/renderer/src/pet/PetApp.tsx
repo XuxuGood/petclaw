@@ -69,13 +69,12 @@ export function PetApp() {
 
   const handleDragEnd = useCallback(() => {}, [])
 
-  // 点击：Sleep 状态下优先唤醒宠物，非 Sleep 状态切换主窗口
+  // 点击宠物是主入口：始终切换主窗口；Sleep 状态额外唤醒，避免点了以后宠物仍沉睡。
   const handleClick = useCallback(() => {
     if (petState === PetState.Sleep) {
       stateMachine.send(PetEvent.WakeUp)
-    } else {
-      window.api.toggleMainWindow()
     }
+    window.api.toggleMainWindow()
   }, [petState, stateMachine])
 
   const handleContextMenu = useCallback(() => {

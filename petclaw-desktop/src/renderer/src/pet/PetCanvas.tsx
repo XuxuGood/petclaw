@@ -252,7 +252,7 @@ export function PetCanvas({
 
   return (
     <div
-      className="w-full h-full relative cursor-grab active:cursor-grabbing select-none"
+      className="w-full h-full relative cursor-pointer active:cursor-grabbing select-none"
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -281,7 +281,7 @@ export function PetCanvas({
 
       {externalBubbleText && (
         <div
-          className="absolute left-1/2 -translate-x-1/2 top-1 z-10 max-w-50 px-3 py-1.5 rounded-xl bg-white/95 text-[11px] text-[#4A4A4A] shadow-md animate-bubble-in pointer-events-none"
+          className="absolute left-1/2 -translate-x-1/2 top-1 z-10 max-w-50 px-3 py-1.5 rounded-xl bg-white/95 text-[11px] text-text-secondary shadow-md animate-bubble-in pointer-events-none"
           style={{ fontFamily: '-apple-system, PingFang SC, sans-serif' }}
         >
           {externalBubbleText}

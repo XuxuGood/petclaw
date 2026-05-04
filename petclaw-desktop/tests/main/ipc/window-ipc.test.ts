@@ -34,11 +34,8 @@ vi.mock('electron', () => ({
 vi.mock('../../../src/main/i18n', () => ({
   t: (key: string) =>
     ({
-      'system.openPetClaw': 'Open PetClaw',
-      'system.togglePet': 'Show/Hide Pet',
       'system.pausePet': 'Pause Pet',
       'system.resumePet': 'Resume Pet',
-      'system.settings': 'Settings...',
       'system.quit': 'Quit PetClaw'
     })[key] ?? key
 }))
@@ -70,16 +67,16 @@ function makePetWindow() {
 }
 
 function registerHandlers(actions = makeActions(), petWindow = makePetWindow()) {
-  const legacyToggleMainWindow = vi.fn()
+  const toggleMainWindow = vi.fn()
   const deps = {
     getPetWindow: () => petWindow,
-    toggleMainWindow: legacyToggleMainWindow,
+    toggleMainWindow,
     actions
   }
 
   registerWindowIpcHandlers(deps)
 
-  return { actions, legacyToggleMainWindow, petWindow }
+  return { actions, toggleMainWindow, petWindow }
 }
 
 function getListener(channel: string) {
@@ -110,32 +107,23 @@ describe('registerWindowIpcHandlers', () => {
     registeredListeners.clear()
   })
 
-  it('opens the main app through SystemActions for the legacy chat toggle event', () => {
-    const { actions, legacyToggleMainWindow } = registerHandlers()
+  it('toggles the main app for the pet click compatibility event', () => {
+    const { actions, toggleMainWindow } = registerHandlers()
 
     getListener('chat:toggle')()
 
-    expect(actions.openPetClaw).toHaveBeenCalledOnce()
-    expect(legacyToggleMainWindow).not.toHaveBeenCalled()
+    expect(toggleMainWindow).toHaveBeenCalledOnce()
+    expect(actions.openPetClaw).not.toHaveBeenCalled()
   })
 
-  it('builds the Pet Context Menu from system actions', () => {
+  it('keeps the Pet Context Menu focused on pet controls', () => {
     const { actions, petWindow } = registerHandlers()
 
     getListener('pet:context-menu')({} as never, false)
     const template = getLastMenuTemplate()
 
-    expect(labelsOf(template)).toEqual([
-      'Open PetClaw',
-      'Show/Hide Pet',
-      'Pause Pet',
-      'Settings...',
-      'Quit PetClaw'
-    ])
-    expect(template[0]).toMatchObject({ click: actions.openPetClaw })
-    expect(template[1]).toMatchObject({ click: actions.togglePet })
-    expect(template[3]).toMatchObject({ click: actions.showSettings })
-    expect(template[5]).toMatchObject({ click: actions.quitPetClaw })
+    expect(labelsOf(template)).toEqual(['Pause Pet', 'Quit PetClaw'])
+    expect(template[2]).toMatchObject({ click: actions.quitPetClaw })
     expect(electronMock.popup).toHaveBeenCalledWith({ window: petWindow })
   })
 
@@ -147,13 +135,13 @@ describe('registerWindowIpcHandlers', () => {
     expect(labelsOf(getLastMenuTemplate())).toContain('Resume Pet')
   })
 
-  it('does not expose task monitor or configuration surfaces in the Pet Context Menu', () => {
+  it('does not expose app navigation or configuration surfaces in the Pet Context Menu', () => {
     registerHandlers()
 
     getListener('pet:context-menu')({} as never, false)
 
     expect(labelsOf(getLastMenuTemplate()).join(' ')).not.toMatch(
-      /Task Monitor|Runtime Monitor|Monitor|Model|Skill|Directory|IM|Cron|任务监控|运行时监控|模型|技能|目录|定时/
+      /Open PetClaw|Show\/Hide Pet|Settings|Task Monitor|Runtime Monitor|Monitor|Model|Skill|Directory|IM|Cron|打开|设置|任务监控|运行时监控|模型|技能|目录|定时/
     )
   })
 
@@ -161,7 +149,7 @@ describe('registerWindowIpcHandlers', () => {
     const { actions, petWindow } = registerHandlers()
 
     getListener('pet:context-menu')({} as never, false)
-    clickMenuItem(getLastMenuTemplate()[2])
+    clickMenuItem(getLastMenuTemplate()[0])
 
     expect(petWindow.webContents.send).toHaveBeenCalledWith('pet:toggle-pause')
     expect(actions.quitPetClaw).not.toHaveBeenCalled()
