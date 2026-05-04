@@ -184,7 +184,7 @@ pnpm --filter petclaw-desktop typecheck
 - Modify: `petclaw-desktop/src/main/system/tray.ts`
 - Test: `petclaw-desktop/tests/main/system/tray.test.ts`
 
-- [ ] **Step 1: 影响分析**
+- [x] **Step 1: 影响分析**
 
 Run:
 
@@ -193,7 +193,7 @@ pnpm ai:prepare-change -- --target createTray
 pnpm ai:prepare-change -- --target app:pet-ready
 ```
 
-- [ ] **Step 2: 写失败测试**
+- [x] **Step 2: 写失败测试**
 
 覆盖：
 
@@ -202,7 +202,7 @@ pnpm ai:prepare-change -- --target app:pet-ready
 - fallback tray 不包含 Task Monitor。
 - fallback tray 不使用 emoji title 作为品牌入口。
 
-- [ ] **Step 3: 修改 index 编排**
+- [x] **Step 3: 修改 index 编排**
 
 在 `app:pet-ready` 中：
 
@@ -211,7 +211,7 @@ pnpm ai:prepare-change -- --target app:pet-ready
 - 非 macOS：按 fallback 策略调用 `createTray(...)`。
 - 快捷键注册继续保留，但应尽量复用 `SystemActions`，不要再传散落窗口函数。
 
-- [ ] **Step 4: 清理 tray fallback**
+- [x] **Step 4: 清理 tray fallback**
 
 `tray.ts` 作为非 macOS fallback：
 
@@ -219,7 +219,7 @@ pnpm ai:prepare-change -- --target app:pet-ready
 - 删除 emoji title。
 - 使用平台可接受的 fallback 图标或保持可测试的空图标，但不在 macOS 使用。
 
-- [ ] **Step 5: 验证**
+- [x] **Step 5: 验证**
 
 ```bash
 pnpm --filter petclaw-desktop test -- tests/main/system/tray.test.ts

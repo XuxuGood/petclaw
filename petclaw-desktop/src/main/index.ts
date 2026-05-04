@@ -30,7 +30,9 @@ import { PetEventBridge } from './pet/pet-event-bridge'
 import { registerAllIpcHandlers, registerBootIpcHandlers, registerSettingsIpcHandlers } from './ipc'
 import { safeHandle, safeOn } from './ipc/ipc-registry'
 import { HookServer } from './hooks/server'
-import { createTray } from './system/tray'
+import { initializeMacosIntegration } from './system/macos-integration'
+import { createSystemActions } from './system/system-actions'
+import { createTray, shouldCreateFallbackTray } from './system/tray'
 import { registerShortcuts, unregisterShortcuts } from './system/shortcuts'
 import { runBootCheck } from './bootcheck'
 import { diagAppReady, diagBootResult, diagWindowLoad, diagError } from './diagnostics'
@@ -375,6 +377,11 @@ app.whenReady().then(async () => {
     petWindow.webContents.on('did-finish-load', () => {
       diagWindowLoad('pet-window', petWindow.webContents.getURL())
     })
+    const systemActions = createSystemActions({
+      app,
+      getMainWindow: () => getMainWindow(),
+      getPetWindow: () => getPetWindow()
+    })
 
     // 注册需要双窗口的 IPC 处理器
     if (petWindow && chatWindow) {
@@ -412,7 +419,11 @@ app.whenReady().then(async () => {
         )
       }
 
-      createTray(petWindow, chatWindow, toggleMainWindow)
+      if (shouldCreateFallbackTray()) {
+        createTray(systemActions)
+      } else {
+        initializeMacosIntegration({ actions: systemActions })
+      }
       registerShortcuts(petWindow, chatWindow, toggleMainWindow)
     }
   })

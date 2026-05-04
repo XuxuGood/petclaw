@@ -1,58 +1,43 @@
-import { Tray, Menu, nativeImage, app, BrowserWindow } from 'electron'
+import { Tray, Menu, nativeImage } from 'electron'
+import type { MenuItemConstructorOptions } from 'electron'
 
 import { t } from '../i18n'
+import type { SystemActions } from './system-actions'
 
-export function createTray(
-  petWindow: BrowserWindow,
-  mainWindow: BrowserWindow,
-  toggleMainWindow: () => void
-): Tray {
-  const icon = nativeImage.createEmpty()
-  const tray = new Tray(icon)
-  tray.setTitle('🐱')
+export function shouldCreateFallbackTray(platform: NodeJS.Platform = process.platform): boolean {
+  return platform !== 'darwin'
+}
 
-  tray.setToolTip('PetClaw - AI Desktop Pet')
-
-  const contextMenu = Menu.buildFromTemplate([
+export function buildTrayMenuTemplate(actions: SystemActions): MenuItemConstructorOptions[] {
+  return [
     {
-      label: t('tray.togglePet'),
-      click: () => {
-        if (petWindow.isVisible()) {
-          petWindow.hide()
-        } else {
-          petWindow.show()
-        }
-      }
+      label: t('system.openPetClaw'),
+      click: actions.openPetClaw
     },
     {
-      label: t('tray.openChat'),
-      click: () => {
-        mainWindow.show()
-        mainWindow.focus()
-      }
-    },
-    {
-      label: t('tray.monitor'),
-      click: () => {
-        mainWindow.show()
-        mainWindow.focus()
-        mainWindow.webContents.send('panel:open', 'monitor')
-      }
+      label: t('system.togglePet'),
+      click: actions.togglePet
     },
     { type: 'separator' },
     {
-      label: t('tray.quit'),
-      click: () => {
-        app.quit()
-      }
+      label: t('system.quit'),
+      click: actions.quitPetClaw
     }
-  ])
+  ]
+}
+
+export function createTray(actions: SystemActions): Tray {
+  // fallback tray 只服务非 macOS 平台，macOS 的常驻入口由 Dock 和桌面宠物承担。
+  const icon = nativeImage.createEmpty()
+  const tray = new Tray(icon)
+
+  tray.setToolTip('PetClaw')
+
+  const contextMenu = Menu.buildFromTemplate(buildTrayMenuTemplate(actions))
 
   tray.setContextMenu(contextMenu)
 
-  tray.on('click', () => {
-    toggleMainWindow()
-  })
+  tray.on('click', actions.openPetClaw)
 
   return tray
 }
