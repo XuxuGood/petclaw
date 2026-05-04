@@ -1,6 +1,6 @@
 # CI/CD 架构设计
 
-本文档描述 PetClaw GitHub Actions 的职责划分。CI/CD 是仓库级工程能力，不属于单个产品包；desktop 打包机制见 `../desktop/runtime/Desktop打包架构设计.md`。
+本文档描述 PetClaw GitHub Actions 的职责划分。CI/CD 是仓库级工程能力，不属于单个产品包；desktop 打包和 OpenClaw runtime 分发机制见 [Desktop打包与Runtime分发架构设计.md](../desktop/runtime/Desktop打包与Runtime分发架构设计.md)。
 
 ## 1. 流水线总览
 

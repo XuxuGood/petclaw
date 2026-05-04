@@ -62,9 +62,11 @@ pnpm -r lint                      # workspace 全量 lint
 |------|------|
 | [`CLAUDE.md`](./CLAUDE.md) | Claude Code 工作指南 |
 | [`AGENTS.md`](./AGENTS.md) | Codex 工作指南 |
-| [`docs/架构设计/README.md`](./docs/架构设计/README.md) | 架构文档入口和阅读路径 |
-| [`docs/架构设计/PetClaw架构总览.md`](./docs/架构设计/PetClaw架构总览.md) | PetClaw 总体架构地图 |
-| [`docs/架构设计/desktop/README.md`](./docs/架构设计/desktop/README.md) | desktop 分层架构入口 |
+| [`docs/架构设计/PetClaw架构总览.md`](./docs/架构设计/PetClaw架构总览.md) | 架构文档顶层入口和 PetClaw 总体架构地图 |
+| [`docs/架构设计/desktop/overview/Desktop架构设计.md`](./docs/架构设计/desktop/overview/Desktop架构设计.md) | desktop 分层架构入口 |
+| [`docs/架构设计/shared/Shared架构设计.md`](./docs/架构设计/shared/Shared架构设计.md) | shared 公共底座边界 |
+| [`docs/架构设计/web/Web架构边界.md`](./docs/架构设计/web/Web架构边界.md) | web 预留包边界 |
+| [`docs/架构设计/api/API架构边界.md`](./docs/架构设计/api/API架构边界.md) | api 预留包边界 |
 | [`docs/架构设计/desktop/foundation/Renderer架构设计.md`](./docs/架构设计/desktop/foundation/Renderer架构设计.md) | desktop renderer、Preload API 使用方式和 UI/UX 架构事实源 |
 | [`docs/架构设计/engineering/AI代码上下文工程设计.md`](./docs/架构设计/engineering/AI代码上下文工程设计.md) | AI 代码上下文工具链、MCP 客户端适配与自动化变更影响分析设计 |
 | [`docs/superpowers/specs/`](./docs/superpowers/specs/) | 阶段性设计规格 |

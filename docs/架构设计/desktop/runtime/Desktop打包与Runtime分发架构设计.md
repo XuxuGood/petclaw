@@ -1,32 +1,50 @@
-# OpenClaw Runtime 工程设计
+# Desktop 打包与 Runtime 分发架构设计
 
 ## 1. 模块定位
 
-OpenClaw Runtime 工程描述 PetClaw 如何锁定、构建、裁剪、预编译、同步和发布随桌面应用分发的 OpenClaw runtime。它是仓库级工程能力，连接 `RuntimeGateway架构设计.md`、`Desktop打包架构设计.md` 和 `CI-CD架构设计.md`。
+Desktop 打包与 Runtime 分发模块负责把 `petclaw-desktop` 的 main/preload/renderer 产物、OpenClaw runtime、预装 SKILLs、本地扩展、平台资源、签名和发布产物组合成可运行的桌面应用。
 
-本文不描述运行时业务调用协议；Gateway 生命周期见 `../desktop/runtime/RuntimeGateway架构设计.md`，用户配置写入见 `../desktop/runtime/ConfigSync架构设计.md`。
+本文回答三个问题：
+
+- 本地 `dist:*` 命令如何构建 Electron 应用和目标平台 OpenClaw runtime。
+- OpenClaw runtime 如何锁定版本、应用补丁、安装插件、同步本地扩展、裁剪并固化生产布局。
+- Electron Builder 如何把 runtime、SKILLs、图标、Windows tar、签名和 notarize 串成平台产物。
+
+本文不描述运行时业务调用协议；Gateway 生命周期见 [RuntimeGateway架构设计.md](./RuntimeGateway架构设计.md)，用户配置写入见 [ConfigSync架构设计.md](./ConfigSync架构设计.md)，远端流水线见 [CI-CD架构设计.md](../../engineering/CI-CD架构设计.md)。
 
 ## 2. 核心概念
 
-- OpenClaw version lock：`petclaw-desktop/package.json#openclaw.version`。
-- OpenClaw repo：`package.json#openclaw.repo`。
-- preinstalled plugins：`package.json#openclaw.plugins`。
-- runtime target：`mac-arm64`、`mac-x64`、`win-x64`、`win-arm64`、`linux-x64`、`linux-arm64`。
-- `vendor/openclaw-runtime/{target}`：目标平台 runtime 输出目录。
-- `vendor/openclaw-runtime/current`：当前打包或开发使用的 runtime 指针目录。
-- local extensions：PetClaw 本地维护的 OpenClaw 扩展，例如 `mcp-bridge`、`ask-user-question`。
-- finalize/prune：打包前去除无关文件并固化生产布局。
+| 概念 | 含义 |
+|---|---|
+| OpenClaw version lock | `petclaw-desktop/package.json#openclaw.version`，发布 runtime 的唯一版本事实源 |
+| OpenClaw repo | `package.json#openclaw.repo`，用于 clone/checkout 的源码仓库 |
+| preinstalled plugins | `package.json#openclaw.plugins`，随 runtime 预装的 OpenClaw 插件 |
+| runtime target | `mac-arm64`、`mac-x64`、`win-x64`、`win-arm64`、`linux-x64`、`linux-arm64` |
+| `vendor/openclaw-runtime/{target}` | 目标平台 runtime 输出目录 |
+| `vendor/openclaw-runtime/current` | 当前开发或打包使用的 runtime 指针目录 |
+| local extensions | PetClaw 本地维护的 OpenClaw 扩展，例如 `mcp-bridge`、`ask-user-question` |
+| finalize/prune | 打包前去除无关文件并固化生产 runtime 布局 |
+| Electron Builder | 生成 `.dmg`、`.zip`、`.exe`、`.AppImage`、`.deb` 等平台产物 |
+| extraResources | 打包到 app resources 的 runtime、SKILLs、tray 图标和平台资源 |
+| asar / asarUnpack | 应用源码进入 asar，native module 按需解包 |
+| notarize/sign | macOS、Windows 等平台发布安全要求 |
 
 ## 3. 总体架构
 
 ```text
 ┌────────────────────────────────────────────────────────────────────┐
 │ petclaw-desktop/package.json                                        │
-│ openclaw.version / repo / plugins / npm scripts                     │
+│ openclaw.version / repo / plugins / dist:* scripts                  │
 └──────────────┬─────────────────────────────────────────────────────┘
                ▼
+┌────────────────────────────┐
+│ electron-vite build         │
+│ out/main + out/preload      │
+│ out/renderer                │
+└──────────────┬─────────────┘
+               ▼
 ┌────────────────────────────────────────────────────────────────────┐
-│ Runtime build scripts                                               │
+│ OpenClaw runtime pipeline                                           │
 │ ensure -> patch -> build target -> sync current -> bundle gateway    │
 │ -> plugins -> local extensions -> precompile -> channel deps -> prune│
 │ -> finalize                                                         │
@@ -38,8 +56,13 @@ OpenClaw Runtime 工程描述 PetClaw 如何锁定、构建、裁剪、预编译
 └──────────────┬─────────────────────────────────────────────────────┘
                ▼
 ┌────────────────────────────────────────────────────────────────────┐
-│ Desktop package                                                     │
-│ Resources/petmind or Windows resource archive                       │
+│ electron-builder                                                    │
+│ beforePack/afterPack hooks -> extraResources -> sign/notarize       │
+└──────────────┬─────────────────────────────────────────────────────┘
+               ▼
+┌────────────────────────────────────────────────────────────────────┐
+│ release artifacts                                                   │
+│ macOS .dmg/.zip | Windows .exe/portable | Linux .AppImage/.deb      │
 └──────────────┬─────────────────────────────────────────────────────┘
                ▼
 ┌────────────────────────────────────────────────────────────────────┐
@@ -77,16 +100,27 @@ npm run openclaw:runtime:<target>
   -> prune-openclaw-runtime.cjs
 ```
 
-发布打包：
+本地或 CI 打包：
 
 ```text
-dist:<platform>:<arch>
+Developer or CI
+  -> npm run dist:mac:arm64 / dist:win:x64 / dist:linux:x64
   -> electron-vite build
   -> openclaw:runtime:<target>
-  -> openclaw:finalize
-  -> electron-builder
-  -> electron-builder-hooks.cjs validates runtime/plugins/extensions
-  -> release artifacts
+  -> finalize-openclaw-runtime.cjs
+  -> electron-builder --<platform> --<arch>
+  -> electron-builder-hooks.cjs validates runtime/SKILLs/platform resources
+  -> sign/notarize when release credentials exist
+  -> release/* artifacts
+```
+
+Windows 特殊路径：
+
+```text
+build-tar/win-resources.tar
+  -> extraResources/win-resources.tar
+  -> scripts/unpack-petmind.cjs
+  -> first run or install phase unpacks Windows runtime resources
 ```
 
 ## 5. 状态机与生命周期
@@ -103,7 +137,10 @@ not-prepared
   -> extensions precompiled
   -> pruned
   -> finalized
+  -> app built
   -> packaged
+  -> signed/notarized
+  -> artifact ready
 ```
 
 失败必须停在最早可解释阶段：
@@ -113,8 +150,9 @@ not-prepared
 - Gateway 入口缺失停在 `openclaw:bundle` 或 builder hook。
 - 插件缺失停在 `openclaw:plugins` 或 builder hook。
 - 本地扩展缺失停在 `openclaw:extensions` / `openclaw:precompile`。
+- macOS symlink、codesign 或 notarize 问题停在 `afterPack` 或 `afterSign`。
 
-## 6. 数据模型
+## 6. 数据模型与目录布局
 
 `package.json#openclaw`：
 
@@ -147,19 +185,35 @@ petclaw-desktop/
     ask-user-question/
 ```
 
-生产资源：
+生产资源布局：
 
 ```text
 macOS/Linux app resources
-  petmind/
+  tray/
   SKILLs/
+  petmind/
 
 Windows app resources
+  tray/
   win-resources.tar
   unpack-petmind.cjs
 ```
 
-## 7. 命令设计
+打包配置来自 `electron-builder.json`、`petclaw-desktop/package.json` scripts、runtime 构建脚本和平台资源文件：
+
+| 配置 | 位置 | 作用 |
+|---|---|---|
+| product/app id | `electron-builder.json` | 应用身份和系统注册 |
+| files | `electron-builder.json` | 收录 package、SYSTEM_PROMPT 和 out 产物 |
+| extraResources | `electron-builder.json` | tray、SKILLs、runtime、Windows tar 资源 |
+| protocols | `electron-builder.json` | 注册 `petclaw://` |
+| asarUnpack | `electron-builder.json` | 解包 `better-sqlite3` native module |
+| dist scripts | `petclaw-desktop/package.json` | 平台和架构入口 |
+| builder hooks | `scripts/electron-builder-hooks.cjs` | 打包前后校验和平台处理 |
+
+`electron-builder.json` 中的 filter 不只是体积优化，也是安全边界：`.env`、测试、源码映射、无关 README/License 不能被误带入 runtime 或 SKILLs 包。
+
+## 7. 命令与脚本职责
 
 常用命令：
 
@@ -189,7 +243,7 @@ pnpm --filter petclaw-desktop dist:linux:x64
 | `finalize-openclaw-runtime.cjs` | 固化生产 runtime 布局 |
 | `electron-builder-hooks.cjs` | 打包前后校验和平台处理 |
 
-## 8. 本地扩展
+## 8. 本地扩展与预装能力
 
 PetClaw 维护的 OpenClaw local extensions 是 runtime 能力的一部分：
 
@@ -225,40 +279,62 @@ production Windows
   -> unpack to userData/runtime location when needed
 ```
 
-GatewayClient 入口查找优先级见 `RuntimeGateway架构设计.md`。构建工程必须保证这些入口在 runtime 内存在。
+GatewayClient 入口查找优先级见 [RuntimeGateway架构设计.md](./RuntimeGateway架构设计.md)。构建和打包必须保证这些入口在 runtime 内存在。
 
-## 10. CI/CD 集成
+EngineManager 不应该知道 CI runner 或开发机路径；它只能根据生产资源目录、用户数据目录和 runtime build info 解析运行时位置。
 
-OpenClaw Integration Check 负责快速验证：
+## 10. IPC / Preload 与 Renderer 可见影响
+
+打包不定义 runtime IPC，但产物必须保持 preload 安全配置：
+
+- `nodeIntegration: false`
+- `contextIsolation: true`
+
+打包验证必须确认以下入口存在：
 
 ```text
-openclaw.version format
-openclaw.repo URL
-openclaw.plugins shape
-core build scripts existence
-latest upstream version on schedule/workflow_dispatch
+petclaw-desktop/out/renderer/index.html
+petclaw-desktop/out/main/index.js
+petclaw-desktop/out/preload/index.js
 ```
 
-Build & Release workflow 调用 `dist:*` 命令执行真实平台构建。PR 不跑全平台打包，避免反馈过慢。
+这些路径改变时，需要同步 Electron Verify workflow、electron-builder 配置和 Desktop/IPC 文档。
+
+打包影响用户看到的版本、关于页、更新状态和首次启动体验：
+
+- About 页版本号来自打包后的 app metadata。
+- BootCheck 的 runtime 缺失、Gateway 入口缺失、资源路径错误都属于打包可见错误。
+- 自动更新状态依赖发布产物和 GitHub Release，不应在未签名本地包中展示成功更新承诺。
+- 首次启动时如果 runtime 解包或资源校验失败，必须展示恢复操作和日志入口。
 
 ## 11. 错误态、安全和权限
+
+签名、notarize、release token 不写入仓库。构建日志不能泄漏 secrets。runtime 缺失时 BootCheck 展示可恢复错误。
+
+安全边界：
 
 - 构建日志不得输出 API key、signing secrets、Gateway token。
 - runtime 配置中的敏感值使用 `${VAR}` placeholder，不写明文。
 - `.env`、测试、源码映射、虚拟环境和无关文档不进入打包 runtime。
 - 版本升级必须显式修改 `package.json#openclaw.version` 并重建 runtime。
 - 本地 OpenClaw 源码开发只能作为开发模式输入，不应污染发布产物。
+- macOS 使用 hardened runtime、entitlements 和 notarize。
+- Windows 签名 secrets 只在 release workflow 注入。
+- GitHub release token 使用 `GITHUB_TOKEN`，只在发布 job 需要 `contents: write`。
+- `CSC_LINK`、`CSC_KEY_PASSWORD`、`APPLE_ID_PASSWORD` 等不得写入脚本默认值或文档示例。
+- SKILLs 打包过滤 `.env`、虚拟环境和测试目录，避免用户凭据或开发依赖进入安装包。
 
 ## 12. 与其它模块的关系
 
 | 模块 | 关系 |
 |---|---|
-| RuntimeGateway | 运行构建好的 Gateway runtime |
-| ConfigSync | 写入 runtime 启动和运行时配置 |
-| Desktop 打包 | 把 runtime 放入平台产物 |
-| MCP | 依赖 `mcp-bridge` local extension |
+| RuntimeGateway | 读取 production runtime、Gateway 入口和运行时资源 |
+| ConfigSync | 生产 runtime 启动后写入 openclaw.json/AGENTS.md |
+| Skills | SKILLs 随包分发，用户目录中的 skill 仍走配置同步 |
+| MCP | 本地 `mcp-bridge` 扩展必须预编译进 runtime |
 | Cowork | 依赖 `ask-user-question` 审批扩展 |
-| CI/CD | 校验版本、脚本和平台构建 |
+| SystemIntegration | 图标、协议、签名、更新和平台资源由打包提供 |
+| CI/CD | 校验版本、脚本，并调用同一组 `dist:*` 命令 |
 
 ## 13. 测试策略
 
@@ -268,4 +344,7 @@ Build & Release workflow 调用 `dist:*` 命令执行真实平台构建。PR 不
 - Gateway 入口存在性校验。
 - local extensions 预编译产物存在性校验。
 - prune 后敏感文件和测试文件不进入 runtime 的检查。
-- 平台 `dist:*` CI job 或本地构建验证。
+- Electron Verify workflow 验证 `out/` 结构。
+- 平台构建脚本 dry-run 或 CI 验证。
+- 打包产物启动冒烟测试。
+- Release 前至少跑目标平台 `dist:*` 或对应 CI job。

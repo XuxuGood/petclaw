@@ -40,4 +40,4 @@ petclaw-shared/src/i18n/
   index.ts
 ```
 
-shared 只提供资源、Locale 类型和纯 helper。主进程 `t()`、renderer `useI18n()`、语言持久化、系统菜单刷新等运行时能力属于 `petclaw-desktop`，详见 `../desktop/foundation/I18n架构设计.md`。
+shared 只提供资源、Locale 类型和纯 helper。主进程 `t()`、renderer `useI18n()`、语言持久化、系统菜单刷新等运行时能力属于 `petclaw-desktop`，详见 [`../desktop/foundation/I18n架构设计.md`](../desktop/foundation/I18n架构设计.md)。

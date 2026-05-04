@@ -2,11 +2,12 @@
 
 本文件是 AI Agent 在 PetClaw 仓库中的执行入口。入口文件只保留必须遵守的规则、常用命令、查找路由和高频架构边界；完整事实以文档和代码为准。
 
-- 总体架构事实源：`docs/架构设计/PetClaw架构总览.md`
-- Desktop 架构事实源：`docs/架构设计/desktop/`
-- 前端架构事实源：`docs/架构设计/desktop/foundation/Renderer架构设计.md`
-- AI 代码上下文事实源：`docs/架构设计/engineering/AI代码上下文工程设计.md`
-- Gateway 协议：`docs/openclaw-gateway-api.md`
+- 总体架构事实源：[docs/架构设计/PetClaw架构总览.md](docs/架构设计/PetClaw架构总览.md)
+- Desktop 架构事实源：[docs/架构设计/desktop/overview/Desktop架构设计.md](docs/架构设计/desktop/overview/Desktop架构设计.md)
+- 前端架构事实源：[docs/架构设计/desktop/foundation/Renderer架构设计.md](docs/架构设计/desktop/foundation/Renderer架构设计.md)
+- AI 代码上下文事实源：[docs/架构设计/engineering/AI代码上下文工程设计.md](docs/架构设计/engineering/AI代码上下文工程设计.md)
+- Gateway 协议：[docs/openclaw-gateway-api.md](docs/openclaw-gateway-api.md)
+- OpenClaw 上游源码参考：`/Users/xiaoxuxuy/Desktop/工作/AI/开源项目/openclaw`，远端为 `https://github.com/openclaw/openclaw`
 
 ## 1. 基本原则
 
@@ -49,17 +50,20 @@
 
 ## 4. 信息查找路由
 
-- 总体架构不清楚：读 `docs/架构设计/PetClaw架构总览.md`
-- Desktop 模块不清楚：先读 `docs/架构设计/desktop/README.md` 和 `docs/架构设计/desktop/overview/Desktop架构设计.md`，再读对应模块文档。
-- 前端状态、UI、preload、renderer 不清楚：读 `docs/架构设计/desktop/foundation/Renderer架构设计.md`
-- AI 代码上下文工具不清楚：读 `docs/架构设计/engineering/AI代码上下文工程设计.md`
-- Gateway 协议不清楚：读 `docs/openclaw-gateway-api.md`
+- 总体架构不清楚：读 [docs/架构设计/PetClaw架构总览.md](docs/架构设计/PetClaw架构总览.md)
+- Desktop 模块不清楚：先读 [docs/架构设计/desktop/overview/Desktop架构设计.md](docs/架构设计/desktop/overview/Desktop架构设计.md)，再读对应模块文档。
+- 前端状态、UI、preload、renderer 不清楚：读 [docs/架构设计/desktop/foundation/Renderer架构设计.md](docs/架构设计/desktop/foundation/Renderer架构设计.md)
+- AI 代码上下文工具不清楚：读 [docs/架构设计/engineering/AI代码上下文工程设计.md](docs/架构设计/engineering/AI代码上下文工程设计.md)
+- Gateway 协议不清楚：读 [docs/openclaw-gateway-api.md](docs/openclaw-gateway-api.md)
+- OpenClaw 上游源码实现不清楚：查 `/Users/xiaoxuxuy/Desktop/工作/AI/开源项目/openclaw`，必要时参考 `https://github.com/openclaw/openclaw`
+- PetClaw 实际分发的 OpenClaw runtime 不清楚：查 `petclaw-desktop/package.json#openclaw.version`、`petclaw-desktop/vendor/openclaw-runtime/current/` 和 [docs/架构设计/desktop/runtime/Desktop打包与Runtime分发架构设计.md](docs/架构设计/desktop/runtime/Desktop打包与Runtime分发架构设计.md)
+- PetClaw 本地 OpenClaw 扩展不清楚：查 `petclaw-desktop/openclaw-extensions/`
 - 启动链路不清楚：查 `petclaw-desktop/src/main/index.ts`、`bootcheck.ts`、`runtime-services.ts`
 - IPC 不清楚：查 `petclaw-desktop/src/main/ipc/`、`petclaw-desktop/src/preload/index.ts`、`petclaw-desktop/src/preload/index.d.ts`
 - SQLite 表结构不清楚：查 `petclaw-desktop/src/main/data/db.ts`
 - ConfigSync 不清楚：查 `petclaw-desktop/src/main/ai/config-sync.ts`
 - Cowork 不清楚：查 `petclaw-desktop/src/main/ai/cowork-*`、`petclaw-desktop/src/renderer/src/views/chat/`
-- Openclaw runtime 不清楚：查 `petclaw-desktop/src/main/ai/engine-manager.ts`、`gateway.ts`
+- Openclaw runtime 运行时链路不清楚：查 `petclaw-desktop/src/main/ai/engine-manager.ts`、`gateway.ts`
 - IM 不清楚：查 `petclaw-desktop/src/main/im/`、`petclaw-desktop/src/renderer/src/views/im/`
 - Cron 不清楚：查 `petclaw-desktop/src/main/scheduler/`、`petclaw-desktop/src/renderer/src/views/cron/`
 - Pet 事件不清楚：查 `petclaw-desktop/src/main/pet/`
@@ -172,7 +176,7 @@ Pet 事件：
 
 前端改动前必须阅读：
 
-`docs/架构设计/desktop/foundation/Renderer架构设计.md`
+[docs/架构设计/desktop/foundation/Renderer架构设计.md](docs/架构设计/desktop/foundation/Renderer架构设计.md)
 
 规则：
 
@@ -203,7 +207,7 @@ Tailwind / CSS：
 - 样式优先写在 `className`，遵循现有组件和 `index.css` token。
 - 禁止硬编码 hex，除非设计 token 尚未覆盖且已说明原因。
 - 圆角、动效、间距优先复用现有同类组件规则，不在新组件中临时发明一套视觉语言。
-- 前端结构、状态和交互边界以 `docs/架构设计/desktop/foundation/Renderer架构设计.md` 为准；像素级视觉细节以 `docs/架构设计/desktop/ui/Desktop视觉规范.md`、`docs/架构设计/desktop/ui/Desktop组件规范.md`、`docs/架构设计/desktop/ui/Desktop页面布局规范.md` 和现有同类组件为准。
+- 前端结构、状态和交互边界以 [docs/架构设计/desktop/foundation/Renderer架构设计.md](docs/架构设计/desktop/foundation/Renderer架构设计.md) 为准；像素级视觉细节以 [docs/架构设计/desktop/ui/Desktop视觉规范.md](docs/架构设计/desktop/ui/Desktop视觉规范.md)、[docs/架构设计/desktop/ui/Desktop组件规范.md](docs/架构设计/desktop/ui/Desktop组件规范.md)、[docs/架构设计/desktop/ui/Desktop页面布局规范.md](docs/架构设计/desktop/ui/Desktop页面布局规范.md) 和现有同类组件为准。
 
 ## 10. i18n 与日志
 
@@ -329,15 +333,11 @@ gitnexus_detect_changes()
 
 ## 15. 文档同步
 
-开发完成后，如改动影响架构、前端边界、IPC 契约、数据模型或工作规则，必须同步相关文档：
+开发完成后必须先看 `git diff --name-only`，判断是否改变了架构事实。
 
-- `AGENTS.md`
-- `CLAUDE.md`
-- `petclaw-desktop/README.md`
-- `docs/架构设计/PetClaw架构总览.md`
-- `docs/架构设计/desktop/`
+如果实现改变模块职责、数据流、IPC 契约、preload API、状态模型、数据模型、错误边界、安全边界、UI 布局规则、CI/CD 流程或 Agent 工作规则，必须按 [docs/架构设计/engineering/文档同步路由.md](docs/架构设计/engineering/文档同步路由.md) 检查并同步文档。
 
-只同步仍然有效的规则，不复制过时实现细节。
+纯内部实现细节、局部 bug 修复、测试补充且不改变契约时，不强行改文档，但最终回复必须说明无需同步的原因。
 
 ## 16. Git 提交
 

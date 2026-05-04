@@ -1,6 +1,6 @@
 # Desktop 页面布局规范
 
-本文档记录 PetClaw desktop 页面级布局规范。页面状态、数据流和交互边界见 `docs/架构设计/desktop/foundation/Renderer架构设计.md`；本文只约束稳定布局、滚动、响应式和页面级视觉结构。
+本文档记录 PetClaw desktop 页面级布局规范。页面状态、数据流和交互边界见 [`../foundation/Renderer架构设计.md`](../foundation/Renderer架构设计.md)；本文只约束稳定布局、滚动、响应式和页面级视觉结构。
 
 ## 1. 总体原则
 
@@ -8,7 +8,6 @@
 - 页面布局优先服务高频操作和扫描效率。
 - 所有页面必须有稳定的 loading、empty、error、disabled 状态区域。
 - 弹窗、列表、详情面板必须有稳定尺寸约束，避免内容加载导致布局跳动。
-- 关键页面 UI 改动后，可更新本地 `docs/设计参考/snapshots/desktop/` 下对应截图辅助回归；该目录不提交。
 
 ## 2. Main Window 工作台
 
@@ -348,23 +347,3 @@ Settings 是全页面模式，进入后隐藏主侧栏，独占渲染。
 - 新增 z-index 必须说明所在层级，不使用随机大数。
 - Modal 和 Tooltip 不应互相遮挡关键内容。
 - Popover 不能被 drawer backdrop 覆盖。
-
-## 18. 截图基线
-
-影响以下页面外观时应更新截图：
-
-- `desktop/chat/`
-- `desktop/settings/`
-- `desktop/skills/`
-- `desktop/cron/`
-- `desktop/im/`
-- `desktop/pet-window/`
-
-更新说明应包含：
-
-```text
-changed page
-changed state: normal / loading / empty / error / disabled
-viewport size
-why visual change is intended
-```

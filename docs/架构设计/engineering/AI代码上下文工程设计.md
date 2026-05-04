@@ -12,7 +12,7 @@ AI 代码上下文工程解决的是这个开发基础设施问题：
 - 让 AI 在写文件前自动准备上下文，不把命令负担转给用户。
 - 让不同 AI 客户端优先共享项目级 `.mcp.json`，并在不支持项目级配置时使用模板 fallback。
 
-本文只描述 AI 自动化上下文系统本身，不复写 PetClaw 的业务开发规则。IPC、ConfigSync、SQLite、i18n、Openclaw Runtime 等业务链路规则仍以 `AGENTS.md`、`CLAUDE.md`、`docs/架构设计/PetClaw架构总览.md` 和 `docs/架构设计/desktop/` 下的对应模块文档为准。
+本文只描述 AI 自动化上下文系统本身，不复写 PetClaw 的业务开发规则。IPC、ConfigSync、SQLite、i18n、Openclaw Runtime 等业务链路规则仍以 [AGENTS.md](../../../AGENTS.md)、[CLAUDE.md](../../../CLAUDE.md)、[PetClaw架构总览.md](../PetClaw架构总览.md) 和 [desktop/](../desktop/) 下的对应模块文档为准。
 
 ## 2. 设计目标
 

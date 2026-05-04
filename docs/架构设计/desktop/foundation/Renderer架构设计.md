@@ -388,8 +388,10 @@ Main Window 和 Pet Window 必须支持：
 
 ```bash
 pnpm --filter petclaw-desktop typecheck
-pnpm --filter petclaw-desktop exec eslint src --max-warnings 0
+pnpm --filter petclaw-desktop lint
 ```
+
+`petclaw-desktop lint` 包含 ESLint 和 renderer UI guardrails。UI guardrails 会阻止组件内硬编码 hex、临时 Tailwind 渐变和随机大 z-index；新增例外必须在脚本白名单中说明原因。
 
 涉及 store、IPC 或会话状态时增加针对性测试：
 

@@ -1,6 +1,6 @@
 # Desktop 组件规范
 
-本文档记录 PetClaw desktop 组件级视觉和交互规范。组件状态来源、IPC 调用和错误处理见 `docs/架构设计/desktop/foundation/Renderer架构设计.md` 和对应功能模块文档；本文只约束组件如何呈现、响应和降级。
+本文档记录 PetClaw desktop 组件级视觉和交互规范。组件状态来源、IPC 调用和错误处理见 [`../foundation/Renderer架构设计.md`](../foundation/Renderer架构设计.md) 和对应功能模块文档；本文只约束组件如何呈现、响应和降级。
 
 ## 1. 通用组件原则
 
@@ -13,7 +13,29 @@
 - 破坏性操作必须与普通操作空间分离，并使用 danger 语义。
 - 组件不得因异步内容加载改变外层布局尺寸；需要预留空间或使用 skeleton。
 
-## 2. 状态矩阵
+## 2. UI Primitive 复用索引
+
+新增 UI 前先查本表。只有现有 primitive 无法表达明确的新语义时，才允许新增共享 class 或组件；新增后必须同步本文或视觉规范。
+
+| 需求 | 优先复用 | 允许新增的条件 |
+|---|---|---|
+| 页面滚动和内容壳 | `.page-scroll`、`.page-container`、`.workspace-page-container` | 新页面有不同滚动所有权或固定面板结构 |
+| 顶栏操作 | `.app-topbar`、`.topbar-btn`、`.topbar-btn-primary`、`.topbar-search-field` | 顶栏出现新的输入/状态组合，且不能撑高 titlebar |
+| 主工作台面板 | `.workspace-window`、`.workspace-main-surface`、`.workspace-sidebar-shell`、`.workspace-monitor-shell` | 新面板需要独立开合或 drawer 行为 |
+| 普通卡片 | `.ui-card` | 需要新的语义层级，不只是换圆角、阴影或背景 |
+| 可点击卡片/行 | `.ui-card-action`、`.ui-row-button`、`.ui-row-button-active` | 行内结构超过现有 row 能表达的信息密度 |
+| 图标按钮 | `.ui-icon-button`、`.ui-primary-icon-button`、`.panel-toggle`、`.ui-focus` | 命中区域、风险语义或拖拽区有特殊约束 |
+| 分段控件 | `.ui-segment`、`.ui-segment-button` | 选项超过 4 个时应改用 tabs/list，不新增 segment 变体 |
+| Popover/Menu | `.ui-popover`、`.ui-popover-row`、`.ui-popover-row-2l`、`.ui-popover-divider`、`.ui-popover-empty` | 需要复杂表单、长列表或多步骤时改用 dialog/page |
+| Tooltip | `.ui-tooltip` 或 `Tooltip` 组件 | 需要交互内容时不能用 tooltip，应改用 popover/dialog |
+| Composer | `.composer-shell`、`.composer-file-card`、`.composer-ref-chip`、`.composer-context-strip` | 只允许 Chat 输入链路使用，不复用到设置表单 |
+| Badge/Chip | `safe/danger/caution` 语义 token、现有 chip class | 新状态有稳定业务语义且已有 token 不适用 |
+| Loading | inline spinner、skeleton、稳定占位 | 新 loading 样式必须说明持续时间和布局占位 |
+| Empty/Error | 页面或卡片内的 icon/title/description/action 结构 | 不能只新增空白提示；必须包含恢复路径 |
+
+禁止为了单个页面新建“同功能不同外观”的 Button、Card、Popover、Dialog、Row。视觉变化应优先通过现有 token、状态 class 和布局容器表达。
+
+## 3. 状态矩阵
 
 | 状态 | 视觉要求 | 交互要求 |
 |---|---|---|
@@ -27,9 +49,9 @@
 | Error | 错误原因 + 恢复动作 | 提供 retry、edit、open settings 等路径 |
 | Disabled | disabled 属性 + `text-disabled` / opacity | 无点击效果，无空 onClick |
 
-## 3. Button
+## 4. Button
 
-### 3.1 类型
+### 4.1 类型
 
 | 类型 | 用途 | 视觉 |
 |---|---|---|
@@ -40,7 +62,7 @@
 | Pill | 顶栏 CTA、短标签动作 | `radius-pill`，文字短，不能塞长句 |
 | Danger | 删除、拒绝、移除敏感配置 | danger token，空间上远离 primary |
 
-### 3.2 尺寸
+### 4.2 尺寸
 
 - 面板控制：`panel-toggle`，28px，圆角 7px。
 - 常规图标按钮：`ui-icon-button`，32px。
@@ -48,16 +70,16 @@
 - 顶栏按钮：`topbar-btn`，高度遵循顶栏密度，不撑高 titlebar。
 - 小窗或触摸风险区域：最小 hit area 44px。
 
-### 3.3 行为
+### 4.3 行为
 
 - async 按钮点击后必须进入 loading 或 disabled，防止重复提交。
 - loading 状态保留按钮宽度，避免文字切换导致跳动。
 - 禁用按钮不显示 hover/active。
 - 只有一个主要 CTA；同一区域多按钮时，主次关系必须明显。
 
-## 4. Input / Search / Textarea
+## 5. Input / Search / Textarea
 
-### 4.1 基础输入
+### 5.1 基础输入
 
 - 输入框背景使用 `--color-bg-input` 或白底，边框使用 `--color-border-input`。
 - label 必须可见；placeholder 只能做示例，不能替代 label。
@@ -65,14 +87,14 @@
 - 错误态必须说明原因和修复方式。
 - 密码/API key 输入必须支持隐藏敏感值，明文展示需要用户动作。
 
-### 4.2 Search
+### 5.2 Search
 
 - 顶栏搜索使用 `topbar-search-field` / `topbar-search-input` 语言。
 - 搜索框应有搜索图标和 placeholder，placeholder 走 i18n。
 - 清空按钮出现时不得挤压输入文字。
 - 搜索过滤无结果时显示 empty state，不显示空列表。
 
-### 4.3 Composer
+### 5.3 Composer
 
 聊天输入壳使用 `composer-shell`：
 
@@ -89,7 +111,7 @@
 - remove 按钮常态可以降权，但 hover 和 focus 必须可见。
 - 附件过多时在 composer 内部滚动，不把底部工具条挤出视口。
 
-## 5. Select / Popover / Menu
+## 6. Select / Popover / Menu
 
 Popover 使用 `.ui-popover`：
 
@@ -107,9 +129,9 @@ Popover 使用 `.ui-popover`：
 - Menu 项的图标、文字、快捷信息、badge 对齐必须稳定。
 - 嵌套 flyout 只用于短列表；复杂配置必须进入页面或 dialog。
 
-## 6. Card / Panel / Row
+## 7. Card / Panel / Row
 
-### 6.1 Card
+### 7.1 Card
 
 - 普通卡片使用 `.ui-card`。
 - 可点击卡片使用 `.ui-card-action`。
@@ -117,7 +139,7 @@ Popover 使用 `.ui-popover`：
 - 卡片内分组间距使用 12/16/20px 体系。
 - 卡片嵌套卡片要谨慎；优先用 section、divider、row 表达层级。
 
-### 6.2 Row
+### 7.2 Row
 
 - 通用行按钮使用 `.ui-row-button`。
 - row selected 使用 `.ui-row-button-active`。
@@ -125,13 +147,13 @@ Popover 使用 `.ui-popover`：
 - 行内尾部操作默认可以弱化，但键盘 focus 时必须出现。
 - 长文本优先 truncation + tooltip；错误信息优先 wrap。
 
-### 6.3 Segment
+### 7.3 Segment
 
 - 分段控件使用 `.ui-segment` / `.ui-segment-button`。
 - 同一 segment 内选项数量建议 2-4 个。
 - selected 要有背景和字重变化，不只靠颜色。
 
-## 7. Badge / Chip / Status
+## 8. Badge / Chip / Status
 
 | 类型 | 用途 | 规则 |
 |---|---|---|
@@ -146,9 +168,9 @@ Popover 使用 `.ui-popover`：
 - 大写 label 只用于短词，letter spacing 只能轻微正值。
 - 数字状态使用 tabular figures。
 
-## 8. Dialog / Modal / Sheet
+## 9. Dialog / Modal / Sheet
 
-### 8.1 基础规则
+### 9.1 基础规则
 
 - Dialog 必须有标题、关闭/取消路径、主操作和错误展示位置。
 - 关闭按钮必须是语义 button，带 aria-label。
@@ -157,7 +179,7 @@ Popover 使用 `.ui-popover`：
 - 背景使用 scrim，前景必须足够可读。
 - 内容过长时 dialog 内部滚动，头部和底部操作保持稳定。
 
-### 8.2 权限审批
+### 9.2 权限审批
 
 权限审批 UI 是高风险组件：
 
@@ -168,13 +190,13 @@ Popover 使用 `.ui-popover`：
 - 多问题表单使用 wizard 时必须显示进度，允许返回修改。
 - 提交后禁用按钮并显示 loading。
 
-### 8.3 表单 Dialog
+### 9.3 表单 Dialog
 
 - 字段分组必须清楚，复杂选项使用 progressive disclosure。
 - 测试连接、保存配置、添加 provider 等异步动作必须显示结果。
 - 关闭含未保存改动的 dialog 前必须确认或保留草稿。
 
-## 9. Tooltip
+## 10. Tooltip
 
 Tooltip 使用 `.ui-tooltip`：
 
@@ -184,16 +206,16 @@ Tooltip 使用 `.ui-tooltip`：
 - 长路径允许 `word-break: break-all`，不能撑出屏幕。
 - Tooltip 不应替代 aria-label。
 
-## 10. Loading / Empty / Error
+## 11. Loading / Empty / Error
 
-### 10.1 Loading
+### 11.1 Loading
 
 - 小区域使用 inline spinner。
 - 列表或卡片加载超过 300ms 使用 skeleton 或稳定占位。
 - 页面初始化 loading 必须保留页面结构，不闪烁空白。
 - 流式输出使用 typing / streaming 状态，不阻断已生成内容阅读。
 
-### 10.2 Empty
+### 11.2 Empty
 
 Empty state 至少包含：
 
@@ -206,7 +228,7 @@ primary recovery action or next step
 
 如果能力未接入，必须 disabled 或隐藏入口，不能显示空操作。
 
-### 10.3 Error
+### 11.3 Error
 
 Error state 至少包含：
 
@@ -219,7 +241,7 @@ retry / settings / details action
 
 错误不能只 `console.error`。用户可见失败必须出现在相关区域附近。
 
-## 11. Navigation Components
+## 12. Navigation Components
 
 - 主导航在 Sidebar，Settings 内部有自己的二级导航。
 - 当前页面必须有 active 状态。
@@ -227,7 +249,7 @@ retry / settings / details action
 - Sidebar 折叠和 drawer 模式必须保留打开入口。
 - 深层配置 dialog 不承担主导航职责。
 
-## 12. Accessibility Checklist
+## 13. Accessibility Checklist
 
 组件交付前检查：
 
@@ -240,7 +262,7 @@ retry / settings / details action
 - 可点击目标视觉尺寸小于 32px 时扩展 hit area。
 - 颜色不是唯一状态信号。
 
-## 13. 新组件准入
+## 14. 新组件准入
 
 新增共享组件或共享 class 前必须回答：
 
