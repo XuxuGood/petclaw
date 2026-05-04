@@ -234,7 +234,7 @@ pnpm --filter petclaw-desktop typecheck
 - Modify: `petclaw-desktop/src/main/ipc/window-ipc.ts`
 - Test: `petclaw-desktop/tests/main/ipc/window-ipc.test.ts`
 
-- [ ] **Step 1: 影响分析**
+- [x] **Step 1: 影响分析**
 
 Run:
 
@@ -242,7 +242,7 @@ Run:
 pnpm ai:prepare-change -- --target registerWindowIpcHandlers
 ```
 
-- [ ] **Step 2: 写失败测试**
+- [x] **Step 2: 写失败测试**
 
 覆盖：
 
@@ -250,7 +250,7 @@ pnpm ai:prepare-change -- --target registerWindowIpcHandlers
 - 不包含 Task Monitor / Runtime Monitor / 模型 / 技能 / 目录 / IM / Cron。
 - Pause/Resume 只发送 `pet:toggle-pause`，不停止 runtime。
 
-- [ ] **Step 3: 改造 IPC deps**
+- [x] **Step 3: 改造 IPC deps**
 
 `registerWindowIpcHandlers` 注入 `SystemActions`，让 pet 右键菜单复用统一动作：
 
@@ -263,7 +263,7 @@ export interface WindowIpcDeps {
 
 保留 `window:move` 和 `chat:toggle` 的兼容入口，但内部调用 actions。
 
-- [ ] **Step 4: 验证**
+- [x] **Step 4: 验证**
 
 ```bash
 pnpm --filter petclaw-desktop test -- tests/main/ipc/window-ipc.test.ts

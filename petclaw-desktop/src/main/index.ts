@@ -406,7 +406,7 @@ app.whenReady().then(async () => {
         imGatewayManager,
         getMainWindow: () => getMainWindow(),
         getPetWindow: () => getPetWindow(),
-        toggleMainWindow
+        actions: systemActions
       })
 
       // 宠物事件桥接：聚合 CoworkController / HookServer 事件
