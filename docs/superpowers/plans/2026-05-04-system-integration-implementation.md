@@ -110,7 +110,7 @@ pnpm --filter petclaw-desktop typecheck
 - Modify: `petclaw-shared/src/i18n/locales/zh.ts`
 - Modify: `petclaw-shared/src/i18n/locales/en.ts`
 
-- [ ] **Step 1: 影响分析**
+- [x] **Step 1: 影响分析**
 
 Run:
 
@@ -121,7 +121,7 @@ pnpm ai:prepare-change -- --target registerWindowIpcHandlers
 
 虽然本任务新增模块，但会替代部分 tray 和窗口 IPC 行为，需要确认入口影响。
 
-- [ ] **Step 2: 写失败测试**
+- [x] **Step 2: 写失败测试**
 
 覆盖：
 
@@ -131,7 +131,7 @@ pnpm ai:prepare-change -- --target registerWindowIpcHandlers
 - 模板不包含 Task Monitor、Runtime Monitor、模型、技能、目录、IM、Cron。
 - 非 macOS 调用初始化函数时 no-op。
 
-- [ ] **Step 3: 实现 macos-integration**
+- [x] **Step 3: 实现 macos-integration**
 
 建议导出：
 
@@ -153,7 +153,7 @@ export function initializeMacosIntegration(options: {
 - Dock Menu 不放 Task Monitor。
 - Application Menu 不承载复杂业务导航。
 
-- [ ] **Step 4: i18n key**
+- [x] **Step 4: i18n key**
 
 新增中英文同步 key：
 
@@ -168,7 +168,7 @@ export function initializeMacosIntegration(options: {
 
 如已有含义完全一致 key，可保留旧 key 兼容，但 macOS 新菜单应使用 `system.*`。
 
-- [ ] **Step 5: 验证**
+- [x] **Step 5: 验证**
 
 ```bash
 pnpm --filter petclaw-desktop test -- tests/main/system/macos-integration.test.ts
