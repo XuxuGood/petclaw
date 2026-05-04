@@ -34,7 +34,7 @@ export function createSystemActions(deps: SystemActionDeps): SystemActions {
     if (!mainWindow) return
     mainWindow.show()
     mainWindow.focus()
-    mainWindow.webContents.send('app:open-settings')
+    mainWindow.webContents.send('panel:open', 'settings')
   }
 
   const showPet = (): void => {

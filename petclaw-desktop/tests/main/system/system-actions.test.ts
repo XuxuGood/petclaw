@@ -42,7 +42,7 @@ describe('createSystemActions', () => {
 
     expect(mainWindow.show).toHaveBeenCalledOnce()
     expect(mainWindow.focus).toHaveBeenCalledOnce()
-    expect(mainWindow.webContents.send).toHaveBeenCalledWith('app:open-settings')
+    expect(mainWindow.webContents.send).toHaveBeenCalledWith('panel:open', 'settings')
   })
 
   it('showPet and hidePet only affect the pet window', () => {

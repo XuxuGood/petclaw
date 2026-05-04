@@ -281,7 +281,7 @@ pnpm --filter petclaw-desktop typecheck
 - Modify: `petclaw-shared/src/i18n/locales/zh.ts`
 - Modify: `petclaw-shared/src/i18n/locales/en.ts`
 
-- [ ] **Step 1: 影响分析**
+- [x] **Step 1: 影响分析**
 
 Run:
 
@@ -290,12 +290,12 @@ pnpm ai:prepare-change -- --target App
 pnpm ai:prepare-change -- --target preload
 ```
 
-- [ ] **Step 2: 确认现有导航事件**
+- [x] **Step 2: 确认现有导航事件**
 
 先用 `rg "settings|panel:open|view"` 查 renderer 入口。若已有事件可复用，优先复用；否则新增
 明确 IPC push，例如 `app:open-settings`。
 
-- [ ] **Step 3: 同步 preload 类型**
+- [x] **Step 3: 同步 preload 类型**
 
 若新增 IPC channel，必须同步：
 
@@ -304,11 +304,13 @@ pnpm ai:prepare-change -- --target preload
 - preload `.d.ts`
 - renderer 调用方
 
-- [ ] **Step 4: 文案检查**
+本轮复用既有 `panel:open` push 通道，不新增 IPC channel，因此无需改 preload。
+
+- [x] **Step 4: 文案检查**
 
 确保系统外壳菜单没有继续使用 `tray.*` 表达 macOS 动作。旧 key 只用于非 macOS fallback。
 
-- [ ] **Step 5: 验证**
+- [x] **Step 5: 验证**
 
 ```bash
 pnpm --filter petclaw-desktop typecheck
