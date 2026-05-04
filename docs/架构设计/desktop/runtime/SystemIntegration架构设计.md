@@ -2,7 +2,7 @@
 
 ## 1. 模块定位
 
-SystemIntegration 管理 desktop 与操作系统的边界，包括窗口、托盘、快捷键、自动更新、平台差异和系统权限。
+SystemIntegration 管理 desktop 与操作系统的边界，包括窗口、系统菜单、非 macOS tray fallback、快捷键、自动更新、平台差异和系统权限。
 
 它不是业务领域模块，也不承载 Cowork、IM、Cron 等业务状态。它的职责是把 Electron 应用安全地放进操作系统环境中：窗口如何创建、如何隐藏到后台、Pet Window 如何透明和点击穿透、Dock/Application Menu/系统入口如何唤醒应用、退出和更新时如何协调 runtime 停止。
 
@@ -61,7 +61,7 @@ macOS 系统入口分层：
 │  Dock icon          -> Open/Focus main window                       │
 │  Dock menu          -> Open PetClaw / Show-Hide Pet / Settings/Quit │
 │  Application menu   -> About / Settings / Open / Show-Hide / Quit   │
-│  Pet context menu   -> Open / Hide Pet / Pause Pet / Settings/Quit  │
+│  Pet context menu   -> Open / Show-Hide / Pause / Settings/Quit     │
 │  Menu Bar Extra     -> not enabled in v1                            │
 └────────────────────────────────────────────────────────────────────┘
 ```

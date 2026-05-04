@@ -362,7 +362,7 @@ pnpm --filter petclaw-desktop build
 - Modify: `docs/架构设计/desktop/runtime/SystemIntegration架构设计.md` if needed
 - Modify: `AGENTS.md` / `CLAUDE.md` only if workflow rules变化
 
-- [ ] **Step 1: 文档引用检查**
+- [x] **Step 1: 文档引用检查**
 
 Run:
 
@@ -370,7 +370,7 @@ Run:
 rg -n "tray|Menu Bar Extra|Task Monitor|SystemIntegration|system-actions|macos-integration" docs AGENTS.md CLAUDE.md
 ```
 
-- [ ] **Step 2: 同步总体架构**
+- [x] **Step 2: 同步总体架构**
 
 总体架构只写仍然有效的高频事实：
 
@@ -378,7 +378,7 @@ rg -n "tray|Menu Bar Extra|Task Monitor|SystemIntegration|system-actions|macos-i
 - SystemIntegration 管理 Dock/Application/Pet Context Menu、窗口恢复、快捷键、更新和系统权限。
 - Task Monitor 不进入系统外壳。
 
-- [ ] **Step 3: 验证**
+- [x] **Step 3: 验证**
 
 ```bash
 pnpm --filter petclaw-desktop typecheck

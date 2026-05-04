@@ -314,15 +314,15 @@ TaskMonitorPanel 只能展示已接入的真实状态。未接入工具、产物
 
 Main Window 和 Pet Window 必须支持：
 
-- Main Window 关闭即隐藏，退出走 tray 或 app quit。
+- Main Window 关闭即隐藏；退出走 macOS Application/Dock/Pet Context Menu、非 macOS tray fallback 或 `app:quit`。
 - Pet Window 可隐藏和恢复，不影响 Main Window 会话状态。
 - 窗口位置和大小持久化，恢复时必须落在可见屏幕区域。
 - 失焦、最小化、隐藏后，流式事件和权限请求仍要进入状态队列。
 - Main Window 从隐藏恢复时，应展示最新会话、任务和权限状态。
 
-### 8.2 托盘和快捷键
+### 8.2 系统入口和快捷键
 
-托盘和全局快捷键触发的是窗口行为或明确 view 行为。主进程发送的 `panel:open` 值必须被 renderer 识别。若 tray 菜单项没有真实目标，应隐藏或禁用。
+Dock/Application/Pet Context Menu、非 macOS tray fallback 和全局快捷键触发的是窗口行为或明确 view 行为。主进程发送的 `panel:open` 值必须被 renderer 识别。系统外壳不承载 Task Monitor、模型、技能、目录、IM 或 Cron 等复杂业务入口；没有真实目标的菜单项应隐藏或禁用。
 
 ### 8.3 Runtime 和 Gateway 状态
 

@@ -72,7 +72,7 @@ desktop/
 │                                                                    │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐  │
 │  │ IPC Router   │  │ SQLite Store │  │ System Integration       │  │
-│  │ safeHandle   │  │ db.ts/stores │  │ windows/tray/update      │  │
+│  │ safeHandle   │  │ db.ts/stores │  │ windows/menus/update     │  │
 │  └──────┬───────┘  └──────┬───────┘  └──────────────────────────┘  │
 │         │                 │                                         │
 │         ▼                 ▼                                         │

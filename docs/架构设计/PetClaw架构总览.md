@@ -126,7 +126,7 @@ Reserved workspace packages:
 | Memory | [`desktop/domains/Memory架构设计.md`](./desktop/domains/Memory架构设计.md) | 记忆文件、检索和 runtime 配置 |
 | DataStorage | [`desktop/foundation/DataStorage架构设计.md`](./desktop/foundation/DataStorage架构设计.md) | SQLite 表和 store 所有权 |
 | I18n | [`desktop/foundation/I18n架构设计.md`](./desktop/foundation/I18n架构设计.md) | 用户可见文案、语言服务和 shared i18n 资源 |
-| SystemIntegration | [`desktop/runtime/SystemIntegration架构设计.md`](./desktop/runtime/SystemIntegration架构设计.md) | 窗口、托盘、快捷键、自动更新和平台差异 |
+| SystemIntegration | [`desktop/runtime/SystemIntegration架构设计.md`](./desktop/runtime/SystemIntegration架构设计.md) | 窗口、macOS Dock/Application/Pet Context Menu、非 macOS tray fallback、快捷键、自动更新和平台差异 |
 | Desktop 打包与 Runtime 分发 | [`desktop/runtime/Desktop打包与Runtime分发架构设计.md`](./desktop/runtime/Desktop打包与Runtime分发架构设计.md) | Electron Builder、OpenClaw runtime 构建、本地扩展和平台产物 |
 
 ## 关键数据流摘要
