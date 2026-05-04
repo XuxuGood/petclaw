@@ -1,5 +1,9 @@
 # PetClaw macOS 系统集成体验设计
 
+> Superseded: 本文是早期 macOS 系统集成体验草案。后续以
+> `docs/架构设计/desktop/runtime/SystemIntegration架构设计.md` 作为 SystemIntegration
+> 模块设计和实现计划的事实源。本文仅保留为决策过程记录。
+
 ## 1. 背景
 
 PetClaw 是桌面宠物优先的 AI 协作应用。现有窗口内部 UI 已有较多设计，但 macOS
