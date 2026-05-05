@@ -1,0 +1,449 @@
+# Logging 架构设计
+
+## 1. 模块定位
+
+Logging 是 Desktop foundation 层能力，负责 PetClaw 桌面端所有本地诊断日志、日志脱敏、日志落盘、跨进程日志上报和诊断包导出。
+
+Logging 不属于 Cowork、RuntimeGateway、MCP、SystemIntegration 或 Renderer 任一业务域。业务域只声明事件和上下文字段，日志平台统一负责序列化、脱敏、路径、轮转、保留和导出。
+
+目标：
+
+- 给开发者提供可定位问题的结构化本地日志。
+- 给用户提供可操作的查看日志和导出诊断包入口。
+- 给 AI/Cowork、MCP、OpenClaw runtime 等高敏感链路提供默认安全的诊断边界。
+- 在 macOS、Windows、Linux 三端使用同一套路径、保留、脱敏和导出规则。
+
+非目标：
+
+- 不做远端 telemetry、analytics 或自动上传。
+- 不记录用户 prompt、模型 response、memory 正文或 tool 参数全文。
+- 不把日志当作用户错误提示；用户可见错误仍由对应 UI 和 i18n 负责。
+- 不暴露通用文件系统或通用 IPC 能力给 renderer。
+
+## 2. 总体架构
+
+```text
+Logging Platform
+  ├── LogFacade
+  │   ├── main logger
+  │   ├── renderer IPC logger
+  │   ├── child-process stream logger
+  │   └── domain scoped logger
+  ├── LogSanitizer
+  │   ├── secret/env/token redaction
+  │   ├── prompt/tool/memory content policy
+  │   └── size truncation / circular-safe serialization
+  ├── LogStorage
+  │   ├── per-source log files
+  │   ├── rotation / retention
+  │   └── cross-platform path resolver
+  ├── DiagnosticsBundle
+  │   ├── collect recent logs
+  │   ├── collect app/runtime metadata
+  │   └── export sanitized archive
+  └── Logging IPC
+      ├── renderer -> main report
+      ├── diagnostics snapshot
+      └── diagnostics bundle export
+```
+
+核心原则：
+
+- 统一规则，不统一成单个日志文件。不同来源保留独立日志流，诊断包负责统一收集。
+- main process 是唯一落盘方。renderer 只能通过 preload 暴露的最小 logging API 上报结构化事件。
+- 所有落盘内容必须经过 `LogSanitizer`。诊断包导出时必须二次脱敏。
+- 新代码使用 `getLogger(module)` 或等价 facade；`console.*` 拦截只作为兼容层，捕获旧代码、Electron 内部输出和第三方库输出。
+- 日志写入失败不能影响业务主流程；应记录日志系统降级状态，并在 diagnostics snapshot 中暴露。
+
+## 3. 日志流与文件布局
+
+日志路径由统一 resolver 基于 Electron `app.getPath('userData')` 和 `path` 派生。业务模块不得自行拼接日志目录。
+
+```text
+{userData}/logs/
+  main/
+    main-YYYY-MM-DD.log
+  renderer/
+    renderer-YYYY-MM-DD.log
+  startup/
+    startup-diagnostics.jsonl
+  cowork/
+    cowork-YYYY-MM-DD.log
+  mcp/
+    mcp-YYYY-MM-DD.log
+  updater/
+    updater-YYYY-MM-DD.log
+  installer/
+    installer.log
+  diagnostics/
+    petclaw-diagnostics-YYYYMMDD-HHmmss.zip
+
+{userData}/openclaw/logs/
+  gateway/
+    gateway-YYYY-MM-DD.log
+  runtime/
+    openclaw-YYYY-MM-DD.log
+```
+
+日志流职责：
+
+| 日志流 | 记录内容 | 不记录内容 |
+|---|---|---|
+| `main` | app 生命周期、IPC handler 失败、系统集成、配置同步摘要 | token、完整 env、用户 prompt |
+| `renderer` | UI 崩溃、关键操作失败、不可恢复错误 | 普通点击流水、输入框正文 |
+| `startup` | 启动阶段 JSONL 事件、boot check 结果、窗口加载结果 | runtime token、完整环境变量 |
+| `cowork` | sessionId、requestId、toolUseId、状态迁移、错误摘要 | prompt/response 全文、memory 正文 |
+| `mcp` | server 连接、tool 调用结果摘要、传输错误 | tool 参数原文、credential |
+| `gateway` | OpenClaw stdout/stderr、启动里程碑、退出原因 | gateway token、完整启动命令 |
+| `updater` / `installer` | 更新检查、下载、安装、解包进度、失败原因 | signing secrets、release token |
+
+`{userData}/logs` 只放 PetClaw Desktop 自己负责的日志、诊断包和安装/更新日志。`{userData}/openclaw/logs` 只放 OpenClaw runtime 和 gateway 相关日志。
+
+如果上游 runtime 仍写入自身临时目录，PetClaw 不把该临时目录作为 Desktop 日志事实源；诊断包可以按受控规则读取或引用这些 runtime 日志，并在 manifest 中标记来源。
+
+## 4. 轮转和保留策略
+
+默认策略：
+
+- 普通日志按天命名。
+- 单个日志文件默认上限为 20 MB；超过上限后使用同日序号轮转，例如 `main-YYYY-MM-DD.1.log`。迁移期可读取旧 `.old` 文件，但新平台不再生成新的 `.old` 文件。
+- 普通日志默认保留最近 14 天。
+- 启动诊断 JSONL 默认保留最近 14 天，并受单文件大小上限保护。
+- 诊断包默认保留最近 5 个。
+
+写入策略：
+
+- 写入前确保目录存在。
+- 单条事件序列化后超过事件大小上限时截断字段，并记录 `truncated: true` 和 `originalSizeBytes`。
+- 单个日志流写入失败时只影响该日志流，不影响业务流程。
+- 日志系统降级状态通过 diagnostics snapshot 暴露给 UI。
+
+## 5. LogFacade API 边界
+
+业务模块只使用 scoped logger：
+
+```typescript
+const logger = getLogger('ConfigSync')
+
+logger.info('sync.completed', {
+  reason,
+  changed,
+  durationMs
+})
+
+logger.warn(
+  'sync.degraded',
+  {
+    reason,
+    missingOptionalConfig: true
+  },
+  error
+)
+
+logger.error(
+  'sync.failed',
+  {
+    reason,
+    sessionId
+  },
+  error
+)
+```
+
+事件命名使用 `domain.action.result`：
+
+```text
+app.started
+boot.check.failed
+configSync.sync.completed
+gateway.process.exited
+cowork.session.started
+cowork.approval.resolved
+mcp.tool.failed
+renderer.render.failed
+updater.download.failed
+```
+
+落盘事件标准字段：
+
+```text
+timestamp
+level
+source
+module
+event
+message
+platform
+arch
+appVersion
+sessionId?
+requestId?
+toolUseId?
+durationMs?
+fields?
+error?
+```
+
+规则：
+
+- `electron-log` 或底层 writer 不暴露给业务模块。
+- `console.*` 拦截保留为兼容层，新代码不依赖它作为规范入口。
+- 错误对象作为最后一个参数传入，保留 `name`、`message`、`stack`。
+- 日志消息使用英文，模块标签和 event name 保持稳定。
+- 高频轮询、心跳和 stream chunk 不使用 info 级别刷屏；必要时使用 debug 并限流。
+
+## 6. Renderer 与 Preload 边界
+
+renderer 不直接写文件，不访问 Node/Electron 日志能力。
+
+preload 暴露最小 API：
+
+```text
+window.api.logging.report(event)
+window.api.logging.snapshot()
+window.api.logging.exportDiagnostics(options)
+window.api.logging.openLogFolder()
+```
+
+IPC channel：
+
+```text
+logging:report
+logging:snapshot
+logging:export-diagnostics
+logging:open-log-folder
+```
+
+规则：
+
+- IPC 必须通过 `safeHandle` / `safeOn` 注册。
+- preload 负责 shape 校验、字段裁剪和事件大小限制。
+- main 负责权限判断、脱敏、落盘和导出。
+- renderer 不能传任意路径给 main 打开，只能请求预定义日志目录或刚导出的诊断包位置。
+- renderer 默认只上报 error/warn、React 错误边界、不可恢复失败和关键用户操作失败。
+- 用户可见失败必须在 UI 展示本地化文案，不能只上报日志。
+
+## 7. Child Process 与 Runtime 日志
+
+OpenClaw gateway、runtime 辅助进程、installer、updater 等子进程日志通过 child-process stream logger 接入。
+
+```text
+attachProcessLogger({
+  source,
+  process,
+  stdoutLevel,
+  stderrLevel,
+  redactPolicy,
+  milestonePatterns
+})
+```
+
+规则：
+
+- stdout/stderr 先进入对应日志流，再按需输出到 main 日志摘要。
+- gateway 启动里程碑只记录首行摘要、耗时和 phase，不记录 token 或完整启动命令。
+- runtime env 只记录安全白名单 key 的存在性和摘要，不 dump 完整 env。
+- 子进程日志中的 UTC 时间戳可以规范化为本地时区展示，但原始事件时间仍需保留。
+- 子进程退出、重启、健康检查失败要写主进程结构化事件，并由 runtime UI 展示可操作错误。
+
+## 8. 隐私脱敏策略
+
+默认策略是记录可排障元数据，不记录用户内容正文和密钥材料。
+
+| 类别 | 默认策略 |
+|---|---|
+| API key、token、secret、password、cookie、authorization | 永远脱敏 |
+| env 完整内容、启动命令完整参数 | 不落盘，只记录 key 摘要和安全白名单 |
+| prompt、response、system prompt、memory 正文 | 默认不记录全文 |
+| MCP tool 参数、tool 返回正文 | 默认只记录 tool 名、server、结果摘要、错误摘要 |
+| 文件路径 | 可记录，但 home/userData/workspace/temp 需规范化 |
+| URL | 保留 origin/path，query 中敏感字段脱敏 |
+| 错误对象 | 保留 name/message/stack，stack 中路径规范化 |
+| SQLite row / app config | 只记录字段摘要，不 dump 整行 |
+
+路径规范化：
+
+```text
+{userData}
+{workspace}
+{temp}
+{home}
+```
+
+`LogSanitizer` 处理顺序：
+
+```text
+redactByKeyName(apiKey/token/secret/password/cookie/authorization...)
+→ redactByValuePattern(sk-..., Bearer ..., JWT-like...)
+→ normalizePaths(userData/workspace/temp/home)
+→ redactUrlQuery()
+→ truncateLargeValues(max chars / max object keys / max array items)
+→ circular-safe serialization
+→ classify event contentPolicy
+```
+
+失败策略：
+
+- 脱敏失败时写入 `sanitization.failed` 元事件，不写原始 payload。
+- 序列化失败时写入 `serialization.failed` 和错误摘要，不写原始对象。
+- 字段过大时截断并记录 `truncated: true`、`originalSizeBytes`。
+- 检测到疑似 secret 时替换为 `[redacted]`，并记录 `redactionCount`。
+
+诊断包导出必须对历史日志再次运行二次脱敏，防止旧日志或第三方输出绕过当前 sanitizer。
+
+## 9. AI 内容日志策略
+
+Cowork、MCP、Memory 和模型调用属于高敏感链路。
+
+默认允许记录：
+
+- `sessionId`、`messageId`、`requestId`、`toolUseId`。
+- provider、model、token 计数、耗时、状态迁移。
+- tool 名、server id、结果类型、错误摘要。
+- memory 检索是否启用、命中数量、耗时。
+
+默认禁止记录：
+
+- 用户消息全文。
+- 模型响应全文。
+- system prompt、AGENTS 模板全文。
+- memory 正文、检索片段正文。
+- MCP tool 参数全文和 tool 返回正文。
+- 模型 provider credential、runtime token、OpenClaw gateway token。
+
+受控内容日志模式：
+
+- 默认关闭。
+- 必须由用户显式开启。
+- UI 必须说明会包含敏感 AI 内容。
+- 必须有过期时间。
+- 诊断包导出时必须再次确认是否包含该内容。
+- 即使开启，也必须保留 secret redaction、大小截断和路径规范化。
+
+## 10. 诊断包
+
+诊断包是 Logging Platform 的一等能力，用于用户主动导出本地排障资料。
+
+用户入口：
+
+```text
+BootCheck 错误页
+  → 查看日志
+  → 导出诊断包
+  → 重试 / 打开设置
+
+Settings / Engine
+  → 查看 runtime 状态
+  → 打开日志目录
+  → 导出诊断包
+  → 复制脱敏诊断摘要
+
+Settings / About 或 Support
+  → 导出诊断包
+  → 打开日志目录
+```
+
+诊断包结构：
+
+```text
+petclaw-diagnostics-YYYYMMDD-HHmmss.zip
+  manifest.json
+  logs/
+    main/*.log
+    renderer/*.log
+    startup/*.jsonl
+    cowork/*.log
+    mcp/*.log
+    gateway/*.log
+    updater/*.log
+    installer/*.log
+  metadata/
+    app.json
+    platform.json
+    runtime-status.json
+    database-summary.json
+    config-summary.json
+    feature-flags.json
+```
+
+`manifest.json` 字段：
+
+```text
+createdAt
+appVersion
+platform
+arch
+logTimeRange
+includedSources
+redactionVersion
+redactionCounts
+truncatedFiles
+exportErrors
+```
+
+默认导出最近 3 天日志。UI 可提供最近 1 天、3 天、7 天选项。
+
+metadata 边界：
+
+- `app.json`：版本、build channel、isPackaged、locale。
+- `platform.json`：OS、arch、Electron/Node/Chrome 版本。
+- `runtime-status.json`：OpenClaw 版本、phase、健康状态、端口是否存在，不写 token。
+- `database-summary.json`：表存在性、记录计数、迁移版本，不 dump row。
+- `config-summary.json`：配置 key 摘要、provider 是否配置、MCP server 数量，不写 credential。
+- `feature-flags.json`：功能开关状态，不写 secret。
+
+部分日志缺失、读失败或二次脱敏失败时，导出仍应尽力完成，并在 manifest 的 `exportErrors` 中记录失败来源和脱敏后的错误摘要。
+
+## 11. 错误态与用户体验
+
+日志和用户提示分层：
+
+- 日志记录英文技术细节和 error 对象。
+- UI 展示本地化摘要、下一步操作和恢复入口。
+- 启动失败、runtime 失败、更新失败、系统权限失败必须提供查看日志或导出诊断包入口。
+
+错误边界：
+
+- 日志写入失败不能导致业务失败。
+- 诊断包导出失败必须返回本地化错误 key 给 UI。
+- renderer 上报失败不能影响当前 UI 操作。
+- 日志目录打开失败必须提示用户，并记录 main error。
+
+## 12. 迁移规则
+
+当前实现中已有多处日志入口，包括主进程 `console.*` 拦截、Cowork 独立日志、启动诊断、OpenClaw gateway stdout/stderr、MCP 安全序列化和 updater 日志。迁移时遵循以下规则：
+
+1. 先建立 Logging Platform 基础层：路径解析、日志流定义、facade、sanitizer、storage、rotation、retention。
+2. 保留 `console.*` 拦截作为兼容层，但新代码必须走 `getLogger()`。
+3. 将 main、startup、gateway、cowork、mcp、updater、installer 的写入入口收敛到统一 storage 和 sanitizer。
+4. 接入 renderer 上报时同步 main IPC、preload、类型声明、renderer 调用点和 i18n 错误态。
+5. 诊断 snapshot 和诊断包导出完成后，BootCheck、EngineSettings、Support/About 才能展示对应入口。
+6. 每个迁移阶段都必须可独立通过 typecheck 和针对性测试；UI 不允许出现空按钮、空实现或临时说明文案。
+7. 旧设计文档和 legacy 文档不再作为 Logging 事实源；有效规则以本文为准。
+
+## 13. 测试策略
+
+必须覆盖：
+
+- `LogSanitizer`：key/value 脱敏、路径规范化、URL query 脱敏、循环引用、大对象截断。
+- `LogStorage`：跨平台路径、目录创建、日切、大小轮转、retention、写入失败降级。
+- `LogFacade`：事件字段标准化、error stack 保留、console 兼容层不重复输出。
+- `Renderer logging IPC`：schema 校验、字段裁剪、非法 payload 拒绝、renderer 无文件写权限。
+- `DiagnosticsBundle`：zip 内容、manifest、二次脱敏、缺失文件 warning、诊断包保留数量。
+- `Gateway/Cowork/MCP`：不泄漏 token、prompt、memory、tool 参数原文。
+- UI：BootCheck、Engine、Support/About 的日志入口有真实行为，失败显示 i18n 文案。
+
+默认验证：
+
+```bash
+pnpm --filter petclaw-desktop typecheck
+pnpm --filter petclaw-desktop test
+```
+
+针对性验证示例：
+
+```bash
+pnpm --filter petclaw-desktop test -- tests/main/logging
+pnpm --filter petclaw-desktop test -- tests/main/ipc/logging-ipc.test.ts
+pnpm --filter petclaw-desktop test -- tests/renderer
+```

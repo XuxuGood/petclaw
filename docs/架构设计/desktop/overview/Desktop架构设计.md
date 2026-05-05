@@ -136,6 +136,7 @@ Pet Window
 - [`../foundation/IPCChannel契约.md`](../foundation/IPCChannel契约.md)
 - [`../foundation/DataStorage架构设计.md`](../foundation/DataStorage架构设计.md)
 - [`../foundation/I18n架构设计.md`](../foundation/I18n架构设计.md)
+- [`../foundation/Logging架构设计.md`](../foundation/Logging架构设计.md)
 
 运行时详细设计：
 
