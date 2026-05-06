@@ -1,156 +1,239 @@
 import { create } from 'zustand'
 
 let nextId = 0
-const DRAFT_SESSION_KEY = '__draft__'
 
 export interface ChatMessage {
   id: number
+  sourceId?: string
   role: 'user' | 'assistant'
   content: string
 }
 
-interface ChatBucket {
-  messages: ChatMessage[]
-  isLoading: boolean
-}
-
 interface ChatState {
   activeSessionId: string | null
+  loadedSessionId: string | null
+  isHistoryLoading: boolean
+  historyLoadError: string | null
   messages: ChatMessage[]
   isLoading: boolean
-  buckets: Record<string, ChatBucket>
+  runningSessionIds: string[]
   setActiveSession: (sessionId: string | null) => void
   bindDraftToSession: (sessionId: string) => void
   addMessage: (msg: Omit<ChatMessage, 'id'>, sessionId?: string | null) => void
   appendToLastMessage: (text: string, sessionId?: string | null) => void
-  replaceLastAssistantMessage: (text: string, sessionId?: string | null) => void
+  replaceLastAssistantMessage: (
+    text: string,
+    sessionId?: string | null,
+    sourceId?: string | null
+  ) => void
   setLoading: (loading: boolean, sessionId?: string | null) => void
+  beginHistoryLoad: (sessionId: string) => void
   loadHistory: (messages: Omit<ChatMessage, 'id'>[], sessionId?: string | null) => void
+  failHistoryLoad: (sessionId: string, error: string) => void
   reset: () => void
 }
 
-function getBucketKey(
+function resolveTargetSessionId(
   sessionId: string | null | undefined,
   activeSessionId: string | null
-): string {
-  return sessionId ?? activeSessionId ?? DRAFT_SESSION_KEY
+): string | null {
+  return sessionId ?? activeSessionId
 }
 
-function emptyBucket(): ChatBucket {
-  return { messages: [], isLoading: false }
-}
-
-function withBucket(
-  state: ChatState,
+function shouldUpdateVisibleMessages(
   sessionId: string | null | undefined,
-  updater: (bucket: ChatBucket) => ChatBucket
-): Partial<ChatState> {
-  const key = getBucketKey(sessionId, state.activeSessionId)
-  const currentBucket = state.buckets[key] ?? emptyBucket()
-  const nextBucket = updater(currentBucket)
-  const buckets = { ...state.buckets, [key]: nextBucket }
-  const isActiveBucket = key === getBucketKey(undefined, state.activeSessionId)
-  return {
-    buckets,
-    ...(isActiveBucket
-      ? {
-          messages: nextBucket.messages,
-          isLoading: nextBucket.isLoading
-        }
-      : {})
-  }
+  activeSessionId: string | null
+): boolean {
+  const targetSessionId = resolveTargetSessionId(sessionId, activeSessionId)
+  return targetSessionId === activeSessionId
+}
+
+function setRunningSession(
+  runningSessionIds: string[],
+  sessionId: string | null,
+  isRunning: boolean
+): string[] {
+  if (!sessionId) return runningSessionIds
+  const exists = runningSessionIds.includes(sessionId)
+  if (isRunning) return exists ? runningSessionIds : [...runningSessionIds, sessionId]
+  return exists ? runningSessionIds.filter((id) => id !== sessionId) : runningSessionIds
+}
+
+function mergeHistoryWithLiveMessages(
+  history: ChatMessage[],
+  live: ChatMessage[],
+  shouldMergeLiveMessages: boolean
+): ChatMessage[] {
+  if (!shouldMergeLiveMessages || live.length === 0) return history
+
+  const historySourceIds = new Set(
+    history.flatMap((message) => (message.sourceId ? [message.sourceId] : []))
+  )
+  const historyFingerprints = new Set(
+    history.map((message) => `${message.role}\u0000${message.content}`)
+  )
+  const liveOnlyMessages = live.filter((message) => {
+    if (message.sourceId) return !historySourceIds.has(message.sourceId)
+    return !historyFingerprints.has(`${message.role}\u0000${message.content}`)
+  })
+  return [...history, ...liveOnlyMessages]
 }
 
 export const useChatStore = create<ChatState>()((set) => ({
   activeSessionId: null,
+  loadedSessionId: null,
+  isHistoryLoading: false,
+  historyLoadError: null,
   messages: [],
   isLoading: false,
-  buckets: {
-    [DRAFT_SESSION_KEY]: emptyBucket()
-  },
+  runningSessionIds: [],
 
   setActiveSession: (sessionId) =>
     set((state) => {
-      const key = getBucketKey(sessionId, null)
-      const bucket = state.buckets[key] ?? emptyBucket()
+      if (state.activeSessionId === sessionId) return state
       return {
         activeSessionId: sessionId,
-        messages: bucket.messages,
-        isLoading: bucket.isLoading,
-        buckets: state.buckets[key] ? state.buckets : { ...state.buckets, [key]: bucket }
+        loadedSessionId: null,
+        isHistoryLoading: Boolean(sessionId),
+        historyLoadError: null,
+        messages: [],
+        isLoading: sessionId ? state.runningSessionIds.includes(sessionId) : false
       }
     }),
 
   bindDraftToSession: (sessionId) =>
     set((state) => {
-      const draft = state.buckets[DRAFT_SESSION_KEY] ?? emptyBucket()
-      const sessionBucket = state.buckets[sessionId] ?? emptyBucket()
-      // 新建会话时用户消息先落在草稿 bucket；主进程返回 sessionId 后把草稿迁移过去，
-      // 后续流事件才能按真实 sessionId 继续追加，避免首轮消息丢失或串到下一次新建任务。
-      const nextBucket =
-        sessionBucket.messages.length === 0 && draft.messages.length > 0 ? draft : sessionBucket
+      const runningSessionIds = setRunningSession(
+        state.runningSessionIds,
+        sessionId,
+        state.isLoading
+      )
       return {
         activeSessionId: sessionId,
-        messages: nextBucket.messages,
-        isLoading: nextBucket.isLoading,
-        buckets: {
-          ...state.buckets,
-          [sessionId]: nextBucket,
-          [DRAFT_SESSION_KEY]: emptyBucket()
-        }
+        loadedSessionId: sessionId,
+        isHistoryLoading: false,
+        historyLoadError: null,
+        runningSessionIds
       }
     }),
 
   addMessage: (msg, sessionId) =>
-    set((state) =>
-      withBucket(state, sessionId, (bucket) => ({
-        ...bucket,
-        messages: [...bucket.messages, { ...msg, id: nextId++ }]
-      }))
-    ),
+    set((state) => {
+      if (!shouldUpdateVisibleMessages(sessionId, state.activeSessionId)) return state
+      if (msg.sourceId) {
+        const existingIndex = state.messages.findIndex(
+          (message) => message.sourceId === msg.sourceId
+        )
+        if (existingIndex !== -1) {
+          const messages = [...state.messages]
+          messages[existingIndex] = { ...messages[existingIndex], ...msg }
+          return { messages }
+        }
+      }
+      return { messages: [...state.messages, { ...msg, id: nextId++ }] }
+    }),
 
   appendToLastMessage: (text, sessionId) =>
-    set((state) =>
-      withBucket(state, sessionId, (bucket) => {
-        const messages = [...bucket.messages]
-        const last = messages[messages.length - 1]
-        if (last && last.role === 'assistant') {
-          messages[messages.length - 1] = { ...last, content: last.content + text }
-        }
-        return { ...bucket, messages }
-      })
-    ),
+    set((state) => {
+      if (!shouldUpdateVisibleMessages(sessionId, state.activeSessionId)) return state
+      const messages = [...state.messages]
+      const last = messages[messages.length - 1]
+      if (last && last.role === 'assistant') {
+        messages[messages.length - 1] = { ...last, content: last.content + text }
+      }
+      return { messages }
+    }),
 
-  replaceLastAssistantMessage: (text, sessionId) =>
-    set((state) =>
-      withBucket(state, sessionId, (bucket) => {
-        const messages = [...bucket.messages]
-        const last = messages[messages.length - 1]
-        if (last && last.role === 'assistant') {
-          messages[messages.length - 1] = { ...last, content: text }
+  replaceLastAssistantMessage: (text, sessionId, sourceId) =>
+    set((state) => {
+      if (!shouldUpdateVisibleMessages(sessionId, state.activeSessionId)) return state
+      const messages = [...state.messages]
+      const sourceIndex = sourceId
+        ? messages.findIndex((message) => message.sourceId === sourceId)
+        : -1
+      if (sourceIndex !== -1) {
+        messages[sourceIndex] = { ...messages[sourceIndex], content: text }
+        return { messages }
+      }
+      let lastAssistantIndex = -1
+      for (let index = messages.length - 1; index >= 0; index -= 1) {
+        if (messages[index].role === 'assistant') {
+          lastAssistantIndex = index
+          break
         }
-        return { ...bucket, messages }
-      })
-    ),
+      }
+      if (lastAssistantIndex !== -1) {
+        messages[lastAssistantIndex] = { ...messages[lastAssistantIndex], content: text }
+      }
+      return { messages }
+    }),
 
   setLoading: (isLoading, sessionId) =>
-    set((state) => withBucket(state, sessionId, (bucket) => ({ ...bucket, isLoading }))),
+    set((state) => {
+      const targetSessionId = resolveTargetSessionId(sessionId, state.activeSessionId)
+      const runningSessionIds = setRunningSession(
+        state.runningSessionIds,
+        targetSessionId,
+        isLoading
+      )
+      if (targetSessionId !== state.activeSessionId) return { runningSessionIds }
+      return { runningSessionIds, isLoading }
+    }),
+
+  beginHistoryLoad: (sessionId) =>
+    set((state) => {
+      if (state.activeSessionId !== sessionId) return state
+      if (
+        state.isHistoryLoading &&
+        state.loadedSessionId === null &&
+        state.historyLoadError === null
+      ) {
+        return state
+      }
+      return {
+        isHistoryLoading: true,
+        historyLoadError: null,
+        loadedSessionId: null
+      }
+    }),
 
   loadHistory: (messages, sessionId) =>
-    set((state) =>
-      withBucket(state, sessionId, () => ({
-        messages: messages.map((m) => ({ ...m, id: nextId++ })),
-        isLoading: false
-      }))
-    ),
+    set((state) => {
+      if (!shouldUpdateVisibleMessages(sessionId, state.activeSessionId)) return state
+      const historyMessages = messages.map((m) => ({ ...m, id: nextId++ }))
+      return {
+        loadedSessionId: state.activeSessionId,
+        isHistoryLoading: false,
+        historyLoadError: null,
+        messages: mergeHistoryWithLiveMessages(
+          historyMessages,
+          state.messages,
+          state.isHistoryLoading
+        ),
+        isLoading: state.activeSessionId
+          ? state.runningSessionIds.includes(state.activeSessionId)
+          : false
+      }
+    }),
+
+  failHistoryLoad: (sessionId, error) =>
+    set((state) => {
+      if (state.activeSessionId !== sessionId) return state
+      return {
+        isHistoryLoading: false,
+        historyLoadError: error,
+        loadedSessionId: null
+      }
+    }),
 
   reset: () =>
     set({
       activeSessionId: null,
+      loadedSessionId: null,
+      isHistoryLoading: false,
+      historyLoadError: null,
       messages: [],
       isLoading: false,
-      buckets: {
-        [DRAFT_SESSION_KEY]: emptyBucket()
-      }
+      runningSessionIds: []
     })
 }))

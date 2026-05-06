@@ -1,15 +1,6 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
+import { CAT_SPRITES, type CatSpriteDefinition } from './cat-sprite-manifest'
 import { PetState } from './state-machine'
-
-import beginVideo from '../assets/cat/begin.webm'
-import staticVideo from '../assets/cat/static.webm'
-import listeningVideo from '../assets/cat/listening.webm'
-import sleepStartVideo from '../assets/cat/sleep-start.webm'
-import sleepLoopVideo from '../assets/cat/sleep-loop.webm'
-import sleepLeaveVideo from '../assets/cat/sleep-leave.webm'
-import taskStartVideo from '../assets/cat/task-start.webm'
-import taskLoopVideo from '../assets/cat/task-loop.webm'
-import taskLeaveVideo from '../assets/cat/task-leave.webm'
 
 interface PetCanvasProps {
   state: PetState
@@ -26,85 +17,94 @@ interface PetCanvasProps {
 const DRAG_THRESHOLD = 5
 const SLEEP_DELAY = 120_000 // 2 minutes idle before sleeping
 
-type VideoStep = { src: string; loop: boolean }
+type CatSpriteName = keyof typeof CAT_SPRITES
+type SpriteStep = { name: CatSpriteName; loop: boolean }
 
-/**
- * Double-buffered video player to avoid flicker on source switch.
- * Two <video> elements swap: the back one loads while the front one keeps showing.
- * 每轮 playSequence 使用 AbortController 管理所有监听器生命周期，
- * abort 时自动清除 canplay/ended 监听器，避免快速切换时旧 handler 执行导致动画混乱。
- */
-class VideoPlayer {
-  private videos: [HTMLVideoElement, HTMLVideoElement]
-  private activeIdx = 0
-  private queue: VideoStep[] = []
-  private abortController: AbortController | null = null
+interface PlaybackState {
+  steps: SpriteStep[]
+  stepIndex: number
+  frameIndex: number
+  lastFrameTime: number
+  paused: boolean
+}
 
-  constructor(v0: HTMLVideoElement, v1: HTMLVideoElement) {
-    this.videos = [v0, v1]
-    v0.style.visibility = 'visible'
-    v1.style.visibility = 'hidden'
+function createInitialPlayback(): PlaybackState {
+  return {
+    steps: [
+      { name: 'begin', loop: false },
+      { name: 'static', loop: true }
+    ],
+    stepIndex: 0,
+    frameIndex: 0,
+    lastFrameTime: 0,
+    paused: false
+  }
+}
+
+function getActiveStep(playback: PlaybackState): SpriteStep {
+  return playback.steps[playback.stepIndex] ?? playback.steps[playback.steps.length - 1]
+}
+
+function loadSpriteImage(src: string) {
+  const image = new Image()
+  image.decoding = 'async'
+  image.src = src
+  return image
+}
+
+function advancePlayback(playback: PlaybackState, definition: CatSpriteDefinition, now: number) {
+  if (playback.paused) return
+
+  if (playback.lastFrameTime === 0) {
+    playback.lastFrameTime = now
+    return
   }
 
-  get active(): HTMLVideoElement {
-    return this.videos[this.activeIdx]
+  const frameDuration = 1000 / definition.fps
+  let elapsedFrames = Math.floor((now - playback.lastFrameTime) / frameDuration)
+  if (elapsedFrames <= 0) return
+
+  playback.lastFrameTime += elapsedFrames * frameDuration
+
+  while (elapsedFrames > 0) {
+    const activeStep = getActiveStep(playback)
+    if (playback.frameIndex + 1 < definition.frameCount) {
+      playback.frameIndex += 1
+      elapsedFrames -= 1
+      continue
+    }
+
+    if (activeStep.loop) {
+      playback.frameIndex = 0
+      elapsedFrames -= 1
+      continue
+    }
+
+    if (playback.stepIndex + 1 < playback.steps.length) {
+      playback.stepIndex += 1
+      playback.frameIndex = 0
+      playback.lastFrameTime = now
+      return
+    }
+
+    playback.frameIndex = definition.frameCount - 1
+    return
   }
+}
 
-  get back(): HTMLVideoElement {
-    return this.videos[1 - this.activeIdx]
-  }
+function resolveSpriteFrameStyle(definition: CatSpriteDefinition, frameIndex: number) {
+  const sourceX =
+    definition.tileMargin +
+    (frameIndex % definition.columns) * (definition.frameWidth + definition.tilePadding)
+  const sourceY =
+    definition.tileMargin +
+    Math.floor(frameIndex / definition.columns) * (definition.frameHeight + definition.tilePadding)
 
-  playSequence(steps: VideoStep[]): void {
-    // abort 上一轮所有监听器，确保 canplay/ended 不会在新序列中执行
-    this.abortController?.abort()
-    this.abortController = new AbortController()
-    this.queue = []
-
-    if (steps.length === 0) return
-    const [first, ...rest] = steps
-    this.queue = rest
-    this.loadAndPlay(first)
-  }
-
-  private loadAndPlay(step: VideoStep): void {
-    const signal = this.abortController!.signal
-    const back = this.back
-
-    back.loop = step.loop
-    back.src = step.src
-    back.load()
-
-    back.addEventListener(
-      'canplay',
-      () => {
-        this.activeIdx = 1 - this.activeIdx
-        this.active.style.visibility = 'visible'
-        this.back.style.visibility = 'hidden'
-        this.back.pause()
-
-        this.active.play().catch(() => {})
-
-        if (!step.loop && this.queue.length > 0) {
-          const next = this.queue.shift()!
-          this.active.addEventListener(
-            'ended',
-            () => {
-              this.loadAndPlay(next)
-            },
-            { once: true, signal }
-          )
-        }
-      },
-      { once: true, signal }
-    )
-  }
-
-  pause(): void {
-    this.active.pause()
-  }
-
-  resume(): void {
-    this.active.play().catch(() => {})
+  return {
+    backgroundPosition: `-${sourceX}px -${sourceY}px`,
+    backgroundSize: `${definition.columns * (definition.frameWidth + definition.tilePadding)}px ${
+      definition.rows * (definition.frameHeight + definition.tilePadding)
+    }px`
   }
 }
 
@@ -118,98 +118,122 @@ export function PetCanvas({
   onContextMenu,
   onSleepTimeout
 }: PetCanvasProps) {
-  const video0Ref = useRef<HTMLVideoElement>(null)
-  const video1Ref = useRef<HTMLVideoElement>(null)
-  const playerRef = useRef<VideoPlayer | null>(null)
+  const spriteLayerRef = useRef<HTMLDivElement>(null)
+  const spriteImagesRef = useRef(new Map<CatSpriteName, HTMLImageElement>())
+  const playbackRef = useRef<PlaybackState>(createInitialPlayback())
   const prevStateRef = useRef<PetState>(PetState.Idle)
   const isMouseDown = useRef(false)
   const hasDragged = useRef(false)
   const dragStart = useRef({ x: 0, y: 0 })
   const mouseDownPos = useRef({ x: 0, y: 0 })
 
-  // Init player + play begin → static
   useEffect(() => {
-    if (!video0Ref.current || !video1Ref.current) return
-    const player = new VideoPlayer(video0Ref.current, video1Ref.current)
-    playerRef.current = player
-
-    player.playSequence([
-      { src: beginVideo, loop: false },
-      { src: staticVideo, loop: true }
-    ])
+    const entries = Object.entries(CAT_SPRITES) as Array<[CatSpriteName, CatSpriteDefinition]>
+    entries.forEach(([name, definition]) => {
+      if (spriteImagesRef.current.has(name)) return
+      spriteImagesRef.current.set(name, loadSpriteImage(definition.src))
+    })
   }, [])
 
-  // 睡眠计时器：Idle 状态下 2 分钟无互动触发
+  useEffect(() => {
+    const spriteLayer = spriteLayerRef.current
+    if (!spriteLayer) return
+
+    let rafId = 0
+
+    const renderFrame = (now: number) => {
+      const playback = playbackRef.current
+      const activeStep = getActiveStep(playback)
+      const definition = CAT_SPRITES[activeStep.name]
+      const image = spriteImagesRef.current.get(activeStep.name)
+
+      if (image?.complete && image.naturalWidth > 0) {
+        advancePlayback(playback, definition, now)
+        const nextStep = getActiveStep(playback)
+        const nextDefinition = CAT_SPRITES[nextStep.name]
+        const nextImage = spriteImagesRef.current.get(nextStep.name)
+        if (nextImage?.complete && nextImage.naturalWidth > 0) {
+          const style = resolveSpriteFrameStyle(nextDefinition, playback.frameIndex)
+          if (spriteLayer.style.backgroundImage !== `url("${nextDefinition.src}")`) {
+            spriteLayer.style.backgroundImage = `url("${nextDefinition.src}")`
+          }
+          spriteLayer.style.backgroundPosition = style.backgroundPosition
+          spriteLayer.style.backgroundSize = style.backgroundSize
+        }
+      } else {
+        spriteLayer.style.backgroundImage = ''
+      }
+
+      rafId = requestAnimationFrame(renderFrame)
+    }
+
+    rafId = requestAnimationFrame(renderFrame)
+    return () => cancelAnimationFrame(rafId)
+  }, [])
+
+  useEffect(() => {
+    playbackRef.current.paused = Boolean(paused)
+  }, [paused])
+
   useEffect(() => {
     if (state !== PetState.Idle || paused) return
     const timer = setTimeout(() => onSleepTimeout?.(), SLEEP_DELAY)
     return () => clearTimeout(timer)
   }, [state, paused, onSleepTimeout])
 
-  // Pause/resume video playback
   useEffect(() => {
-    const player = playerRef.current
-    if (!player) return
-    if (paused) {
-      player.playSequence([{ src: staticVideo, loop: true }])
-      // Wait for static to load, then pause on first frame
-      const timer = setTimeout(() => player.pause(), 100)
-      return () => clearTimeout(timer)
-    } else {
-      player.resume()
-    }
-  }, [paused])
-
-  // State change handler
-  useEffect(() => {
-    const player = playerRef.current
-    if (!player) return
-
     const prev = prevStateRef.current
     if (prev === state) return
     prevStateRef.current = state
 
-    // 从 Sleep 唤醒时，先播 sleep-leave 过渡
-    const wakePrefix: VideoStep[] =
-      prev === PetState.Sleep ? [{ src: sleepLeaveVideo, loop: false }] : []
+    const wakePrefix: SpriteStep[] =
+      prev === PetState.Sleep ? [{ name: 'sleep-leave', loop: false }] : []
+
+    const playSequence = (steps: SpriteStep[]) => {
+      playbackRef.current = {
+        steps,
+        stepIndex: 0,
+        frameIndex: 0,
+        lastFrameTime: 0,
+        paused: Boolean(paused)
+      }
+    }
 
     if (state === PetState.Sleep) {
-      player.playSequence([
-        { src: sleepStartVideo, loop: false },
-        { src: sleepLoopVideo, loop: true }
+      playSequence([
+        { name: 'sleep-start', loop: false },
+        { name: 'sleep-loop', loop: true }
       ])
       return
     }
 
     if (state === PetState.Working) {
-      player.playSequence([
+      playSequence([
         ...wakePrefix,
-        { src: taskStartVideo, loop: false },
-        { src: taskLoopVideo, loop: true }
+        { name: 'task-start', loop: false },
+        { name: 'task-loop', loop: true }
       ])
       return
     }
 
     if (state === PetState.Thinking) {
-      player.playSequence([...wakePrefix, { src: listeningVideo, loop: true }])
+      playSequence([...wakePrefix, { name: 'listening', loop: true }])
       return
     }
 
     if (state === PetState.Happy) {
-      player.playSequence([
-        { src: taskLeaveVideo, loop: false },
-        { src: staticVideo, loop: true }
+      playSequence([
+        { name: 'task-leave', loop: false },
+        { name: 'static', loop: true }
       ])
       return
     }
 
     if (state === PetState.Idle) {
-      player.playSequence([...wakePrefix, { src: staticVideo, loop: true }])
+      playSequence([...wakePrefix, { name: 'static', loop: true }])
       return
     }
-  }, [state])
-
-  // 气泡显示由 PetApp 管理，通过 bubbleText prop 传入
+  }, [state, paused])
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     isMouseDown.current = true
@@ -264,19 +288,16 @@ export function PetCanvas({
       }}
       style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
     >
-      <video
-        ref={video0Ref}
-        muted
-        playsInline
-        className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-        style={{ background: 'transparent' }}
-      />
-      <video
-        ref={video1Ref}
-        muted
-        playsInline
-        className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-        style={{ background: 'transparent' }}
+      <div
+        ref={spriteLayerRef}
+        className="absolute inset-0 h-full w-full pointer-events-none bg-no-repeat"
+        style={{
+          width: '180px',
+          height: '145px',
+          transform: 'translateZ(0)',
+          backfaceVisibility: 'hidden',
+          contain: 'strict'
+        }}
       />
 
       {externalBubbleText && (

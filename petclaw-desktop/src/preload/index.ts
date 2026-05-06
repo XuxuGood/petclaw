@@ -4,6 +4,8 @@ const api = {
   // Window
   moveWindow: (dx: number, dy: number) => ipcRenderer.send('window:move', dx, dy),
   toggleMainWindow: () => ipcRenderer.send('chat:toggle'),
+  updateComposerBounds: (bounds: { x: number; y: number; width: number; height: number }) =>
+    ipcRenderer.send('window:composer-bounds:update', bounds),
 
   onHookEvent: (
     callback: (event: {
@@ -39,30 +41,6 @@ const api = {
   // i18n 语言查询与切换
   getLanguage: (): Promise<string> => ipcRenderer.invoke('i18n:get-language'),
   setLanguage: (locale: string): Promise<void> => ipcRenderer.invoke('i18n:set-language', locale),
-
-  // Onboarding
-  checkEnv: (): Promise<{ nodeOk: boolean; nodeVersion: string | null }> =>
-    ipcRenderer.invoke('onboarding:check-env'),
-  checkGateway: (url: string): Promise<{ connected: boolean; latencyMs: number | null }> =>
-    ipcRenderer.invoke('onboarding:check-gateway', url),
-  installHooks: (): Promise<{
-    success: boolean
-    alreadyInstalled: boolean
-    error?: string
-  }> => ipcRenderer.invoke('onboarding:install-hooks'),
-  saveOnboardingConfig: (data: {
-    nickname: string
-    roles: string[]
-    selectedSkills: string[]
-    voiceShortcut: string
-    language: string
-  }): Promise<{ success: boolean }> => ipcRenderer.invoke('onboarding:save-config', data),
-  getSystemPermissions: (): Promise<{ accessibility: boolean; microphone: boolean }> =>
-    ipcRenderer.invoke('onboarding:get-permissions'),
-  requestSystemPermission: (
-    type: 'accessibility' | 'microphone'
-  ): Promise<{ accessibility: boolean; microphone: boolean }> =>
-    ipcRenderer.invoke('onboarding:request-permission', type),
 
   // BootCheck
   onBootStepUpdate: (

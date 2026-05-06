@@ -12,6 +12,7 @@ import path from 'path'
 
 import type { McpServer, McpToolManifestEntry, StdioConfig, HttpConfig } from '../ai/types'
 import { getElectronNodeRuntimePath, getEnhancedEnv } from '../ai/cowork-util'
+import { resolveUserDataPaths } from '../user-data-paths'
 import {
   getToolTextPreview,
   looksLikeTransportErrorText,
@@ -116,7 +117,7 @@ const WINDOWS_HIDE_INIT_SCRIPT_CONTENT = [
 function ensureWindowsHideInitScript(): string | null {
   if (process.platform !== 'win32') return null
   try {
-    const dir = path.join(app.getPath('userData'), 'mcp-bridge', 'bin')
+    const dir = resolveUserDataPaths(app.getPath('userData')).mcpBridgeShimBin
     fs.mkdirSync(dir, { recursive: true })
     const scriptPath = path.join(dir, WINDOWS_HIDE_INIT_SCRIPT_NAME)
     const existing = fs.existsSync(scriptPath) ? fs.readFileSync(scriptPath, 'utf8') : ''

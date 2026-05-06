@@ -15,31 +15,47 @@ function makeWindow(visible = false) {
   }
 }
 
+function makeApp() {
+  return {
+    quit: vi.fn(),
+    show: vi.fn(),
+    focus: vi.fn()
+  }
+}
+
 describe('createSystemActions', () => {
-  it('openPetClaw shows and focuses the main window', () => {
+  it('openPetClaw activates the macOS app before focusing the main window', () => {
     const mainWindow = makeWindow(false)
+    const app = makeApp()
     const actions = createSystemActions({
-      app: { quit: vi.fn() },
+      app,
       getMainWindow: () => mainWindow as never,
-      getPetWindow: () => null
+      getPetWindow: () => null,
+      platform: 'darwin'
     })
 
     actions.openPetClaw()
 
+    expect(app.show).toHaveBeenCalledOnce()
+    expect(app.focus).toHaveBeenCalledWith({ steal: true })
     expect(mainWindow.show).toHaveBeenCalledOnce()
     expect(mainWindow.focus).toHaveBeenCalledOnce()
   })
 
   it('showSettings opens the main window and requests the settings view', () => {
     const mainWindow = makeWindow(false)
+    const app = makeApp()
     const actions = createSystemActions({
-      app: { quit: vi.fn() },
+      app,
       getMainWindow: () => mainWindow as never,
-      getPetWindow: () => null
+      getPetWindow: () => null,
+      platform: 'darwin'
     })
 
     actions.showSettings()
 
+    expect(app.show).toHaveBeenCalledOnce()
+    expect(app.focus).toHaveBeenCalledWith({ steal: true })
     expect(mainWindow.show).toHaveBeenCalledOnce()
     expect(mainWindow.focus).toHaveBeenCalledOnce()
     expect(mainWindow.webContents.send).toHaveBeenCalledWith('panel:open', 'settings')
@@ -48,7 +64,7 @@ describe('createSystemActions', () => {
   it('showPet and hidePet only affect the pet window', () => {
     const petWindow = makeWindow(false)
     const actions = createSystemActions({
-      app: { quit: vi.fn() },
+      app: makeApp(),
       getMainWindow: () => null,
       getPetWindow: () => petWindow as never
     })
@@ -63,7 +79,7 @@ describe('createSystemActions', () => {
   it('togglePet hides visible pet window and shows hidden pet window', () => {
     const petWindow = makeWindow(true)
     const actions = createSystemActions({
-      app: { quit: vi.fn() },
+      app: makeApp(),
       getMainWindow: () => null,
       getPetWindow: () => petWindow as never
     })
@@ -80,7 +96,7 @@ describe('createSystemActions', () => {
     const destroyedWindow = makeWindow(false)
     destroyedWindow.isDestroyed.mockReturnValue(true)
     const actions = createSystemActions({
-      app: { quit: vi.fn() },
+      app: makeApp(),
       getMainWindow: () => destroyedWindow as never,
       getPetWindow: () => destroyedWindow as never
     })
@@ -92,15 +108,15 @@ describe('createSystemActions', () => {
   })
 
   it('quitPetClaw delegates to app.quit', () => {
-    const quit = vi.fn()
+    const app = makeApp()
     const actions = createSystemActions({
-      app: { quit },
+      app,
       getMainWindow: () => null,
       getPetWindow: () => null
     })
 
     actions.quitPetClaw()
 
-    expect(quit).toHaveBeenCalledOnce()
+    expect(app.quit).toHaveBeenCalledOnce()
   })
 })

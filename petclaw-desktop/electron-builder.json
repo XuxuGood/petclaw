@@ -38,13 +38,6 @@
     "!**/test/**",
     "!**/__tests__/**"
   ],
-  "extraResources": [
-    {
-      "from": "resources/tray",
-      "to": "tray",
-      "filter": ["**/*"]
-    }
-  ],
   "protocols": [
     {
       "name": "PetClaw",
@@ -58,7 +51,7 @@
   },
   "mac": {
     "target": ["dmg", "zip"],
-    "icon": "resources/icon.png",
+    "icon": "build/icons/mac/icon.icns",
     "category": "public.app-category.utilities",
     "hardenedRuntime": true,
     "gatekeeperAssess": false,
@@ -66,8 +59,8 @@
     "entitlementsInherit": "build/entitlements.mac.plist",
     "extraResources": [
       {
-        "from": "SKILLs",
-        "to": "SKILLs",
+        "from": "skills",
+        "to": "skills",
         "filter": [
           "**/*",
           "!**/.env",
@@ -103,6 +96,37 @@
         "to": "petmind",
         "filter": [
           "**/*",
+          "!**/*.map",
+          "!**/*.d.ts",
+          "!**/*.d.cts",
+          "!**/*.d.mts",
+          "!**/README.md",
+          "!**/README",
+          "!**/readme.md",
+          "!**/CHANGELOG.md",
+          "!**/CHANGELOG",
+          "!**/HISTORY.md",
+          "!**/LICENSE",
+          "!**/LICENSE.md",
+          "!**/LICENSE.txt",
+          "!**/.eslintrc*",
+          "!**/.prettierrc*",
+          "!**/tsconfig.json",
+          "!**/tsconfig.*.json",
+          "!**/*.test.*",
+          "!**/*.spec.*",
+          "!**/tests/**",
+          "!**/test/**",
+          "!**/__tests__/**"
+        ]
+      },
+      {
+        "from": "vendor/openclaw-runtime/current/node_modules",
+        "to": "petmind/node_modules",
+        "filter": [
+          "**/*",
+          "!**/.bin",
+          "!**/.bin/**",
           "!**/*.map",
           "!**/*.d.ts",
           "!**/*.d.cts",
@@ -135,7 +159,7 @@
   "afterSign": "scripts/notarize.js",
   "win": {
     "target": ["nsis", "portable"],
-    "icon": "resources/icon.png",
+    "icon": "build/icons/win/icon.ico",
     "requestedExecutionLevel": "asInvoker",
     "extraResources": [
       {
@@ -150,12 +174,12 @@
   },
   "linux": {
     "target": ["AppImage", "deb"],
-    "icon": "resources/icon.png",
+    "icon": "build/icons/png",
     "category": "Utility",
     "extraResources": [
       {
-        "from": "SKILLs",
-        "to": "SKILLs",
+        "from": "skills",
+        "to": "skills",
         "filter": [
           "**/*",
           "!**/.env",
@@ -214,12 +238,45 @@
           "!**/test/**",
           "!**/__tests__/**"
         ]
+      },
+      {
+        "from": "vendor/openclaw-runtime/current/node_modules",
+        "to": "petmind/node_modules",
+        "filter": [
+          "**/*",
+          "!**/.bin",
+          "!**/.bin/**",
+          "!**/*.map",
+          "!**/*.d.ts",
+          "!**/*.d.cts",
+          "!**/*.d.mts",
+          "!**/README.md",
+          "!**/README",
+          "!**/readme.md",
+          "!**/CHANGELOG.md",
+          "!**/CHANGELOG",
+          "!**/HISTORY.md",
+          "!**/LICENSE",
+          "!**/LICENSE.md",
+          "!**/LICENSE.txt",
+          "!**/.eslintrc*",
+          "!**/.prettierrc*",
+          "!**/tsconfig.json",
+          "!**/tsconfig.*.json",
+          "!**/*.test.*",
+          "!**/*.spec.*",
+          "!**/tests/**",
+          "!**/test/**",
+          "!**/__tests__/**"
+        ]
       }
     ],
     "desktop": {
-      "Name": "PetClaw",
-      "Comment": "AI Desktop Pet Assistant",
-      "Terminal": "false"
+      "entry": {
+        "Name": "PetClaw",
+        "Comment": "AI Desktop Pet Assistant",
+        "Terminal": "false"
+      }
     }
   },
   "nsis": {

@@ -42,7 +42,7 @@ export function MonitorView() {
         <div>
           {sessionList.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-text-tertiary">
-              <div className="w-12 h-12 rounded-2xl bg-bg-input flex items-center justify-center mb-4">
+              <div className="w-12 h-12 rounded-[10px] bg-bg-input flex items-center justify-center mb-4">
                 <Activity size={22} className="text-text-tertiary" strokeWidth={1.75} />
               </div>
               <p className="text-[13px] font-medium text-text-secondary mb-1">
@@ -93,7 +93,7 @@ function SessionCard({ session }: { session: AgentSession }) {
       </div>
 
       {session.lastEventData && Object.keys(session.lastEventData).length > 0 && (
-        <div className="mt-2 text-[11px] text-text-tertiary truncate font-mono leading-relaxed bg-bg-input rounded-lg px-3 py-1.5">
+        <div className="mt-2 text-[11px] text-text-tertiary truncate font-mono leading-relaxed bg-bg-input rounded-[8px] px-3 py-1.5">
           {JSON.stringify(session.lastEventData).slice(0, 120)}
         </div>
       )}

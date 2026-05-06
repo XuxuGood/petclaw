@@ -9,6 +9,7 @@ import path from 'path'
 
 import type { EnginePhase, EngineStatus, GatewayConnectionInfo, RuntimeMetadata } from './types'
 import { t } from '../i18n'
+import { resolveUserDataPaths } from '../user-data-paths'
 import { ensureElectronNodeShim, getElectronNodeRuntimePath, getSkillsRoot } from './cowork-util'
 import {
   cleanupStaleThirdPartyPluginsFromBundledDir,
@@ -155,10 +156,10 @@ export class OpenclawEngineManager extends EventEmitter {
   constructor() {
     super()
 
-    const userDataPath = app.getPath('userData')
-    this.baseDir = path.join(userDataPath, 'openclaw')
-    this.stateDir = path.join(this.baseDir, 'state')
-    this.logsDir = path.join(this.baseDir, 'logs')
+    const userDataPaths = resolveUserDataPaths(app.getPath('userData'))
+    this.baseDir = userDataPaths.openclawRoot
+    this.stateDir = userDataPaths.openclawState
+    this.logsDir = userDataPaths.openclawLogs
 
     this.gatewayTokenPath = path.join(this.stateDir, 'gateway-token')
     this.gatewayPortPath = path.join(this.stateDir, 'gateway-port.json')

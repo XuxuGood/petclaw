@@ -2,11 +2,14 @@ import { PawPrint, FolderOpen, PenLine, BarChart3 } from 'lucide-react'
 
 import { useI18n } from '../i18n'
 
+export type WelcomeSuggestionCategory = 'fileOrganize' | 'contentCreation' | 'docProcess'
+
 interface WelcomePageProps {
-  onSendPrompt: (text: string) => void
+  selectedCategory: WelcomeSuggestionCategory | null
+  onSelectCategory: (category: WelcomeSuggestionCategory) => void
 }
 
-export function WelcomePage({ onSendPrompt }: WelcomePageProps) {
+export function WelcomePage({ selectedCategory, onSelectCategory }: WelcomePageProps) {
   const { t } = useI18n()
 
   // 根据当前时段返回问候语（依赖 t，必须在组件内调用）
@@ -19,29 +22,29 @@ export function WelcomePage({ onSendPrompt }: WelcomePageProps) {
   // 快捷卡片数据（包含中文文案，必须放在组件内部使用 t()）
   const quickCards = [
     {
+      id: 'fileOrganize' as const,
       icon: FolderOpen,
       title: t('welcome.card.fileOrganize.title'),
-      desc: t('welcome.card.fileOrganize.desc'),
-      prompt: t('welcome.card.fileOrganize.prompt')
+      desc: t('welcome.card.fileOrganize.desc')
     },
     {
+      id: 'contentCreation' as const,
       icon: PenLine,
       title: t('welcome.card.contentCreation.title'),
-      desc: t('welcome.card.contentCreation.desc'),
-      prompt: t('welcome.card.contentCreation.prompt')
+      desc: t('welcome.card.contentCreation.desc')
     },
     {
+      id: 'docProcess' as const,
       icon: BarChart3,
       title: t('welcome.card.docProcess.title'),
-      desc: t('welcome.card.docProcess.desc'),
-      prompt: t('welcome.card.docProcess.prompt')
+      desc: t('welcome.card.docProcess.desc')
     }
   ]
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-6">
       {/* 吉祥物图标 */}
-      <div className="w-16 h-16 rounded-2xl bg-accent flex items-center justify-center mb-6">
+      <div className="w-16 h-16 rounded-[12px] bg-accent flex items-center justify-center mb-6">
         <PawPrint size={30} className="text-white" strokeWidth={2} />
       </div>
 
@@ -57,9 +60,13 @@ export function WelcomePage({ onSendPrompt }: WelcomePageProps) {
           const Icon = card.icon
           return (
             <button
-              key={card.title}
-              onClick={() => onSendPrompt(card.prompt)}
-              className="ui-card-action flex flex-1 flex-col items-start p-4 text-left"
+              key={card.id}
+              type="button"
+              aria-pressed={selectedCategory === card.id}
+              onClick={() => onSelectCategory(card.id)}
+              className={`ui-card-action flex flex-1 flex-col items-start p-4 text-left ${
+                selectedCategory === card.id ? 'border-accent/30 bg-bg-active' : ''
+              }`}
             >
               <Icon size={20} className="text-text-secondary mb-3" strokeWidth={1.75} />
               <span className="text-[14px] font-medium text-text-primary mb-1">{card.title}</span>

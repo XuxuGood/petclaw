@@ -10,8 +10,10 @@
 
 const {
   describeGitNexusEnvironmentError,
+  getGitChangedFiles,
   getGitNexusListResult,
   getGitNexusRepoName,
+  getGitSnapshot,
   hasWorkingTreeChanges,
   isGitNexusRepoRegistered,
   isGitNexusEnvironmentError,
@@ -20,10 +22,14 @@ const {
   looksLikeStaleIndex,
   runCommand,
   runGitNexus,
-  runGitNexusForRepo
+  runGitNexusForRepo,
+  writeAiState,
+  writeJsonArtifact
 } = require('./gitnexus-utils.cjs')
 
 const jsonOutput = process.argv.includes('--json')
+const fromGit = process.argv.includes('--from-git')
+const fromStaged = process.argv.includes('--from-staged')
 
 function readArg(name) {
   // 不引入额外参数解析依赖，保持脚本能在 hook 和最小 Node 环境中直接运行。
@@ -31,10 +37,27 @@ function readArg(name) {
   return index >= 0 ? process.argv[index + 1] : undefined
 }
 
+function readListArg(name) {
+  const index = process.argv.indexOf(name)
+  if (index < 0) {
+    return []
+  }
+
+  const values = []
+  for (const value of process.argv.slice(index + 1)) {
+    if (value.startsWith('--')) {
+      break
+    }
+    values.push(value)
+  }
+  return values
+}
+
 function printUsage() {
   // prepare-change 是给 AI 自动调用的入口；缺 target 直接失败，避免生成没有上下文价值的报告。
   console.log('用法：pnpm ai:prepare-change -- --target <file-or-symbol>')
   console.log('示例：pnpm ai:prepare-change -- --target petclaw-desktop/src/main/ai/config-sync.ts')
+  console.log('自动推断：pnpm ai:prepare-change -- --from-git 或 --from-staged')
 }
 
 function printInfo(message) {
@@ -85,7 +108,8 @@ function ensureFreshEnoughIndex() {
 
     return {
       available: !analyze.skipped && analyze.status === 0,
-      environmentBlocked: false
+      environmentBlocked: false,
+      refreshed: !analyze.skipped && analyze.status === 0
     }
   }
 
@@ -109,7 +133,8 @@ function ensureFreshEnoughIndex() {
   if (!looksLikeStaleIndex(statusOutput, status.status)) {
     return {
       available: true,
-      environmentBlocked: false
+      environmentBlocked: false,
+      refreshed: false
     }
   }
 
@@ -129,7 +154,8 @@ function ensureFreshEnoughIndex() {
 
   return {
     available: !analyze.skipped && analyze.status === 0,
-    environmentBlocked: false
+    environmentBlocked: false,
+    refreshed: !analyze.skipped && analyze.status === 0
   }
 }
 
@@ -172,6 +198,62 @@ function uniqueSearchPatterns(target) {
       ].filter((item) => item && item.length >= 2)
     )
   )
+}
+
+function isNonSymbolRiskTarget(target) {
+  // 这些目标通常不会完整进入 GitNexus symbol 图谱，即使 GitNexus 返回成功也必须补 rg 使用面扫描。
+  return /^(--|var\()/.test(target) ||
+    target.includes(':') ||
+    target.includes('/') ||
+    target.includes('.') ||
+    /^[A-Z0-9_]+$/.test(target) ||
+    /config|setting|token|channel|ipc|i18n|sqlite|schema|env/i.test(target)
+}
+
+function inferTargets() {
+  const explicitTarget = readArg('--target') ?? readArg('-t')
+  if (explicitTarget) {
+    return {
+      primary: explicitTarget,
+      inferred: [explicitTarget],
+      source: 'target'
+    }
+  }
+
+  const fromFiles = readListArg('--from-files')
+  if (fromFiles.length > 0) {
+    return {
+      primary: fromFiles[0],
+      inferred: fromFiles,
+      source: 'from-files'
+    }
+  }
+
+  if (fromStaged) {
+    const files = getGitChangedFiles('staged')
+    return {
+      primary: files[0],
+      inferred: files,
+      source: 'from-staged'
+    }
+  }
+
+  if (fromGit) {
+    const staged = getGitChangedFiles('staged')
+    const worktree = getGitChangedFiles('worktree')
+    const files = staged.length > 0 ? staged : worktree
+    return {
+      primary: files[0],
+      inferred: files,
+      source: staged.length > 0 ? 'from-git-staged' : 'from-git-worktree'
+    }
+  }
+
+  return {
+    primary: null,
+    inferred: [],
+    source: 'missing'
+  }
 }
 
 function runRipgrep(pattern, extraArgs = []) {
@@ -349,12 +431,14 @@ function runTextFallback(target) {
 
 function main() {
   // 整体流程：读取目标 → 确认索引 → 拉 context/impact → 提醒已有草稿 → 输出项目级核对清单。
-  const target = readArg('--target') ?? readArg('-t')
+  const inferredTargets = inferTargets()
+  const target = inferredTargets.primary
   if (!target) {
     printUsage()
     process.exit(1)
   }
 
+  const gitSnapshot = getGitSnapshot()
   printInfo(`准备分析改动目标：${target}`)
   const indexState = ensureFreshEnoughIndex()
   if (!indexState.available) {
@@ -363,10 +447,14 @@ function main() {
 
   const report = {
     target,
+    inferredTargets: inferredTargets.inferred,
+    targetSource: inferredTargets.source,
     repo: getGitNexusRepoName(),
+    git: gitSnapshot,
     gitnexus: {
       indexAvailable: indexState.available,
       environmentBlocked: indexState.environmentBlocked,
+      refreshed: Boolean(indexState.refreshed),
       contextStatus: null,
       impactStatus: null,
       risk: null
@@ -425,7 +513,7 @@ function main() {
         matched: Boolean(fallback.matched),
         groups: fallback.groups ?? []
       }
-    } else if (outputLooksUnknown(context) || outputLooksUnknown(impact)) {
+    } else if (outputLooksUnknown(context) || outputLooksUnknown(impact) || isNonSymbolRiskTarget(target)) {
       const fallback = runTextFallback(target)
       report.fallback = {
         used: true,
@@ -439,6 +527,18 @@ function main() {
     report.workingTreeChanged = true
     printInfo('工作区已有未提交变更，AI 修改前需要确认这些变更是否属于当前任务。')
   }
+
+  report.artifactPath = writeJsonArtifact('prepare-change', report)
+  writeAiState({
+    gitnexusRepo: report.repo,
+    lastPrepareChange: {
+      target,
+      targetSource: report.targetSource,
+      artifactPath: report.artifactPath,
+      git: gitSnapshot,
+      fallbackUsed: report.fallback.used
+    }
+  })
 
   if (jsonOutput) {
     console.log(JSON.stringify(report, null, 2))

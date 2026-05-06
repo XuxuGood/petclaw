@@ -9,12 +9,14 @@ import { SkillManager } from '../../../src/main/skills/skill-manager'
 describe('SkillManager', () => {
   let db: Database.Database
   let tmpDir: string
+  let bundledDir: string
   let manager: SkillManager
 
   beforeEach(() => {
     db = new Database(':memory:')
     initDatabase(db)
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'petclaw-skills-'))
+    bundledDir = fs.mkdtempSync(path.join(os.tmpdir(), 'petclaw-bundled-skills-'))
 
     // 创建模拟 Skill 目录
     const skill1 = path.join(tmpDir, 'web-search')
@@ -37,6 +39,7 @@ describe('SkillManager', () => {
   afterEach(() => {
     db.close()
     fs.rmSync(tmpDir, { recursive: true, force: true })
+    fs.rmSync(bundledDir, { recursive: true, force: true })
   })
 
   it('should scan skills from directory', async () => {
@@ -100,5 +103,202 @@ describe('SkillManager', () => {
     const prompt = manager.buildSelectedSkillPrompt(['web-search', 'missing'])
 
     expect(prompt).toBe('')
+  })
+
+  it('should copy missing bundled skills into userData skills root', async () => {
+    const bundledSkill = path.join(bundledDir, 'docx')
+    fs.mkdirSync(bundledSkill, { recursive: true })
+    fs.writeFileSync(
+      path.join(bundledSkill, 'SKILL.md'),
+      '---\nname: docx\ndescription: Edit Word documents\nversion: 1.0.0\n---\nUse docx.\n'
+    )
+    fs.writeFileSync(
+      path.join(bundledDir, 'skills.config.json'),
+      JSON.stringify({ defaults: { docx: { enabled: true } } }, null, 2)
+    )
+
+    manager.syncBundledSkillsToUserData({ bundledRoot: bundledDir })
+    const skills = await manager.scan()
+
+    expect(fs.existsSync(path.join(tmpDir, 'docx', 'SKILL.md'))).toBe(true)
+    expect(skills.find((skill) => skill.id === 'docx')?.isBuiltIn).toBe(true)
+  })
+
+  it('should skip bundled directories that are not declared in skills config defaults', () => {
+    const declaredSkill = path.join(bundledDir, 'docx')
+    fs.mkdirSync(declaredSkill, { recursive: true })
+    fs.writeFileSync(
+      path.join(declaredSkill, 'SKILL.md'),
+      '---\nname: docx\ndescription: Edit Word documents\nversion: 1.0.0\n---\nUse docx.\n'
+    )
+
+    const straySkill = path.join(bundledDir, 'stray')
+    fs.mkdirSync(straySkill, { recursive: true })
+    fs.writeFileSync(
+      path.join(straySkill, 'SKILL.md'),
+      '---\nname: stray\ndescription: Stray skill\nversion: 1.0.0\n---\nDo not sync.\n'
+    )
+    fs.writeFileSync(
+      path.join(bundledDir, 'skills.config.json'),
+      JSON.stringify({ defaults: { docx: { enabled: true } } }, null, 2)
+    )
+
+    manager.syncBundledSkillsToUserData({ bundledRoot: bundledDir })
+
+    expect(fs.existsSync(path.join(tmpDir, 'docx', 'SKILL.md'))).toBe(true)
+    expect(fs.existsSync(path.join(tmpDir, 'stray'))).toBe(false)
+  })
+
+  it('should upgrade bundled skills when bundled version is newer and preserve local env', async () => {
+    const targetSkill = path.join(tmpDir, 'docx')
+    fs.mkdirSync(targetSkill, { recursive: true })
+    fs.writeFileSync(
+      path.join(targetSkill, 'SKILL.md'),
+      '---\nname: docx\ndescription: Old\nversion: 1.0.0\n---\nOld prompt.\n'
+    )
+    fs.writeFileSync(path.join(targetSkill, '.env'), 'TOKEN=local\n')
+    fs.writeFileSync(path.join(targetSkill, 'stale.js'), 'old runtime file\n')
+
+    const bundledSkill = path.join(bundledDir, 'docx')
+    fs.mkdirSync(bundledSkill, { recursive: true })
+    fs.writeFileSync(
+      path.join(bundledSkill, 'SKILL.md'),
+      '---\nname: docx\ndescription: New\nversion: 1.1.0\n---\nNew prompt.\n'
+    )
+
+    manager.syncBundledSkillsToUserData({ bundledRoot: bundledDir })
+
+    expect(fs.readFileSync(path.join(targetSkill, 'SKILL.md'), 'utf8')).toContain('version: 1.1.0')
+    expect(fs.readFileSync(path.join(targetSkill, 'SKILL.md'), 'utf8')).toContain('New prompt.')
+    expect(fs.readFileSync(path.join(targetSkill, '.env'), 'utf8')).toBe('TOKEN=local\n')
+    expect(fs.existsSync(path.join(targetSkill, 'stale.js'))).toBe(false)
+  })
+
+  it('should repair bundled skill runtime dependencies from packaged resources', () => {
+    const targetSkill = path.join(tmpDir, 'web-search')
+    fs.writeFileSync(
+      path.join(targetSkill, 'SKILL.md'),
+      '---\nname: web-search\ndescription: Search the web\nversion: 1.0.0\n---\nUse web search.\n'
+    )
+    fs.writeFileSync(path.join(targetSkill, '.env'), 'API_KEY=local\n')
+
+    const bundledSkill = path.join(bundledDir, 'web-search')
+    fs.mkdirSync(path.join(bundledSkill, 'node_modules', 'runtime-lib'), { recursive: true })
+    fs.writeFileSync(
+      path.join(bundledSkill, 'SKILL.md'),
+      '---\nname: web-search\ndescription: Search the web\nversion: 1.0.0\n---\nUse web search.\n'
+    )
+    fs.writeFileSync(
+      path.join(bundledSkill, 'package.json'),
+      '{"dependencies":{"runtime-lib":"1.0.0"}}\n'
+    )
+    fs.writeFileSync(
+      path.join(bundledSkill, 'node_modules', 'runtime-lib', 'index.js'),
+      'module.exports = {}\n'
+    )
+
+    manager.syncBundledSkillsToUserData({ bundledRoot: bundledDir })
+
+    expect(fs.existsSync(path.join(targetSkill, 'node_modules', 'runtime-lib', 'index.js'))).toBe(
+      true
+    )
+    expect(fs.readFileSync(path.join(targetSkill, '.env'), 'utf8')).toBe('API_KEY=local\n')
+  })
+
+  it('should repair broken web-search runtime files from packaged resources', () => {
+    const targetSkill = path.join(tmpDir, 'web-search')
+    fs.rmSync(targetSkill, { recursive: true, force: true })
+    fs.mkdirSync(path.join(targetSkill, 'scripts'), { recursive: true })
+    fs.writeFileSync(
+      path.join(targetSkill, 'SKILL.md'),
+      '---\nname: web-search\ndescription: Search the web\nversion: 1.0.0\n---\nUse web search.\n'
+    )
+    fs.writeFileSync(path.join(targetSkill, '.env'), 'API_KEY=local\n')
+    fs.writeFileSync(path.join(targetSkill, 'scripts', 'start-server.sh'), 'legacy\n')
+
+    const bundledSkill = path.join(bundledDir, 'web-search')
+    fs.mkdirSync(path.join(bundledSkill, 'scripts'), { recursive: true })
+    fs.mkdirSync(path.join(bundledSkill, 'dist', 'server'), { recursive: true })
+    fs.writeFileSync(
+      path.join(bundledSkill, 'SKILL.md'),
+      '---\nname: web-search\ndescription: Search the web\nversion: 1.0.0\n---\nUse web search.\n'
+    )
+    fs.writeFileSync(
+      path.join(bundledSkill, 'scripts', 'start-server.sh'),
+      'WEB_SEARCH_FORCE_REPAIR\ndetect_healthy_bridge_server\n'
+    )
+    fs.writeFileSync(path.join(bundledSkill, 'scripts', 'search.sh'), 'ACTIVE_SERVER_URL\n')
+    fs.writeFileSync(path.join(bundledSkill, 'dist', 'server', 'index.js'), 'createBridgeServer\n')
+
+    manager.syncBundledSkillsToUserData({ bundledRoot: bundledDir })
+
+    expect(fs.readFileSync(path.join(targetSkill, 'scripts', 'start-server.sh'), 'utf8')).toContain(
+      'WEB_SEARCH_FORCE_REPAIR'
+    )
+    expect(fs.existsSync(path.join(targetSkill, 'dist', 'server', 'index.js'))).toBe(true)
+    expect(fs.readFileSync(path.join(targetSkill, '.env'), 'utf8')).toBe('API_KEY=local\n')
+  })
+
+  it('should replace conflicting non-directory targets with bundled skill directories', () => {
+    fs.writeFileSync(path.join(tmpDir, 'docx'), 'not a directory\n')
+    const bundledSkill = path.join(bundledDir, 'docx')
+    fs.mkdirSync(bundledSkill, { recursive: true })
+    fs.writeFileSync(
+      path.join(bundledSkill, 'SKILL.md'),
+      '---\nname: docx\ndescription: Edit Word documents\nversion: 1.0.0\n---\nUse docx.\n'
+    )
+
+    manager.syncBundledSkillsToUserData({ bundledRoot: bundledDir })
+
+    expect(fs.statSync(path.join(tmpDir, 'docx')).isDirectory()).toBe(true)
+    expect(fs.existsSync(path.join(tmpDir, 'docx', 'SKILL.md'))).toBe(true)
+  })
+
+  it('should isolate bundled skill sync failures and continue syncing other skills', () => {
+    const brokenSkill = path.join(bundledDir, 'broken')
+    fs.mkdirSync(brokenSkill, { recursive: true })
+    fs.writeFileSync(
+      path.join(brokenSkill, 'SKILL.md'),
+      '---\nname: broken\ndescription: Broken skill\nversion: 1.0.0\n---\nBroken.\n'
+    )
+    fs.symlinkSync(path.join(brokenSkill, 'missing-target'), path.join(brokenSkill, 'broken-link'))
+
+    const healthySkill = path.join(bundledDir, 'healthy')
+    fs.mkdirSync(healthySkill, { recursive: true })
+    fs.writeFileSync(
+      path.join(healthySkill, 'SKILL.md'),
+      '---\nname: healthy\ndescription: Healthy skill\nversion: 1.0.0\n---\nHealthy.\n'
+    )
+
+    expect(() => manager.syncBundledSkillsToUserData({ bundledRoot: bundledDir })).not.toThrow()
+    expect(fs.existsSync(path.join(tmpDir, 'healthy', 'SKILL.md'))).toBe(true)
+    expect(fs.existsSync(path.join(tmpDir, 'broken'))).toBe(false)
+  })
+
+  it('should merge bundled skills defaults without overwriting user config', () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'skills.config.json'),
+      JSON.stringify({ defaults: { docx: { enabled: false } }, custom: true }, null, 2)
+    )
+    fs.writeFileSync(
+      path.join(bundledDir, 'skills.config.json'),
+      JSON.stringify(
+        { defaults: { docx: { enabled: true }, web: { enabled: true } }, bundled: true },
+        null,
+        2
+      )
+    )
+
+    manager.syncBundledSkillsToUserData({ bundledRoot: bundledDir })
+
+    const config = JSON.parse(fs.readFileSync(path.join(tmpDir, 'skills.config.json'), 'utf8')) as {
+      defaults: Record<string, { enabled: boolean }>
+      custom: boolean
+      bundled: boolean
+    }
+    expect(config.defaults.docx.enabled).toBe(false)
+    expect(config.defaults.web.enabled).toBe(true)
+    expect(config.custom).toBe(true)
+    expect(config.bundled).toBe(true)
   })
 })

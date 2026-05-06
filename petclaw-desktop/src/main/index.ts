@@ -3,6 +3,7 @@ import path from 'path'
 import crypto from 'crypto'
 
 import { app } from 'electron'
+import type { Tray } from 'electron'
 import { is } from '@electron-toolkit/utils'
 import Database from 'better-sqlite3'
 
@@ -30,9 +31,14 @@ import { PetEventBridge } from './pet/pet-event-bridge'
 import { registerAllIpcHandlers, registerBootIpcHandlers, registerSettingsIpcHandlers } from './ipc'
 import { safeHandle, safeOn } from './ipc/ipc-registry'
 import { HookServer } from './hooks/server'
-import { initializeMacosIntegration } from './system/macos-integration'
+import {
+  initializeMacosApplicationIdentity,
+  initializeMacosIntegration,
+  refreshMacosMenus
+} from './system/macos-integration'
+import { activateMainWindow } from './system/window-activation'
 import { createSystemActions } from './system/system-actions'
-import { createTray, shouldCreateFallbackTray } from './system/tray'
+import { createTray, shouldCreateFallbackTray, updateTrayMenu } from './system/tray'
 import { registerShortcuts, unregisterShortcuts } from './system/shortcuts'
 import { runBootCheck } from './bootcheck'
 import { diagAppReady, diagBootResult, diagWindowLoad, diagError } from './diagnostics'
@@ -43,13 +49,15 @@ import { initLogger } from './logger'
 import { getSkillsRoot } from './ai/cowork-util'
 import { GatewayRestartScheduler } from './ai/gateway-restart-scheduler'
 import { setupRuntimeServices, type RuntimeServices } from './runtime-services'
+import { resolveUserDataPaths } from './user-data-paths'
 import {
   closeMainWindowForQuit,
   createMainWindow,
   createPetWindow,
   getMainWindow,
   getPetWindow,
-  toggleMainWindow
+  toggleMainWindow,
+  updatePetWindowComposerAnchor
 } from './windows'
 
 let db: Database.Database
@@ -58,6 +66,7 @@ let configSync: ConfigSync
 let coworkStore: CoworkStore
 let coworkConfigStore: CoworkConfigStore
 let runtimeServices: RuntimeServices | null = null
+let runtimeIpcRegistered = false
 
 // Manager 实例声明（在 app.whenReady 中初始化）
 let directoryManager: DirectoryManager
@@ -93,14 +102,26 @@ async function initializeRuntimeServices(): Promise<RuntimeServices> {
   return runtimeServices
 }
 
+function resolveBundledSkillsRoot(): string | null {
+  const candidates = app.isPackaged
+    ? [path.join(process.resourcesPath, 'skills'), path.join(app.getAppPath(), 'skills')]
+    : [path.join(app.getAppPath(), 'skills'), path.join(process.cwd(), 'skills')]
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate
+  }
+
+  return null
+}
+
 app.whenReady().then(async () => {
+  initializeMacosApplicationIdentity()
   diagAppReady()
 
   // 1. 初始化数据库
-  const dbPath = resolveDatabasePath({
-    petclawHome: path.join(app.getPath('home'), '.petclaw'),
-    legacyUserDataPath: app.getPath('userData')
-  })
+  const userDataPath = app.getPath('userData')
+  const userDataPaths = resolveUserDataPaths(userDataPath)
+  const dbPath = resolveDatabasePath({ userDataPath })
   db = new Database(dbPath)
   initDatabase(db)
   // 初始化 i18n，读取系统语言偏好
@@ -108,7 +129,7 @@ app.whenReady().then(async () => {
 
   // 2. EngineManager 初始化，OpenClaw runtime root 由 userData/openclaw 承载
   engineManager = new OpenclawEngineManager()
-  workspacePath = path.join(engineManager.getBaseDir(), 'workspace')
+  workspacePath = userDataPaths.openclawWorkspace
   fs.mkdirSync(workspacePath, { recursive: true })
 
   // 3. CoworkStore 防御性重置：上次崩溃遗留的 running 状态归零
@@ -128,6 +149,9 @@ app.whenReady().then(async () => {
   skillsDir = getSkillsRoot()
   fs.mkdirSync(skillsDir, { recursive: true })
   skillManager = new SkillManager(db, skillsDir)
+  if (app.isPackaged) {
+    skillManager.syncBundledSkillsToUserData({ bundledRoot: resolveBundledSkillsRoot() })
+  }
   await skillManager.scan()
 
   // McpManager：MCP 服务器 CRUD，数据持久化在 SQLite
@@ -302,13 +326,66 @@ app.whenReady().then(async () => {
   }
 
   // 9. 创建 chat 窗口（立即显示 BootCheck UI）
-  const chatWindow = createMainWindow()
+  const chatWindow = createMainWindow(db)
+  const systemActions = createSystemActions({
+    app,
+    getMainWindow: () => getMainWindow(),
+    getPetWindow: () => getPetWindow()
+  })
+  let fallbackTray: Tray | null = null
+
+  function refreshSystemMenus(): void {
+    if (fallbackTray) {
+      updateTrayMenu(fallbackTray, systemActions)
+      return
+    }
+
+    refreshMacosMenus({ actions: systemActions })
+  }
+
+  function registerRuntimeIpcHandlers(): void {
+    if (runtimeIpcRegistered) return
+    if (!runtimeServices) {
+      throw new Error('[IPC] runtime services are not initialized')
+    }
+
+    registerAllIpcHandlers({
+      db,
+      coworkSessionManager: runtimeServices.coworkSessionManager,
+      coworkController: runtimeServices.coworkController,
+      coworkConfigStore,
+      configSync,
+      mcpBridgeServer,
+      directoryManager,
+      modelRegistry,
+      skillManager,
+      mcpManager,
+      refreshMcpBridge,
+      memoryManager,
+      cronJobService: runtimeServices.cronJobService,
+      imGatewayManager,
+      getMainWindow: () => getMainWindow(),
+      getPetWindow: () => getPetWindow(),
+      actions: systemActions,
+      toggleMainWindow,
+      updatePetWindowComposerAnchor
+    })
+    runtimeIpcRegistered = true
+  }
+
+  // 桌面系统入口必须在启动页阶段就可用，不能等待 renderer 进入 main 后的 app:pet-ready。
+  // pet 相关动作在宠物窗口创建前会安全 no-op；主窗口和退出动作可立即工作。
+  if (shouldCreateFallbackTray()) {
+    fallbackTray = createTray(systemActions)
+  } else {
+    initializeMacosIntegration({ actions: systemActions })
+  }
 
   // 10. 注册启动阶段 IPC（boot 检查和设置查询，不依赖 petWindow）
   // app:version 已收入 registerBootIpcHandlers
   let bootSuccess: boolean | null = null
   safeHandle('boot:status', () => bootSuccess)
-  registerBootIpcHandlers({ db })
+  registerBootIpcHandlers({ db, refreshSystemMenus })
   registerSettingsIpcHandlers({ db })
 
   chatWindow.webContents.on('did-finish-load', () => {
@@ -319,8 +396,7 @@ app.whenReady().then(async () => {
   await new Promise<void>((resolve) => {
     chatWindow.once('ready-to-show', () => resolve())
   })
-  chatWindow.show()
-  chatWindow.focus()
+  activateMainWindow({ app, window: chatWindow })
 
   // 12. 运行 BootCheck（环境 → 引擎 → 连接，进度推送到 chat 窗口）
   const bootResult = await runBootCheck(chatWindow, engineManager, configSync)
@@ -336,6 +412,7 @@ app.whenReady().then(async () => {
 
     if (retryResult.success) {
       await initializeRuntimeServices()
+      registerRuntimeIpcHandlers()
       await new Promise((r) => setTimeout(r, 1500))
       mainWindow.webContents.send('boot:complete', true)
     } else {
@@ -346,6 +423,7 @@ app.whenReady().then(async () => {
   // 14. Boot 成功 → 初始化运行时（Gateway + CoworkController + CoworkSessionManager）
   if (bootResult.success) {
     await initializeRuntimeServices()
+    registerRuntimeIpcHandlers()
   }
 
   // 初始化自动更新（boot 成功后，生产环境延迟检查）
@@ -359,75 +437,40 @@ app.whenReady().then(async () => {
     console.info('[HookServer] listening on:', socketPath)
   })
 
-  // 16. 通知 chat 窗口 boot 完成（成功时延迟 2s 用于动画编排）
-  if (bootResult.success) {
-    await new Promise((r) => setTimeout(r, 2000))
-  }
-  bootSuccess = bootResult.success
-  chatWindow.webContents.send('boot:complete', bootSuccess)
-
-  // 17. chat 窗口进入主界面后创建 pet 窗口并注册完整 IPC
-  // app:pet-ready 依赖窗口创建和完整 IPC 注册编排，保留在 index.ts
+  // 16. chat 窗口进入主界面后创建 pet 窗口。
+  // 完整 IPC 已在 runtime 就绪后、boot:complete 前注册；这里仅处理双窗口相关编排。
   let petCreated = false
   safeOn('app:pet-ready', () => {
     if (petCreated) return
     petCreated = true
 
-    const petWindow = createPetWindow()
+    const petWindow = createPetWindow(db)
     petWindow.webContents.on('did-finish-load', () => {
       diagWindowLoad('pet-window', petWindow.webContents.getURL())
     })
-    const systemActions = createSystemActions({
-      app,
-      getMainWindow: () => getMainWindow(),
-      getPetWindow: () => getPetWindow()
+    petWindow.once('ready-to-show', () => {
+      activateMainWindow({ app, window: chatWindow })
     })
 
-    // 注册需要双窗口的 IPC 处理器
-    if (petWindow && chatWindow) {
-      // registerAllIpcHandlers 统一注册全部模块 IPC，
-      // Chat/Session/Manager IPC 需要运行时（coworkSessionManager + coworkController），
-      // boot 失败时 coworkSessionManager / coworkController 为 null，会话启动等 IPC 会报 500 错误，
-      // 但 UI 层保证 boot 失败后不允许发送，所以这里以 null 断言传入
-      registerAllIpcHandlers({
-        db,
-        coworkSessionManager: runtimeServices!.coworkSessionManager,
-        coworkController: runtimeServices!.coworkController,
-        coworkConfigStore,
-        configSync,
-        mcpBridgeServer,
-        directoryManager,
-        modelRegistry,
-        skillManager,
-        mcpManager,
-        refreshMcpBridge,
-        memoryManager,
-        cronJobService: runtimeServices!.cronJobService,
-        imGatewayManager,
-        getMainWindow: () => getMainWindow(),
-        getPetWindow: () => getPetWindow(),
-        actions: systemActions,
-        toggleMainWindow
-      })
-
+    if (petWindow && chatWindow && runtimeServices) {
       // 宠物事件桥接：聚合 CoworkController / HookServer 事件
-      if (runtimeServices) {
-        petEventBridge = new PetEventBridge(
-          petWindow,
-          runtimeServices.coworkController,
-          hookServer,
-          () => getMainWindow()
-        )
-      }
+      petEventBridge = new PetEventBridge(
+        petWindow,
+        runtimeServices.coworkController,
+        hookServer,
+        () => getMainWindow()
+      )
 
-      if (shouldCreateFallbackTray()) {
-        createTray(systemActions)
-      } else {
-        initializeMacosIntegration({ actions: systemActions })
-      }
       registerShortcuts(petWindow, chatWindow, toggleMainWindow)
     }
   })
+
+  // 17. 通知 chat 窗口 boot 完成（成功时延迟 2s 用于动画编排）
+  if (bootResult.success) {
+    await new Promise((r) => setTimeout(r, 2000))
+  }
+  bootSuccess = bootResult.success
+  chatWindow.webContents.send('boot:complete', bootSuccess)
 
   // 18. 引擎状态变更转发到 renderer
   engineManager.on('status', (status) => {

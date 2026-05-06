@@ -36,7 +36,7 @@ describe('runBootCheck', () => {
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'petclaw-bootcheck-'))
     baseDir = path.join(tmpDir, 'openclaw')
-    skillsRoot = path.join(tmpDir, 'SKILLs')
+    skillsRoot = path.join(tmpDir, 'skills')
 
     vi.mocked(app.getPath).mockImplementation((name: string) => {
       if (name === 'userData') return tmpDir
@@ -52,7 +52,7 @@ describe('runBootCheck', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  it('creates the shared SKILLs root instead of an openclaw-local skills directory', async () => {
+  it('creates the shared userData skills root instead of an openclaw-local skills directory', async () => {
     const result = await runBootCheck(
       new FakeWindow() as never,
       createEngineManager(baseDir) as never,

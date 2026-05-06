@@ -162,7 +162,7 @@ function verifyPreinstalledPlugins(runtimeRoot, buildHint) {
   console.log(`[electron-builder-hooks] 已校验 ${plugins.length} 个预装插件。`);
 }
 
-// ── SKILLs 依赖安装 ──────────────────────────────────────────────────────────
+// ── skills 依赖安装 ──────────────────────────────────────────────────────────
 
 function hasCommand(command) {
   const checker = process.platform === 'win32' ? 'where' : 'which';
@@ -171,7 +171,7 @@ function hasCommand(command) {
 }
 
 /**
- * 遍历 SKILLs/ 目录，对有 package.json 但没有 node_modules 的技能执行 npm install。
+ * 遍历 skills/ 目录，对有 package.json 但没有 node_modules 的技能执行 npm install。
  */
 function installSkillDependencies() {
   if (!hasCommand('npm')) {
@@ -179,9 +179,9 @@ function installSkillDependencies() {
     return;
   }
 
-  const skillsDir = path.join(__dirname, '..', 'SKILLs');
+  const skillsDir = path.join(__dirname, '..', 'skills');
   if (!existsSync(skillsDir)) {
-    console.log('[electron-builder-hooks] SKILLs 目录不存在，跳过依赖安装');
+    console.log('[electron-builder-hooks] skills 目录不存在，跳过依赖安装');
     return;
   }
 
@@ -265,12 +265,20 @@ function removeAllBinDirsInPetmind(appOutDir) {
   console.log(`[electron-builder-hooks] ✓ 已移除 ${removedCount} 个 .bin 目录`);
 }
 
+function readPlistRawValue(infoPlistPath, key) {
+  const result = spawnSync('plutil', ['-extract', key, 'raw', infoPlistPath], {
+    encoding: 'utf-8',
+  });
+  if (result.status !== 0) return null;
+  return result.stdout.trim();
+}
+
 /**
- * macOS 图标修复：在 Info.plist 中写入 CFBundleIconName，
- * 解决 Apple Silicon 下图标不显示问题。
+ * macOS 正式包图标以 electron-builder 的 mac.icon 为唯一事实源。
+ * 这里只校验 builder 生成的 icon.icns / CFBundleIconFile，并刷新 bundle 元数据。
  */
-function applyMacIconFix(appPath) {
-  console.log('[electron-builder-hooks] 应用 macOS 图标修复...');
+function verifyMacIconBundle(appPath) {
+  console.log('[electron-builder-hooks] 校验 macOS 图标资源...');
 
   const infoPlistPath = path.join(appPath, 'Contents', 'Info.plist');
   const resourcesPath = path.join(appPath, 'Contents', 'Resources');
@@ -285,24 +293,11 @@ function applyMacIconFix(appPath) {
     return;
   }
 
-  // 检查 CFBundleIconName 是否已存在
-  const checkResult = spawnSync('plutil', ['-extract', 'CFBundleIconName', 'raw', infoPlistPath], {
-    encoding: 'utf-8',
-  });
-
-  if (checkResult.status !== 0) {
-    // 不存在则写入
-    console.log('[electron-builder-hooks] 写入 CFBundleIconName 到 Info.plist...');
-    const addResult = spawnSync('plutil', ['-insert', 'CFBundleIconName', '-string', 'icon', infoPlistPath], {
-      encoding: 'utf-8',
-    });
-    if (addResult.status === 0) {
-      console.log('[electron-builder-hooks] ✓ CFBundleIconName 已写入');
-    } else {
-      console.warn('[electron-builder-hooks] 写入 CFBundleIconName 失败:', addResult.stderr);
-    }
+  const iconFile = readPlistRawValue(infoPlistPath, 'CFBundleIconFile');
+  if (iconFile !== 'icon.icns') {
+    console.warn(`[electron-builder-hooks] CFBundleIconFile 异常: ${iconFile || '<missing>'}`);
   } else {
-    console.log('[electron-builder-hooks] ✓ CFBundleIconName 已存在');
+    console.log('[electron-builder-hooks] ✓ CFBundleIconFile 指向 icon.icns');
   }
 
   // 清除扩展属性，避免签名时出错
@@ -310,7 +305,7 @@ function applyMacIconFix(appPath) {
   spawnSync('touch', [appPath], { encoding: 'utf-8' });
   spawnSync('touch', [resourcesPath], { encoding: 'utf-8' });
 
-  console.log('[electron-builder-hooks] ✓ macOS 图标修复完成');
+  console.log('[electron-builder-hooks] ✓ macOS 图标资源校验完成');
 }
 
 // ── 主钩子 ───────────────────────────────────────────────────────────────────
@@ -351,7 +346,7 @@ async function beforePack(context) {
     );
   }
 
-  // 6. 安装 SKILLs 依赖
+  // 6. 安装 skills 依赖
   installSkillDependencies();
 
   // 7. Windows：设置便携式 Python 运行时（resources/python-win/）
@@ -361,7 +356,7 @@ async function beforePack(context) {
     await ensurePortablePythonRuntime({ required: true });
   }
 
-  // 8. Windows：打包 runtime + SKILLs + python-win 为单个 tar，加速 NSIS 解压
+  // 8. Windows：打包 runtime + skills + python-win 为单个 tar，加速 NSIS 解压
   if (isWindowsTarget(context)) {
     const projectRoot = path.join(__dirname, '..');
     const buildTarDir = path.join(projectRoot, 'build-tar');
@@ -373,10 +368,10 @@ async function beforePack(context) {
       unlinkSync(outputTar);
     }
     console.log('[electron-builder-hooks] 打包 Windows tar...');
-    // 三个来源：OpenClaw runtime（petmind）、技能包（SKILLs）、Python 运行时（python-win）
+    // 三个来源：OpenClaw runtime（petmind）、技能包（skills）、Python 运行时（python-win）
     const sources = [
       { dir: path.join(projectRoot, 'vendor', 'openclaw-runtime', 'current'), prefix: 'petmind' },
-      { dir: path.join(projectRoot, 'SKILLs'), prefix: 'SKILLs' },
+      { dir: path.join(projectRoot, 'skills'), prefix: 'skills' },
       { dir: path.join(projectRoot, 'resources', 'python-win'), prefix: 'python-win' },
     ];
     packMultipleSources(sources, outputTar);
@@ -391,8 +386,7 @@ async function afterPack(context) {
     if (existsSync(appPath)) {
       // 移除 .bin 符号链接目录（codesign 不接受 app bundle 内的 symlink）
       removeAllBinDirsInPetmind(appPath);
-      // 修复 Apple Silicon 图标问题
-      applyMacIconFix(appPath);
+      verifyMacIconBundle(appPath);
     } else {
       console.warn(`[electron-builder-hooks] App 不存在于 ${appPath}，跳过 macOS 后处理`);
     }

@@ -1,5 +1,7 @@
 import type { App, BrowserWindow } from 'electron'
 
+import { activateMainWindow } from './window-activation'
+
 export interface SystemActions {
   openPetClaw: () => void
   showSettings: () => void
@@ -10,9 +12,10 @@ export interface SystemActions {
 }
 
 export interface SystemActionDeps {
-  app: Pick<App, 'quit'>
+  app: Pick<App, 'quit' | 'show' | 'focus'>
   getMainWindow: () => BrowserWindow | null
   getPetWindow: () => BrowserWindow | null
+  platform?: NodeJS.Platform
 }
 
 function getLiveWindow(getWindow: () => BrowserWindow | null): BrowserWindow | null {
@@ -25,15 +28,13 @@ export function createSystemActions(deps: SystemActionDeps): SystemActions {
   const openPetClaw = (): void => {
     const mainWindow = getLiveWindow(deps.getMainWindow)
     if (!mainWindow) return
-    mainWindow.show()
-    mainWindow.focus()
+    activateMainWindow({ app: deps.app, window: mainWindow, platform: deps.platform })
   }
 
   const showSettings = (): void => {
     const mainWindow = getLiveWindow(deps.getMainWindow)
     if (!mainWindow) return
-    mainWindow.show()
-    mainWindow.focus()
+    activateMainWindow({ app: deps.app, window: mainWindow, platform: deps.platform })
     mainWindow.webContents.send('panel:open', 'settings')
   }
 

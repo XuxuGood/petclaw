@@ -1,6 +1,7 @@
 interface ElectronAPI {
   moveWindow: (dx: number, dy: number) => void
   toggleMainWindow: () => void
+  updateComposerBounds: (bounds: { x: number; y: number; width: number; height: number }) => void
   onHookEvent: (
     callback: (event: {
       type: string
@@ -16,20 +17,6 @@ interface ElectronAPI {
   getAppVersion: () => Promise<string>
   getLanguage: () => Promise<string>
   setLanguage: (locale: string) => Promise<void>
-  checkEnv: () => Promise<{ nodeOk: boolean; nodeVersion: string | null }>
-  checkGateway: (url: string) => Promise<{ connected: boolean; latencyMs: number | null }>
-  installHooks: () => Promise<{ success: boolean; alreadyInstalled: boolean; error?: string }>
-  saveOnboardingConfig: (data: {
-    nickname: string
-    roles: string[]
-    selectedSkills: string[]
-    voiceShortcut: string
-    language: string
-  }) => Promise<{ success: boolean }>
-  getSystemPermissions: () => Promise<{ accessibility: boolean; microphone: boolean }>
-  requestSystemPermission: (
-    type: 'accessibility' | 'microphone'
-  ) => Promise<{ accessibility: boolean; microphone: boolean }>
   onBootStepUpdate: (
     callback: (
       steps: Array<{

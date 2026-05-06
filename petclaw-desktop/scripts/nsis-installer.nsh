@@ -1,6 +1,6 @@
 ; scripts/nsis-installer.nsh
 ; Windows NSIS 自定义安装/卸载脚本
-; 负责：管理员权限申请、进程终止、用户 skills 备份/恢复、资源解压、Defender 排除
+; 负责：管理员权限申请、进程终止、资源解压、Defender 排除
 
 !include "FileFunc.nsh"
 
@@ -19,7 +19,7 @@
   ShowInstDetails nevershow
 !macroend
 
-; 安装前阶段：终止旧进程 → 备份用户 skills → 移除旧安装目录
+; 安装前阶段：终止旧进程 → 移除旧安装目录
 !macro customInit
   CreateDirectory "$APPDATA\PetClaw"
   FileOpen $9 "$APPDATA\PetClaw\install-timing.log" w
@@ -48,54 +48,6 @@
   FileWrite $9 "$8 phase=process-stop-complete exit=$0 elapsed_ms=$5$\r$\n"
   FileClose $9
 
-  ; 备份用户自创 skills（排除 skills.config.json 中的内置 skills）
-  DetailPrint "[Installer] Backing up user-created skills"
-  System::Call 'kernel32::GetTickCount()i .r7'
-  ClearErrors
-  FileOpen $R0 "$APPDATA\PetClaw\skill-migrate.log" w
-  IfErrors BackupLogOpenFailed
-    !insertmacro GetTimestamp $8
-    FileWrite $R0 "$8 phase=backup-start instdir=$INSTDIR appdata=$APPDATA$\r$\n"
-    Goto BackupDoExec
-  BackupLogOpenFailed:
-    StrCpy $R0 ""
-  BackupDoExec:
-
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
-    $$src    = \"$INSTDIR\resources\SKILLs\";\
-    $$backup = \"$APPDATA\PetClaw\skills-backup\";\
-    $$config = \"$$src\skills.config.json\";\
-    if (Test-Path $$backup) { Remove-Item -Path $$backup -Recurse -Force -ErrorAction SilentlyContinue };\
-    if (Test-Path $$src) {\
-      $$bundled = @(try {\
-        if (Test-Path $$config) {\
-          (Get-Content $$config -Raw | ConvertFrom-Json).defaults.PSObject.Properties.Name\
-        }\
-      } catch { });\
-      $$userSkills = @(Get-ChildItem -Path $$src -Directory | Where-Object { $$bundled -notcontains $$_.Name });\
-      if ($$userSkills.Count -gt 0) {\
-        New-Item -ItemType Directory -Path $$backup -Force | Out-Null;\
-        $$userSkills | ForEach-Object {\
-          Copy-Item -Path $$_.FullName -Destination (Join-Path $$backup $$_.Name) -Recurse -Force\
-        }\
-      }\
-    }"'
-  Pop $0
-  Pop $1
-  System::Call 'kernel32::GetTickCount()i .r6'
-  IntOp $5 $6 - $7
-
-  StrCmp $R0 "" BackupSkipCloseLog
-    !insertmacro GetTimestamp $8
-    FileWrite $R0 "$8 phase=backup-end exit=$0 elapsed_ms=$5$\r$\n"
-    FileWrite $R0 "$8 phase=backup-output text=$1$\r$\n"
-    FileClose $R0
-  BackupSkipCloseLog:
-  FileOpen $9 "$APPDATA\PetClaw\install-timing.log" a
-  !insertmacro GetTimestamp $8
-  FileWrite $9 "$8 phase=skill-backup-complete exit=$0 elapsed_ms=$5$\r$\n"
-  FileClose $9
-
   ; 异步删除旧安装目录：先 rename 再后台 rd，避免阻塞安装进度
   DetailPrint "[Installer] Removing previous installation directory"
   System::Call 'kernel32::GetTickCount()i .r7'
@@ -119,7 +71,7 @@
   FileClose $9
 !macroend
 
-; 安装阶段：添加 Defender 排除 → 通过 ELECTRON_RUN_AS_NODE 解压资源 → 恢复 skills → 清理
+; 安装阶段：添加 Defender 排除 → 通过 ELECTRON_RUN_AS_NODE 解压资源 → 清理
 !macro customInstall
   CreateDirectory "$APPDATA\PetClaw"
   FileOpen $2 "$APPDATA\PetClaw\install-timing.log" a
@@ -128,9 +80,9 @@
   FileClose $2
   DetailPrint "[Installer] Preparing installation steps"
 
-  ; 创建资源目录：petmind（OpenClaw runtime）、SKILLs（技能包）、python-win（便携式 Python）
+  ; 创建资源目录：petmind（OpenClaw runtime）、skills（技能包）、python-win（便携式 Python）
   CreateDirectory "$INSTDIR\resources\petmind"
-  CreateDirectory "$INSTDIR\resources\SKILLs"
+  CreateDirectory "$INSTDIR\resources\skills"
   CreateDirectory "$INSTDIR\resources\python-win"
   DetailPrint "[Installer] Preparing resource directories"
 
@@ -141,7 +93,7 @@
   FileWrite $2 "$8 phase=defender-exclusion-start$\r$\n"
   FileClose $2
   System::Call 'kernel32::GetTickCount()i .r7'
-  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "try { Add-MpPreference -ExclusionPath $\"$INSTDIR\resources\petmind$\",$\"$INSTDIR\resources\SKILLs$\",$\"$INSTDIR\resources\python-win$\",$\"$INSTDIR\resources\app.asar.unpacked$\" -ErrorAction Stop; Write-Output \"[Installer] Windows Defender exclusions added\" } catch { Write-Output (\"[Installer] Windows Defender exclusions skipped: \" + $$_.Exception.Message) }"'
+  nsExec::ExecToLog 'powershell -NoProfile -NonInteractive -Command "try { Add-MpPreference -ExclusionPath $\"$INSTDIR\resources\petmind$\",$\"$INSTDIR\resources\skills$\",$\"$INSTDIR\resources\python-win$\",$\"$INSTDIR\resources\app.asar.unpacked$\" -ErrorAction Stop; Write-Output \"[Installer] Windows Defender exclusions added\" } catch { Write-Output (\"[Installer] Windows Defender exclusions skipped: \" + $$_.Exception.Message) }"'
   Pop $0
   System::Call 'kernel32::GetTickCount()i .r6'
   IntOp $5 $6 - $7
@@ -181,36 +133,6 @@
   DetailPrint "[Installer] Bundled resources extraction complete"
   Delete "$INSTDIR\resources\win-resources.tar"
 
-  ; 将用户自创 skills 从备份目录还原到新安装目录（不覆盖内置 skills）
-  IfFileExists "$APPDATA\PetClaw\skills-backup\*.*" 0 SkipSkillRestore
-    DetailPrint "[Installer] Restoring user-created skills"
-    FileOpen $2 "$APPDATA\PetClaw\install-timing.log" a
-    !insertmacro GetTimestamp $8
-    FileWrite $2 "$8 phase=skill-restore-start$\r$\n"
-    FileClose $2
-    System::Call 'kernel32::GetTickCount()i .r7'
-
-    nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "\
-      $$backup    = \"$APPDATA\PetClaw\skills-backup\";\
-      $$newSkills = \"$INSTDIR\resources\SKILLs\";\
-      Get-ChildItem -Path $$backup -Directory | ForEach-Object {\
-        $$target = Join-Path $$newSkills $$_.Name;\
-        if (-not (Test-Path $$target)) {\
-          Copy-Item -Path $$_.FullName -Destination $$target -Recurse -Force\
-        }\
-      };\
-      Remove-Item -Path $$backup -Recurse -Force -ErrorAction SilentlyContinue"'
-    Pop $0
-    Pop $1
-    System::Call 'kernel32::GetTickCount()i .r6'
-    IntOp $5 $6 - $7
-    FileOpen $2 "$APPDATA\PetClaw\install-timing.log" a
-    !insertmacro GetTimestamp $8
-    FileWrite $2 "$8 phase=skill-restore-complete exit=$0 elapsed_ms=$5$\r$\n"
-    FileWrite $2 "$8 phase=skill-restore-output text=$1$\r$\n"
-    FileClose $2
-  SkipSkillRestore:
-
   ; 清除 ELECTRON_RUN_AS_NODE，恢复正常 Electron 运行模式
   System::Call 'Kernel32::SetEnvironmentVariable(t "ELECTRON_RUN_AS_NODE", t "")i'
 
@@ -241,7 +163,7 @@
 
 ; 卸载后：移除 Windows Defender 排除规则（忽略失败）
 !macro customUnInstall
-  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "try { Remove-MpPreference -ExclusionPath $\"$INSTDIR\resources\petmind$\",$\"$INSTDIR\resources\SKILLs$\",$\"$INSTDIR\resources\python-win$\",$\"$INSTDIR\resources\app.asar.unpacked$\" -ErrorAction SilentlyContinue } catch {}"'
+  nsExec::ExecToStack 'powershell -NoProfile -NonInteractive -Command "try { Remove-MpPreference -ExclusionPath $\"$INSTDIR\resources\petmind$\",$\"$INSTDIR\resources\skills$\",$\"$INSTDIR\resources\python-win$\",$\"$INSTDIR\resources\app.asar.unpacked$\" -ErrorAction SilentlyContinue } catch {}"'
   Pop $0
   Pop $1
 !macroend

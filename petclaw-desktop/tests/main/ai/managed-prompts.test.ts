@@ -35,17 +35,17 @@ describe('managed-prompts', () => {
   describe('buildSkillCreationPrompt', () => {
     it('should include skill dir path', () => {
       const result = buildSkillCreationPrompt(
-        '/Users/test/Library/Application Support/PetClaw/SKILLs'
+        '/Users/test/Library/Application Support/PetClaw/skills'
       )
       expect(result).toContain('## Skill Creation')
-      expect(result).toContain('SKILLs')
+      expect(result).toContain('skills')
       expect(result).toContain('SKILL.md')
     })
 
     it('should compact home directory to ~', () => {
       const home = os.homedir()
-      const result = buildSkillCreationPrompt(`${home}/Library/Application Support/PetClaw/SKILLs`)
-      expect(result).toContain('~/Library/Application Support/PetClaw/SKILLs')
+      const result = buildSkillCreationPrompt(`${home}/Library/Application Support/PetClaw/skills`)
+      expect(result).toContain('~/Library/Application Support/PetClaw/skills')
       expect(result).not.toContain(home)
     })
   })

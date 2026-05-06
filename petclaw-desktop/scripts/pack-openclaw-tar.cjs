@@ -1,5 +1,5 @@
 // scripts/pack-openclaw-tar.cjs
-// Windows NSIS 优化：将 runtime + SKILLs 打包为单个 tar 加速安装解压
+// Windows NSIS 优化：将 runtime + skills 打包为单个 tar 加速安装解压
 // 用法:
 //   node scripts/pack-openclaw-tar.cjs --win-combined
 //   node scripts/pack-openclaw-tar.cjs [sourceDir] [outputTar]
@@ -189,7 +189,7 @@ function packMultipleSources(sources, outputTar) {
 // ── 业务场景封装 ──────────────────────────────────────────────────────────────
 
 /**
- * 打包 Windows combined tar（runtime + SKILLs）。
+ * 打包 Windows combined tar（runtime + skills）。
  * electron-builder-hooks.cjs 调用此函数，保持向后兼容。
  */
 function packWinCombined() {
@@ -203,8 +203,8 @@ function packWinCombined() {
   const sources = [
     // petmind: OpenClaw 运行时，安装后解压为 petmind/ 目录
     { dir: path.join(projectRoot, 'vendor', 'openclaw-runtime', 'current'), prefix: 'petmind' },
-    // SKILLs: 技能包，安装后解压为 SKILLs/ 目录
-    { dir: path.join(projectRoot, 'SKILLs'), prefix: 'SKILLs' },
+    // skills: 技能包，安装后解压为 skills/ 目录
+    { dir: path.join(projectRoot, 'skills'), prefix: 'skills' },
   ]
 
   console.log(`[pack-openclaw-tar] 打包 Windows combined tar: ${outputTar}`)

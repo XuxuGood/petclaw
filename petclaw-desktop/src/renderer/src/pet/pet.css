@@ -1,8 +1,8 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-primary: #d97757;
-  --color-primary-hover: #e49b7b;
+  --color-primary: #d98245;
+  --color-primary-hover: #e39b72;
 }
 
 html,
@@ -32,7 +32,7 @@ body,
   }
 }
 
-/* Onboarding animations */
+/* Shared fade-in animation */
 @keyframes fade-in {
   from {
     opacity: 0;

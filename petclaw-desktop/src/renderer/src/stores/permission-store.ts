@@ -2,6 +2,7 @@
 import { create } from 'zustand'
 
 export interface PermissionRequest {
+  sessionId: string
   requestId: string
   toolName: string
   toolInput: Record<string, unknown>

@@ -33,13 +33,28 @@ export const en: Record<string, string> = {
   'welcome.subtitle': 'Run locally, plan autonomously, your secure AI work companion',
   'welcome.card.fileOrganize.title': 'File Organizer',
   'welcome.card.fileOrganize.desc': 'Intelligently organize and manage local files',
-  'welcome.card.fileOrganize.prompt': 'Help me organize my desktop files by type into corresponding folders',
+  'welcome.suggestion.fileOrganize.duplicateDownloads':
+    'Scan my Downloads folder, find all duplicate files, and keep the newest version.',
+  'welcome.suggestion.fileOrganize.sortDesktop':
+    'Open my Desktop folder and automatically sort files by type, such as documents, images, videos, and spreadsheets, into separate subfolders.',
+  'welcome.suggestion.fileOrganize.renamePhotos':
+    'Read EXIF information from photos in my album folder, get the shooting location and date, and rename them as "YY-MM-DD Location-Number.jpg".',
   'welcome.card.contentCreation.title': 'Content Creation',
   'welcome.card.contentCreation.desc': 'Create presentations and various content',
-  'welcome.card.contentCreation.prompt': 'Help me write an article about',
+  'welcome.suggestion.contentCreation.brandGuide':
+    'Organize the logos, color palettes, and font files in the "Brand Assets" folder, then create a brand usage guide PDF with previews and usage notes for every asset.',
+  'welcome.suggestion.contentCreation.meetingSubtitles':
+    'Generate Chinese-English bilingual subtitles in SRT format for this 20-minute meeting recording, and export a timestamped transcript as a Word document.',
+  'welcome.suggestion.contentCreation.refractionLesson':
+    'Generate an animated video that demonstrates light refraction, then create a PPT lesson deck and insert the video as a slide asset.',
   'welcome.card.docProcess.title': 'Document Processing',
   'welcome.card.docProcess.desc': 'Process and analyze document content',
-  'welcome.card.docProcess.prompt': 'Help me analyze the key information in this document',
+  'welcome.suggestion.docProcess.weeklyMeetings':
+    'Read all meeting notes from this week in the "Meeting Notes" folder, extract key decisions and action items, and generate a weekly meeting summary document.',
+  'welcome.suggestion.docProcess.paperReferences':
+    'Extract titles, authors, publication years, abstracts, and keywords from 20 PDF papers in the "References" folder, then generate a standardized bibliography.',
+  'welcome.suggestion.docProcess.formatProposals':
+    'Format the 10 Word documents in the "Proposals" folder with bold 18 pt SimSun titles, 12 pt SimSun body text, 1.5 line spacing, and two-character first-line indentation.',
 
   // ── sidebar ──
   'sidebar.newTask': 'New Task',
@@ -267,41 +282,6 @@ export const en: Record<string, string> = {
   'mcpSettings.title': 'MCP Services',
   'mcpSettings.subtitle': 'Configure Model Context Protocol servers',
 
-  // ── onboarding ──
-  'onboarding.setupTitle': 'Set up PetClaw on your computer',
-  'onboarding.setupSubtitle': 'PetClaw needs these permissions to work properly. Your data is processed locally only — we never store anything.',
-  'onboarding.accessibility': 'Allow PetClaw to use accessibility features',
-  'onboarding.microphone': 'Allow PetClaw to use your microphone',
-  'onboarding.recordingDone': "Recording complete! We've recommended skills for you. Click next to see them~",
-  'onboarding.aboutYou': 'Tell us about yourself',
-  'onboarding.aboutYouSubtitle': 'Help PetClaw create a personalized experience for you',
-  'onboarding.nameQuestion': 'What should we call you?',
-  'onboarding.roleQuestion': 'Select your role',
-  'onboarding.skillsTitle': 'PetClaw Skills',
-  'onboarding.skillsSubtitle': "We've pre-installed useful and safe skills for you",
-  'onboarding.needsConfig': 'Config needed',
-  'onboarding.voiceShortcut': 'Voice Shortcut',
-  'onboarding.voiceHint': 'Press the shortcut to start speaking, press again to confirm.',
-  'onboarding.keyboardShortcut': 'Keyboard Shortcut',
-  'onboarding.voiceTestHint': 'Speak to test your microphone',
-  'onboarding.voiceTestDesc': 'Click the button below or press the shortcut to start speaking. Introduce yourself and give me a name!',
-  'onboarding.recording': 'Recording...',
-  'onboarding.clickToSpeak': 'Click to speak',
-  'onboarding.quickTask.news.title': "Summarize today's news",
-  'onboarding.quickTask.news.desc': 'Collect the latest AI and tech news, compile into a briefing',
-  'onboarding.quickTask.news.message': "Please compile today's AI and tech news, sorted by importance",
-  'onboarding.quickTask.email.title': 'Write an email',
-  'onboarding.quickTask.email.desc': 'Generate a professional email from your description',
-  'onboarding.quickTask.email.message': 'I need to write an email',
-  'onboarding.quickTask.code.title': 'Organize code repo',
-  'onboarding.quickTask.code.desc': 'Analyze project structure, generate docs and suggestions',
-  'onboarding.quickTask.code.message': 'Help me analyze the current project structure and list improvement suggestions',
-  'onboarding.quickTask.plan.title': 'Create daily work plan',
-  'onboarding.quickTask.plan.desc': 'Create a work schedule based on your to-dos',
-  'onboarding.quickTask.plan.message': "Help me create today's work plan",
-  'onboarding.tryTitle': 'Try asking PetClaw to help you',
-  'onboarding.trySubtitle': 'Choose a quick task to start, or skip to begin using',
-
   // ── bootcheck ──
   'boot.stepEnv': 'Preparing environment',
   'boot.stepEngine': 'Starting engine',
@@ -322,6 +302,7 @@ export const en: Record<string, string> = {
 
   // ── system integration ──
   'system.about': 'About PetClaw',
+  'system.open': 'Open',
   'system.openPetClaw': 'Open PetClaw',
   'system.showPet': 'Show Pet',
   'system.hidePet': 'Hide Pet',
@@ -330,7 +311,23 @@ export const en: Record<string, string> = {
   'system.quit': 'Quit PetClaw',
   'system.pausePet': 'Pause Pet',
   'system.resumePet': 'Resume Pet',
+  'system.services': 'Services',
+  'system.hidePetClaw': 'Hide PetClaw',
+  'system.hideOthers': 'Hide Others',
+  'system.showAll': 'Show All',
+  'system.edit': 'Edit',
+  'system.undo': 'Undo',
+  'system.redo': 'Redo',
+  'system.cut': 'Cut',
+  'system.copy': 'Copy',
+  'system.paste': 'Paste',
+  'system.pasteAndMatchStyle': 'Paste and Match Style',
+  'system.delete': 'Delete',
+  'system.selectAll': 'Select All',
   'system.window': 'Window',
+  'system.minimize': 'Minimize',
+  'system.closeWindow': 'Close Window',
+  'system.bringAllToFront': 'Bring All to Front',
 
   // ── pet context menu ──
   'pet.resume': 'Resume',

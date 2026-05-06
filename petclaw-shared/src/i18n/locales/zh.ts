@@ -33,13 +33,28 @@ export const zh: Record<string, string> = {
   'welcome.subtitle': '本地运行，自主规划，安全可控的 AI 工作搭子',
   'welcome.card.fileOrganize.title': '文件整理',
   'welcome.card.fileOrganize.desc': '智能整理和管理本地文件',
-  'welcome.card.fileOrganize.prompt': '帮我整理桌面文件，按类型分类到对应文件夹',
+  'welcome.suggestion.fileOrganize.duplicateDownloads':
+    '扫描我的 Downloads 文件夹，找出所有重复的文件，保留最新版本。',
+  'welcome.suggestion.fileOrganize.sortDesktop':
+    '请访问我的桌面文件夹，按文件类型（文档、图片、视频、表格等）自动分类整理到不同的子文件夹中。',
+  'welcome.suggestion.fileOrganize.renamePhotos':
+    '请读取相册目录下照片的 EXIF 信息，获取拍摄地点和日期，统一重命名为『YY-MM-DD 地点-序号.jpg』。',
   'welcome.card.contentCreation.title': '内容创作',
   'welcome.card.contentCreation.desc': '创作演讲文稿和多种内容',
-  'welcome.card.contentCreation.prompt': '帮我写一篇关于的文章',
+  'welcome.suggestion.contentCreation.brandGuide':
+    '整理『品牌资源』文件夹中的 Logo、配色方案、字体文件，创建一个品牌使用指南 PDF，包含所有素材的预览和使用说明。',
+  'welcome.suggestion.contentCreation.meetingSubtitles':
+    '为这个20分钟的会议录音生成中英双语字幕文件（SRT格式），并导出带时间轴的文字记录 Word 文档。',
+  'welcome.suggestion.contentCreation.refractionLesson':
+    '生成一个用于演示光的折射原理的动画视频，并帮我制作一个 PPT 课件，将这个视频作为素材插入 PPT 中。',
   'welcome.card.docProcess.title': '文档处理',
   'welcome.card.docProcess.desc': '处理和分析文档数据内容',
-  'welcome.card.docProcess.prompt': '帮我分析这份文档的关键信息',
+  'welcome.suggestion.docProcess.weeklyMeetings':
+    '读取『会议记录』文件夹中本周的所有会议记录，提取关键决策和行动项，生成一份本周会议要点总结文档。',
+  'welcome.suggestion.docProcess.paperReferences':
+    '从『参考文献』文件夹中的20篇 PDF 论文中提取标题、作者、发表年份、摘要和关键词，生成规范的参考文献列表。',
+  'welcome.suggestion.docProcess.formatProposals':
+    '将『提案文件』文件夹中的10份 Word 文档统一调整为：标题宋体加粗18号、正文宋体12号、1.5倍行距、首行缩进2字符。',
 
   // ── sidebar ──
   'sidebar.newTask': '新建任务',
@@ -267,41 +282,6 @@ export const zh: Record<string, string> = {
   'mcpSettings.title': 'MCP 服务',
   'mcpSettings.subtitle': '配置 Model Context Protocol 服务器',
 
-  // ── onboarding ──
-  'onboarding.setupTitle': '在您的电脑上设置 PetClaw',
-  'onboarding.setupSubtitle': 'PetClaw 需要以下权限才能正常工作。您的数据仅在本地处理，我们不会存储任何内容。',
-  'onboarding.accessibility': '允许 PetClaw 使用辅助功能',
-  'onboarding.microphone': '允许 PetClaw 使用您的麦克风',
-  'onboarding.recordingDone': '记录完成！已为您推荐了合适的技能，点击下一步查看吧~',
-  'onboarding.aboutYou': '告诉我们关于您',
-  'onboarding.aboutYouSubtitle': '帮助 PetClaw 为您打造个性化体验',
-  'onboarding.nameQuestion': '怎么称呼您?',
-  'onboarding.roleQuestion': '选择您的身份角色',
-  'onboarding.skillsTitle': 'PetClaw 拥有的技能',
-  'onboarding.skillsSubtitle': '我们为您默认安装好用且安全的 Skill',
-  'onboarding.needsConfig': '需配置',
-  'onboarding.voiceShortcut': '语音快捷键',
-  'onboarding.voiceHint': '按下快捷键开始说话，再按一次确认发送。',
-  'onboarding.keyboardShortcut': '键盘快捷键',
-  'onboarding.voiceTestHint': '口述以测试您的麦克风',
-  'onboarding.voiceTestDesc': '点击下方按钮或按快捷键开始说话，介绍一下自己，顺便给我取个名字吧。',
-  'onboarding.recording': '正在录音...',
-  'onboarding.clickToSpeak': '点击开始说话',
-  'onboarding.quickTask.news.title': '帮我整理今日资讯',
-  'onboarding.quickTask.news.desc': '搜集 AI、科技领域的最新动态，整理成简报',
-  'onboarding.quickTask.news.message': '请帮我整理今日 AI 和科技领域的最新资讯，按重要性排序',
-  'onboarding.quickTask.email.title': '帮我写一封邮件',
-  'onboarding.quickTask.email.desc': '根据你的描述，生成一封专业的邮件',
-  'onboarding.quickTask.email.message': '我需要写一封邮件',
-  'onboarding.quickTask.code.title': '整理代码仓库',
-  'onboarding.quickTask.code.desc': '分析项目结构，生成文档和改进建议',
-  'onboarding.quickTask.code.message': '帮我分析当前项目结构，列出改进建议',
-  'onboarding.quickTask.plan.title': '创建每日工作计划',
-  'onboarding.quickTask.plan.desc': '根据待办事项，制定今日工作安排',
-  'onboarding.quickTask.plan.message': '帮我制定今天的工作计划',
-  'onboarding.tryTitle': '试试让 PetClaw 帮你做点什么',
-  'onboarding.trySubtitle': '选择一个快捷任务开始，或者跳过直接开始使用',
-
   // ── bootcheck ──
   'boot.stepEnv': '准备环境',
   'boot.stepEngine': '启动引擎',
@@ -322,6 +302,7 @@ export const zh: Record<string, string> = {
 
   // ── system integration ──
   'system.about': '关于 PetClaw',
+  'system.open': '打开',
   'system.openPetClaw': '打开 PetClaw',
   'system.showPet': '显示宠物',
   'system.hidePet': '隐藏宠物',
@@ -330,7 +311,23 @@ export const zh: Record<string, string> = {
   'system.quit': '退出 PetClaw',
   'system.pausePet': '暂停宠物',
   'system.resumePet': '继续宠物',
+  'system.services': '服务',
+  'system.hidePetClaw': '隐藏 PetClaw',
+  'system.hideOthers': '隐藏其他',
+  'system.showAll': '全部显示',
+  'system.edit': '编辑',
+  'system.undo': '撤销',
+  'system.redo': '重做',
+  'system.cut': '剪切',
+  'system.copy': '复制',
+  'system.paste': '粘贴',
+  'system.pasteAndMatchStyle': '粘贴并匹配样式',
+  'system.delete': '删除',
+  'system.selectAll': '全选',
   'system.window': '窗口',
+  'system.minimize': '最小化',
+  'system.closeWindow': '关闭窗口',
+  'system.bringAllToFront': '全部置于前台',
 
   // ── pet context menu ──
   'pet.resume': '继续',

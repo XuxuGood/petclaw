@@ -172,10 +172,11 @@ Reserved workspace packages:
 ```text
 App boot
 → BootCheck Phase A IPC
-→ pet-ready 后注册 Phase B IPC
 → OpenclawEngineManager 准备 runtime、端口、token、环境变量
 → GatewayClient 建连和健康检查
 → ConfigSync 同步 openclaw.json / AGENTS.md / approvals
+→ runtimeServices 就绪后、boot:complete 前注册 Phase B IPC
+→ renderer 进入主界面后发送 app:pet-ready 创建 Pet Window / PetEventBridge
 → renderer 获取 snapshot 并订阅状态
 ```
 

@@ -28,6 +28,7 @@ import {
 import type { OpenAICompatProxyTarget } from './cowork-openai-compat-proxy'
 import { appendPythonRuntimeToEnv } from './python-runtime'
 import { isSystemProxyEnabled, resolveSystemProxyUrlForTargets } from './system-proxy'
+import { resolveUserDataPaths } from '../user-data-paths'
 
 function appendEnvPath(current: string | undefined, additions: string[]): string | undefined {
   const items = new Set<string>()
@@ -489,7 +490,7 @@ function getWindowsGitToolDirs(bashPath: string): string[] {
 
 export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string): string | null {
   try {
-    const shimDir = join(app.getPath('userData'), 'cowork', 'bin')
+    const shimDir = resolveUserDataPaths(app.getPath('userData')).coworkShimBin
     mkdirSync(shimDir, { recursive: true })
     coworkLog(
       'INFO',
@@ -1030,7 +1031,7 @@ function ensureWindowsOriginalPath(env: Record<string, string | undefined>): voi
  */
 function ensureWindowsBashUtf8InitScript(): string | null {
   try {
-    const initDir = join(app.getPath('userData'), 'cowork', 'bin')
+    const initDir = resolveUserDataPaths(app.getPath('userData')).coworkShimBin
     mkdirSync(initDir, { recursive: true })
 
     const initScript = join(initDir, 'bash_utf8_init.sh')
@@ -1451,7 +1452,7 @@ function verifyNodeEnvironment(env: Record<string, string | undefined>): void {
 }
 
 /**
- * 获取 SKILLs 根目录。
+ * 获取 skills 根目录。
  *
  * 生产环境的技能会复制到 userData，开发环境则优先从项目目录或显式环境变量查找，
  * 以兼容 electron-vite 输出目录变化和本地调试场景。
@@ -1459,7 +1460,7 @@ function verifyNodeEnvironment(env: Record<string, string | undefined>): void {
 export function getSkillsRoot(): string {
   if (app.isPackaged) {
     // 生产环境运行时只读 Resources，用户可写的技能目录统一放在 userData。
-    return join(app.getPath('userData'), 'SKILLs')
+    return resolveUserDataPaths(app.getPath('userData')).skillsRoot
   }
 
   // 开发环境下 __dirname 会随构建输出目录变化（例如 dist-electron/ 或 dist-electron/libs/）。
@@ -1469,10 +1470,10 @@ export function getSkillsRoot(): string {
     .filter((value): value is string => Boolean(value))
   const skillCandidates = [
     ...envRoots,
-    join(app.getAppPath(), 'SKILLs'),
-    join(process.cwd(), 'SKILLs'),
-    join(__dirname, '..', 'SKILLs'),
-    join(__dirname, '..', '..', 'SKILLs')
+    join(app.getAppPath(), 'skills'),
+    join(process.cwd(), 'skills'),
+    join(__dirname, '..', 'skills'),
+    join(__dirname, '..', '..', 'skills')
   ]
 
   for (const candidate of skillCandidates) {
@@ -1481,14 +1482,14 @@ export function getSkillsRoot(): string {
     }
   }
 
-  // 首次开发启动时 SKILLs 目录可能还没同步，最终回退到 app path 下的预期位置。
-  return join(app.getAppPath(), 'SKILLs')
+  // 首次开发启动时 Resources/skills 可能还没同步，最终回退到 app path 下的预期位置。
+  return join(app.getAppPath(), 'skills')
 }
 
 /**
  * 构造 Cowork 子进程使用的增强环境变量。
  *
- * 这里会合并模型配置环境、打包/开发模式 PATH 修正、SKILLs 路径，以及系统代理。
+ * 这里会合并模型配置环境、打包/开发模式 PATH 修正、skills 路径，以及系统代理。
  * 代理解析是异步的，所以该函数保持 async。
  */
 export async function getEnhancedEnv(

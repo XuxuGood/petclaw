@@ -68,15 +68,17 @@ function makePetWindow() {
 
 function registerHandlers(actions = makeActions(), petWindow = makePetWindow()) {
   const toggleMainWindow = vi.fn()
+  const updatePetWindowComposerAnchor = vi.fn()
   const deps = {
     getPetWindow: () => petWindow,
     toggleMainWindow,
+    updatePetWindowComposerAnchor,
     actions
   }
 
   registerWindowIpcHandlers(deps)
 
-  return { actions, toggleMainWindow, petWindow }
+  return { actions, toggleMainWindow, updatePetWindowComposerAnchor, petWindow }
 }
 
 function getListener(channel: string) {
@@ -163,5 +165,21 @@ describe('registerWindowIpcHandlers', () => {
 
     expect(actions.quitPetClaw).toHaveBeenCalledOnce()
     expect(electronMock.quit).not.toHaveBeenCalled()
+  })
+
+  it('updates the pet anchor from reported composer bounds', () => {
+    const { updatePetWindowComposerAnchor } = registerHandlers()
+
+    getListener('window:composer-bounds:update')(
+      {} as never,
+      { x: 380, y: 528, width: 730, height: 108 } as never
+    )
+
+    expect(updatePetWindowComposerAnchor).toHaveBeenCalledWith({
+      x: 380,
+      y: 528,
+      width: 730,
+      height: 108
+    })
   })
 })

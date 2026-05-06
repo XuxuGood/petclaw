@@ -4,7 +4,8 @@ import type { SystemActions } from '../../../src/main/system/system-actions'
 import {
   buildTrayMenuTemplate,
   createTray,
-  shouldCreateFallbackTray
+  shouldCreateFallbackTray,
+  updateTrayMenu
 } from '../../../src/main/system/tray'
 
 const electronMock = vi.hoisted(() => {
@@ -108,5 +109,14 @@ describe('fallback tray', () => {
     expect(electronMock.trayInstance.setToolTip).toHaveBeenCalledWith('PetClaw')
     expect(electronMock.trayInstance.setContextMenu).toHaveBeenCalledOnce()
     expect(electronMock.trayInstance.on).toHaveBeenCalledWith('click', actions.openPetClaw)
+  })
+
+  it('rebuilds the fallback tray menu when language changes', () => {
+    const actions = makeActions()
+
+    updateTrayMenu(electronMock.trayInstance as never, actions)
+
+    expect(electronMock.buildFromTemplate).toHaveBeenCalledOnce()
+    expect(electronMock.trayInstance.setContextMenu).toHaveBeenCalledOnce()
   })
 })

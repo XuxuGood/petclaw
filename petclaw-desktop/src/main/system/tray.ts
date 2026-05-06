@@ -33,11 +33,14 @@ export function createTray(actions: SystemActions): Tray {
 
   tray.setToolTip('PetClaw')
 
-  const contextMenu = Menu.buildFromTemplate(buildTrayMenuTemplate(actions))
-
-  tray.setContextMenu(contextMenu)
+  updateTrayMenu(tray, actions)
 
   tray.on('click', actions.openPetClaw)
 
   return tray
+}
+
+export function updateTrayMenu(tray: Tray, actions: SystemActions): void {
+  const contextMenu = Menu.buildFromTemplate(buildTrayMenuTemplate(actions))
+  tray.setContextMenu(contextMenu)
 }

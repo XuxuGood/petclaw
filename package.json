@@ -28,7 +28,8 @@
   "lint-staged": {
     "petclaw-desktop/**/*.{ts,tsx}": [
       "pnpm --filter petclaw-desktop exec prettier --write",
-      "pnpm --filter petclaw-desktop exec eslint --fix"
+      "pnpm --filter petclaw-desktop exec eslint --fix",
+      "pnpm --filter petclaw-desktop lint:ui"
     ]
   },
   "devDependencies": {

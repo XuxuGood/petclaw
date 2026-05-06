@@ -20,6 +20,7 @@ import {
   Wrench,
   X
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 import { CwdSelector } from '../../components/CwdSelector'
 import { ModelSelector, type SelectedModel } from '../../components/ModelSelector'
@@ -59,6 +60,12 @@ interface ChatPathReference {
   kind: 'file' | 'directory'
 }
 
+interface PromptSuggestion {
+  id: string
+  icon: LucideIcon
+  text: string
+}
+
 interface ChatInputBoxProps {
   onSend: (
     message: string,
@@ -69,6 +76,7 @@ interface ChatInputBoxProps {
     pathReferences: ChatPathReference[]
   ) => void
   disabled?: boolean
+  promptSuggestions?: PromptSuggestion[]
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -187,7 +195,11 @@ function getBadgeText(attachment: ChatAttachment): string {
   return ext ? ext.toUpperCase() : 'FILE'
 }
 
-export function ChatInputBox({ onSend, disabled = false }: ChatInputBoxProps) {
+export function ChatInputBox({
+  onSend,
+  disabled = false,
+  promptSuggestions = []
+}: ChatInputBoxProps) {
   const { t } = useI18n()
   const [input, setInput] = useState('')
   const [cwd, setCwd] = useState('')
@@ -203,6 +215,7 @@ export function ChatInputBox({ onSend, disabled = false }: ChatInputBoxProps) {
   const [skills, setSkills] = useState<Skill[]>([])
   const [skillsLoading, setSkillsLoading] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const composerShellRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const actionMenuRef = useRef<HTMLDivElement>(null)
   const actionPrimaryMenuRef = useRef<HTMLDivElement>(null)
@@ -214,6 +227,40 @@ export function ChatInputBox({ onSend, disabled = false }: ChatInputBoxProps) {
   const messages = useChatStore((state) => state.messages)
   const estimatedUsedTokens = messages.reduce((sum, m) => sum + Math.ceil(m.content.length / 2), 0)
   const contextTotal = 128_000
+
+  useEffect(() => {
+    const composer = composerShellRef.current
+    if (!composer) return
+
+    let animationFrame: number | null = null
+    const reportBounds = (): void => {
+      const rect = composer.getBoundingClientRect()
+      window.api.updateComposerBounds({
+        x: Math.round(rect.x),
+        y: Math.round(rect.y),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height)
+      })
+    }
+    const scheduleReport = (): void => {
+      if (animationFrame !== null) window.cancelAnimationFrame(animationFrame)
+      animationFrame = window.requestAnimationFrame(() => {
+        animationFrame = null
+        reportBounds()
+      })
+    }
+
+    scheduleReport()
+    const resizeObserver = new ResizeObserver(scheduleReport)
+    resizeObserver.observe(composer)
+    window.addEventListener('resize', scheduleReport)
+
+    return () => {
+      if (animationFrame !== null) window.cancelAnimationFrame(animationFrame)
+      resizeObserver.disconnect()
+      window.removeEventListener('resize', scheduleReport)
+    }
+  }, [])
 
   const canSend = !disabled && input.trim().length > 0
   // 按 kind 分流：image 走 imageAttachments，file/directory 走 pathReferences
@@ -275,6 +322,16 @@ export function ChatInputBox({ onSend, disabled = false }: ChatInputBoxProps) {
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
   }
 
+  const handleSelectPromptSuggestion = (text: string) => {
+    setInput(text)
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus()
+      if (!textareaRef.current) return
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 240)}px`
+    })
+  }
+
   // 一键清空引用区：同时清理附件和已选技能，用于 selected 条目过多时快速重置
   const handleClearContext = () => {
     setAttachments([])
@@ -282,6 +339,12 @@ export function ChatInputBox({ onSend, disabled = false }: ChatInputBoxProps) {
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
+      e.preventDefault()
+      e.currentTarget.select()
+      return
+    }
+
     // IME 输入中不触发发送（isComposing 检测中文输入）
     if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -444,7 +507,20 @@ export function ChatInputBox({ onSend, disabled = false }: ChatInputBoxProps) {
 
   return (
     <div className="shrink-0 px-0 pb-0 pt-2">
+      {promptSuggestions.length > 0 ? (
+        <div className="mx-[var(--space-page-x)] mb-3 flex flex-col gap-2">
+          {promptSuggestions.map((suggestion) => (
+            <PromptSuggestionButton
+              key={suggestion.id}
+              suggestion={suggestion}
+              disabled={disabled}
+              onSelect={handleSelectPromptSuggestion}
+            />
+          ))}
+        </div>
+      ) : null}
       <div
+        ref={composerShellRef}
         className={`composer-shell ${isDragging ? 'composer-shell--dragging' : ''}`}
         aria-disabled={disabled || undefined}
         onDragEnter={handleDragEnter}
@@ -826,5 +902,33 @@ export function ChatInputBox({ onSend, disabled = false }: ChatInputBoxProps) {
         </div>
       </div>
     </div>
+  )
+}
+
+function PromptSuggestionButton({
+  suggestion,
+  disabled,
+  onSelect
+}: {
+  suggestion: PromptSuggestion
+  disabled: boolean
+  onSelect: (text: string) => void
+}) {
+  const Icon = suggestion.icon
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => onSelect(suggestion.text)}
+      className="ui-row-button ui-focus items-start text-left text-[13px] leading-[1.55] text-text-secondary disabled:cursor-default disabled:opacity-60"
+    >
+      <Icon
+        size={14}
+        strokeWidth={1.8}
+        className="mt-[3px] shrink-0 text-text-tertiary"
+        aria-hidden="true"
+      />
+      <span className="min-w-0 flex-1">{suggestion.text}</span>
+    </button>
   )
 }

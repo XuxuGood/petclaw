@@ -9,11 +9,10 @@ export function initDatabase(db: Database.Database): void {
   // 通用键值存储，各模块通过 typed store 访问。
   // 已知 key：
   //   language           — 界面语言，JSON 字符串 "zh" | "en"
-  //   onboardingComplete — 引导流程是否完成，"true" | "false"
   //   nickname           — 用户昵称，JSON 字符串
-  //   roles              — 用户角色列表，JSON 数组
-  //   selectedSkills     — 引导时选择的 skills，JSON 数组
-  //   userMdSyncedFrom   — workspace AGENTS.md 同步指纹，JSON 字符串
+  //   role               — 用户角色，JSON 字符串
+  //   window.mainBounds  — 主窗口位置和尺寸，JSON { x, y, width, height }
+  //   window.petPosition — 宠物窗口位置，JSON { x, y }
   //   cowork.defaultDirectory — Cowork 默认工作目录，纯文本路径
   //   cowork.systemPrompt     — 用户自定义系统提示词，纯文本
   //   cowork.memory           — Cowork 记忆内容，纯文本

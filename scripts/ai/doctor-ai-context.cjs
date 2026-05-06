@@ -29,7 +29,9 @@ const {
   resolveGitNexusCommand,
   runCommand,
   runGitNexus,
-  runGitNexusForRepo
+  runGitNexusForRepo,
+  writeAiState,
+  writeJsonArtifact
 } = require('./gitnexus-utils.cjs')
 
 const jsonOutput = process.argv.includes('--json')
@@ -246,6 +248,16 @@ function checkSerena(report) {
 }
 
 function printSummary(report) {
+  report.artifactPath = writeJsonArtifact('doctor', report)
+  writeAiState({
+    gitnexusRepo: report.repo,
+    lastDoctor: {
+      artifactPath: report.artifactPath,
+      deepCheck: report.deepCheck,
+      failedChecks: report.checks.filter((check) => !check.ok).map((check) => check.name)
+    }
+  })
+
   if (jsonOutput) {
     console.log(JSON.stringify(report, null, 2))
     return

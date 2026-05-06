@@ -24,13 +24,14 @@ Skills 模块负责 skill 的发现、安装、更新、作用域和 runtime 同
 ┌────────────────────────────────────────────────────────────────────┐
 │ Main Process                                                        │
 │  SkillManager                                                       │
+│  ├── sync bundled skills to userData                                │
 │  ├── scan SKILL.md                                                  │
 │  ├── install / uninstall / enable                                   │
 │  └── toOpenclawConfig                                               │
 │                                                                    │
 │  Skill dirs                                                         │
-│  ├── Resources/SKILLs                                               │
-│  └── {userData}/SKILLs                                              │
+│  ├── Resources/skills        read-only bundled source               │
+│  └── {userData}/skills       writable runtime source                │
 └──────────────────────────────┬─────────────────────────────────────┘
                                │ ConfigSync skills.load.extraDirs
                                ▼
@@ -58,7 +59,9 @@ Skills 模块负责 skill 的发现、安装、更新、作用域和 runtime 同
 Skills 不通过 main workspace `AGENTS.md` 告知 runtime。runtime 原生扫描 `SKILL.md`，PetClaw 只负责：
 
 ```text
-Resources/SKILLs 或 userData/SKILLs
+Resources/skills
+→ SkillManager syncBundledSkillsToUserData
+→ userData/skills
 → ConfigSync skills.load.extraDirs
 → OpenClaw runtime 扫描
 → ChatInputBox 本轮选择 skillIds
@@ -86,8 +89,19 @@ Skill 信息来自本地目录、runtime 状态和用户选择。持久化层应
 | 目录 | 说明 |
 |---|---|
 | `Resources/petmind/skills/` | OpenClaw runtime 内置 skills，PetClaw 不复制 |
-| `Resources/SKILLs/` | PetClaw 定制 skill 模板，只读 |
-| `{userData}/SKILLs/` | 同步后的 PetClaw 定制 skills 和用户自定义 skills |
+| `Resources/skills/` | PetClaw 定制内置 skills 的打包只读源 |
+| `{userData}/skills/` | OpenClaw 与 UI 实际消费的 skills 根目录，包含同步后的内置 skills 和用户自定义 skills |
+
+启动同步规则：
+
+- packaged app 在 `SkillManager.scan()` 前把 `Resources/skills` 同步到 `{userData}/skills`。
+- 开发环境不自动同步打包源；开发调试直接扫描项目 `skills` 或 `PETCLAW_SKILLS_ROOT` 指向的目录。
+- packaged resources 不直接写入 `skills.load.extraDirs`，避免 OpenClaw 读取只读目录。
+- `skills.config.json` 中 `defaults` 的 key 是内置 skill allowlist，也是 UI `isBuiltIn` 的事实源。
+- 内置 skill 目标不存在时复制；目标是非目录时修复为目录；打包版本号高于 userData 版本时覆盖更新。
+- 打包源有 `package.json`、`node_modules`、`scripts` 或 `dist` 而 userData 目标缺失时触发修复复制；`web-search` 还检查桥接脚本和服务入口的关键 marker。
+- 覆盖更新或依赖修复使用临时目录和 backup 原子替换；失败时恢复旧目录，单个 skill 失败不阻断其它内置 skill 同步。
+- 覆盖更新或依赖修复时保留目标 skill 根目录的 `.env`，避免用户密钥被内置资源覆盖。
 
 ## 7. IPC / Preload 契约
 
@@ -103,8 +117,7 @@ interface Skill {
   enabled: boolean
   isBuiltIn: boolean
   skillPath: string
-  source: 'official' | 'custom'
-  requires?: { bins?: string[]; env?: string[]; config?: string[] }
+  version?: string
 }
 ```
 

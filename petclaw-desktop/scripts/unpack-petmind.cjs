@@ -10,7 +10,7 @@
  *
  * 效果:
  *   输入: $INSTDIR/resources/win-resources.tar
- *   输出: $INSTDIR/resources/petmind/, SKILLs/
+ *   输出: $INSTDIR/resources/petmind/, skills/
  *   tar 文件由 NSIS 脚本在解压成功后删除
  *
  * 依赖: 从 app.asar 内加载 tar npm 包（Electron 内置 ASAR 透明读取支持）
@@ -170,8 +170,8 @@ try {
     logLine(`[unpack-petmind] phase=root-summary root=${root} entries=${stats.entries} bytes=${stats.bytes} mb=${formatMegabytes(stats.bytes)} elapsed_ms=${rootElapsedMs}`);
   }
 
-  // 验证三个预期目录：petmind（OpenClaw runtime）、SKILLs（技能包）、python-win（便携式 Python）
-  const expectedDirs = ['petmind', 'SKILLs', 'python-win'];
+  // 验证三个预期目录：petmind（OpenClaw runtime）、skills（技能包）、python-win（便携式 Python）
+  const expectedDirs = ['petmind', 'skills', 'python-win'];
   for (const dir of expectedDirs) {
     const dirPath = path.join(destDir, dir);
     if (fs.existsSync(dirPath)) {

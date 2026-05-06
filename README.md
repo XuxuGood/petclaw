@@ -56,6 +56,19 @@ npm test                           # workspace 全量测试
 pnpm -r lint                      # workspace 全量 lint
 ```
 
+## 桌面打包
+
+```bash
+# 本地验证真实 Electron 应用壳，不生成 dmg/zip/安装包
+pnpm --filter petclaw-desktop run package:dir
+
+# macOS Apple Silicon 正式分发包
+pnpm --filter petclaw-desktop dist:mac:arm64
+```
+
+`package:dir` 会按当前平台生成 unpacked app：macOS 打开 `release/mac*/PetClaw.app`，Windows
+运行 `release/win-unpacked/PetClaw.exe`，Linux 运行 `release/linux-unpacked/PetClaw`。
+
 ## 文档
 
 | 文档 | 说明 |

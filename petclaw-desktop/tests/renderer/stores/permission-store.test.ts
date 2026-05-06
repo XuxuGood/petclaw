@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { usePermissionStore } from '../../../src/renderer/src/stores/permission-store'
 
 const makeRequest = (id: string) => ({
+  sessionId: `session-${id}`,
   requestId: id,
   toolName: 'AskUserQuestion',
   toolInput: { questions: [] },
@@ -20,6 +21,7 @@ describe('usePermissionStore', () => {
     expect(usePermissionStore.getState().pendingPermissions).toHaveLength(2)
     expect(usePermissionStore.getState().pendingPermissions[0].requestId).toBe('a')
     expect(usePermissionStore.getState().pendingPermissions[1].requestId).toBe('b')
+    expect(usePermissionStore.getState().pendingPermissions[0].sessionId).toBe('session-a')
   })
 
   it('enqueue 按 requestId 去重', () => {

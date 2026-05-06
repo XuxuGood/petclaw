@@ -1,6 +1,6 @@
 // scripts/notarize.js
 // macOS 公证脚本，由 electron-builder afterSign 钩子调用
-// 需要在环境变量或 .env 中配置 Apple Developer 凭据
+// 本地构建可缺省跳过；发布构建通过 PETCLAW_REQUIRE_MAC_NOTARIZATION=1 强制要求凭据。
 
 const { notarize } = require('@electron/notarize');
 const path = require('path');
@@ -14,6 +14,37 @@ try {
   }
 }
 
+function isRequiredMacReleaseBuild() {
+  return process.env.PETCLAW_REQUIRE_MAC_NOTARIZATION === '1';
+}
+
+function resolveAppleIdPassword() {
+  return process.env.APPLE_ID_PASSWORD || process.env.APPLE_APP_SPECIFIC_PASSWORD || '';
+}
+
+function getMissingReleaseCredentials() {
+  const missing = [];
+  if (!process.env.CSC_LINK) missing.push('CSC_LINK');
+  if (!process.env.CSC_KEY_PASSWORD) missing.push('CSC_KEY_PASSWORD');
+  if (!process.env.APPLE_ID) missing.push('APPLE_ID');
+  if (!resolveAppleIdPassword()) missing.push('APPLE_ID_PASSWORD');
+  if (!process.env.APPLE_TEAM_ID) missing.push('APPLE_TEAM_ID');
+  return missing;
+}
+
+function skipOrThrowForMissingCredentials(missing) {
+  if (isRequiredMacReleaseBuild()) {
+    throw new Error(
+      'Missing required macOS release credentials: '
+      + missing.join(', ')
+      + '. Configure CI secrets or unset PETCLAW_REQUIRE_MAC_NOTARIZATION for local builds.',
+    );
+  }
+
+  console.warn(`⚠️  跳过公证: 未设置 ${missing.join(', ')}`);
+  console.warn('   本地开发和 package:dir 可跳过；正式发布必须在 CI secrets 中配置 Apple Developer 凭据');
+}
+
 exports.default = async function notarizing(context) {
   const { electronPlatformName, appOutDir } = context;
 
@@ -21,26 +52,19 @@ exports.default = async function notarizing(context) {
     return;
   }
 
-  // 未配置凭据时跳过公证，允许本地开发构建不出错
-  if (!process.env.APPLE_ID || !process.env.APPLE_ID_PASSWORD) {
-    console.warn('⚠️  跳过公证: 未设置 APPLE_ID 或 APPLE_ID_PASSWORD');
-    console.warn('   如需启用公证，请创建 .env 文件并配置 Apple Developer 凭据');
-    console.warn('   参考 .env.example 模板');
+  const missing = getMissingReleaseCredentials();
+  if (missing.length > 0) {
+    skipOrThrowForMissingCredentials(missing);
     return;
   }
 
-  if (!process.env.APPLE_TEAM_ID) {
-    console.warn('⚠️  跳过公证: 未设置 APPLE_TEAM_ID');
-    console.warn('   公证需要 APPLE_TEAM_ID（可在 Apple Developer 账户中找到）');
-    return;
-  }
-
+  const appleIdPassword = resolveAppleIdPassword();
   const appName = context.packager.appInfo.productFilename;
   const appPath = path.join(appOutDir, `${appName}.app`);
 
   console.log(`🔐 正在公证 ${appName}...`);
   console.log(`   应用路径: ${appPath}`);
-  console.log(`   Apple ID: ${process.env.APPLE_ID}`);
+  console.log('   Apple ID: configured');
   console.log(`   Team ID:  ${process.env.APPLE_TEAM_ID}`);
   console.log(`   App ID:   ai.petclaw.desktop`);
 
@@ -48,7 +72,7 @@ exports.default = async function notarizing(context) {
     await notarize({
       appPath,
       appleId: process.env.APPLE_ID,
-      appleIdPassword: process.env.APPLE_ID_PASSWORD,
+      appleIdPassword,
       teamId: process.env.APPLE_TEAM_ID,
     });
 
@@ -61,4 +85,10 @@ exports.default = async function notarizing(context) {
     console.error('   访问 https://appstoreconnect.apple.com/notarization-history 查看详情');
     throw error;
   }
+};
+
+exports._private = {
+  getMissingReleaseCredentials,
+  isRequiredMacReleaseBuild,
+  resolveAppleIdPassword,
 };

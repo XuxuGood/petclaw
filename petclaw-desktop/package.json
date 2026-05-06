@@ -51,12 +51,16 @@
     "dev:openclaw": "node scripts/check-native-abi.cjs && npm run openclaw:ensure && npm run openclaw:patch && npm run openclaw:runtime:host && electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
-    "package": "electron-vite build && electron-builder",
+    "package:dir": "npm run check:icons && electron-vite build && electron-builder --dir --config electron-builder.json",
     "postinstall": "electron-rebuild -f -w better-sqlite3",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
-    "lint": "eslint . --max-warnings 0",
+    "lint": "eslint . --max-warnings 0 && npm run lint:ui",
+    "lint:ui": "node scripts/check-renderer-ui-guardrails.cjs",
+    "assets:icons": "node scripts/generate-app-icons.cjs",
+    "check:icons": "node scripts/check-app-icons.cjs",
+    "assets:cat-sprites": "node scripts/build-cat-sprites.cjs",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -80,10 +84,10 @@
     "openclaw:channel-deps": "node scripts/install-openclaw-channel-deps.cjs",
     "openclaw:prune": "node scripts/prune-openclaw-runtime.cjs",
     "openclaw:finalize": "node scripts/finalize-openclaw-runtime.cjs",
-    "dist:mac:arm64": "electron-vite build && npm run openclaw:runtime:mac-arm64 && npm run openclaw:finalize && electron-builder --mac --arm64 --config electron-builder.json",
-    "dist:mac:x64": "electron-vite build && npm run openclaw:runtime:mac-x64 && npm run openclaw:finalize && electron-builder --mac --x64 --config electron-builder.json",
-    "dist:win:x64": "electron-vite build && npm run openclaw:runtime:win-x64 && npm run openclaw:finalize && electron-builder --win --x64 --config electron-builder.json",
-    "dist:linux:x64": "electron-vite build && npm run openclaw:runtime:linux-x64 && npm run openclaw:finalize && electron-builder --linux --x64 --config electron-builder.json"
+    "dist:mac:arm64": "npm run check:icons && electron-vite build && npm run openclaw:runtime:mac-arm64 && npm run openclaw:finalize && electron-builder --mac --arm64 --config electron-builder.json",
+    "dist:mac:x64": "npm run check:icons && electron-vite build && npm run openclaw:runtime:mac-x64 && npm run openclaw:finalize && electron-builder --mac --x64 --config electron-builder.json",
+    "dist:win:x64": "npm run check:icons && electron-vite build && npm run openclaw:runtime:win-x64 && npm run openclaw:finalize && electron-builder --win --x64 --config electron-builder.json",
+    "dist:linux:x64": "npm run check:icons && electron-vite build && npm run openclaw:runtime:linux-x64 && npm run openclaw:finalize && electron-builder --linux --x64 --config electron-builder.json"
   },
   "dependencies": {
     "@electron-toolkit/utils": "^4.0.0",
@@ -131,6 +135,7 @@
   "lint-staged": {
     "*.{ts,tsx}": [
       "eslint --fix --max-warnings 0",
+      "node scripts/check-renderer-ui-guardrails.cjs",
       "prettier --write"
     ],
     "*.{json,css}": [

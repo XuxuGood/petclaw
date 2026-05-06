@@ -2,13 +2,13 @@
 
 ## 1. 模块定位
 
-Desktop 打包与 Runtime 分发模块负责把 `petclaw-desktop` 的 main/preload/renderer 产物、OpenClaw runtime、预装 SKILLs、本地扩展、平台资源、签名和发布产物组合成可运行的桌面应用。
+Desktop 打包与 Runtime 分发模块负责把 `petclaw-desktop` 的 main/preload/renderer 产物、OpenClaw runtime、预装 skills、本地扩展、平台资源、签名和发布产物组合成可运行的桌面应用。
 
 本文回答三个问题：
 
 - 本地 `dist:*` 命令如何构建 Electron 应用和目标平台 OpenClaw runtime。
 - OpenClaw runtime 如何锁定版本、应用补丁、安装插件、同步本地扩展、裁剪并固化生产布局。
-- Electron Builder 如何把 runtime、SKILLs、图标、Windows tar、签名和 notarize 串成平台产物。
+- Electron Builder 如何把 runtime、skills、图标、Windows tar、签名和 notarize 串成平台产物。
 
 本文不描述运行时业务调用协议；Gateway 生命周期见 [RuntimeGateway架构设计.md](./RuntimeGateway架构设计.md)，用户配置写入见 [ConfigSync架构设计.md](./ConfigSync架构设计.md)，远端流水线见 [CI-CD架构设计.md](../../engineering/CI-CD架构设计.md)。
 
@@ -25,7 +25,7 @@ Desktop 打包与 Runtime 分发模块负责把 `petclaw-desktop` 的 main/prelo
 | local extensions | PetClaw 本地维护的 OpenClaw 扩展，例如 `mcp-bridge`、`ask-user-question` |
 | finalize/prune | 打包前去除无关文件并固化生产 runtime 布局 |
 | Electron Builder | 生成 `.dmg`、`.zip`、`.exe`、`.AppImage`、`.deb` 等平台产物 |
-| extraResources | 打包到 app resources 的 runtime、SKILLs、tray 图标和平台资源 |
+| extraResources | 打包到 app resources 的 runtime、skills、tray 图标和平台资源 |
 | asar / asarUnpack | 应用源码进入 asar，native module 按需解包 |
 | notarize/sign | macOS、Windows 等平台发布安全要求 |
 
@@ -109,7 +109,7 @@ Developer or CI
   -> openclaw:runtime:<target>
   -> finalize-openclaw-runtime.cjs
   -> electron-builder --<platform> --<arch>
-  -> electron-builder-hooks.cjs validates runtime/SKILLs/platform resources
+  -> electron-builder-hooks.cjs validates runtime/skills/platform resources
   -> sign/notarize when release credentials exist
   -> release/* artifacts
 ```
@@ -190,8 +190,9 @@ petclaw-desktop/
 ```text
 macOS/Linux app resources
   tray/
-  SKILLs/
+  skills/              PetClaw 内置 skills 打包只读源
   petmind/
+    node_modules/      OpenClaw runtime 根依赖，独立 FileSet 复制
 
 Windows app resources
   tray/
@@ -199,19 +200,38 @@ Windows app resources
   unpack-petmind.cjs
 ```
 
+打包后的 `Resources/skills` 不作为运行时直接读取目录。应用启动时由
+`SkillManager.syncBundledSkillsToUserData()` 同步到 Electron `{userData}/skills`，随后
+`ConfigSync` 只把 `{userData}/skills` 写入 `skills.load.extraDirs`。内置 skill 升级以
+`SKILL.md` frontmatter `version` 为准；修复或覆盖使用临时目录和 backup 原子替换，
+失败时恢复旧目录且不阻断其它 skill；修复或覆盖时保留 userData 目标目录里的 `.env`。
+
 打包配置来自 `electron-builder.json`、`petclaw-desktop/package.json` scripts、runtime 构建脚本和平台资源文件：
 
 | 配置 | 位置 | 作用 |
 |---|---|---|
 | product/app id | `electron-builder.json` | 应用身份和系统注册 |
 | files | `electron-builder.json` | 收录 package、SYSTEM_PROMPT 和 out 产物 |
-| extraResources | `electron-builder.json` | tray、SKILLs、runtime、Windows tar 资源 |
+| extraResources | `electron-builder.json` | tray、skills、runtime、Windows tar 资源 |
+| platform icons | `build/icons/{mac,win,png}` | macOS `.icns`、Windows `.ico`、Linux PNG 图标输入 |
 | protocols | `electron-builder.json` | 注册 `petclaw://` |
 | asarUnpack | `electron-builder.json` | 解包 `better-sqlite3` native module |
 | dist scripts | `petclaw-desktop/package.json` | 平台和架构入口 |
 | builder hooks | `scripts/electron-builder-hooks.cjs` | 打包前后校验和平台处理 |
 
-`electron-builder.json` 中的 filter 不只是体积优化，也是安全边界：`.env`、测试、源码映射、无关 README/License 不能被误带入 runtime 或 SKILLs 包。
+macOS 图标事实源是 `electron-builder.json#mac.icon`。electron-builder 会把 `.icns`
+复制到 `Contents/Resources/icon.icns` 并写入 `Info.plist#CFBundleIconFile`。PetClaw
+不手写 `CFBundleIconName`，也不在 packaged app 启动时用 `app.dock.setIcon()` 覆盖
+bundle 图标。
+
+`electron-builder.json` 中的 filter 不只是体积优化，也是安全边界：`.env`、测试、源码映射、无关 README/License 不能被误带入 runtime 或 skills 包。
+
+macOS/Linux 的 OpenClaw runtime 资源必须把
+`vendor/openclaw-runtime/current/node_modules` 作为独立 `extraResources` FileSet
+复制到 `petmind/node_modules`。electron-builder 26 会过滤 FileSet 源目录下的根
+`node_modules`，只配置 `from: vendor/openclaw-runtime/current` 会导致生产包缺失
+runtime 依赖，Gateway 在 bootcheck 阶段启动失败。Windows 不走这条路径，安装包内
+使用 `win-resources.tar` 保留 runtime 目录结构并在安装/首次运行时解压。
 
 ## 7. 命令与脚本职责
 
@@ -220,6 +240,9 @@ Windows app resources
 ```text
 pnpm --filter petclaw-desktop dev:openclaw
 pnpm --filter petclaw-desktop openclaw:runtime:host
+pnpm --filter petclaw-desktop assets:icons
+pnpm --filter petclaw-desktop check:icons
+pnpm --filter petclaw-desktop run package:dir
 pnpm --filter petclaw-desktop dist:mac:arm64
 pnpm --filter petclaw-desktop dist:mac:x64
 pnpm --filter petclaw-desktop dist:win:x64
@@ -230,6 +253,8 @@ pnpm --filter petclaw-desktop dist:linux:x64
 
 | 脚本 | 职责 |
 |---|---|
+| `generate-app-icons.cjs` | 从 `resources/icon.png` 生成 `build/icons` 平台图标产物；仅在图标源变化时运行 |
+| `check-app-icons.cjs` | 构建前检查平台图标产物是否存在且尺寸有效 |
 | `ensure-openclaw-version.cjs` | 校验版本、clone/checkout 指定 OpenClaw |
 | `apply-openclaw-patches.cjs` | 应用 PetClaw 维护的 patch |
 | `run-build-openclaw-runtime.cjs` | 按 target 构建 runtime |
@@ -242,6 +267,11 @@ pnpm --filter petclaw-desktop dist:linux:x64
 | `prune-openclaw-runtime.cjs` | 裁剪无关文件 |
 | `finalize-openclaw-runtime.cjs` | 固化生产 runtime 布局 |
 | `electron-builder-hooks.cjs` | 打包前后校验和平台处理 |
+
+`package:dir` 是当前平台 unpacked app 的系统壳验收入口：它运行 `check:icons`、构建 Electron
+产物并执行 `electron-builder --dir`。`dev:openclaw` 只作为功能调试入口，不作为
+Dock/Finder/任务栏/desktop icon 的最终事实源。完整发布仍使用 `dist:*`，并在构建前运行
+`check:icons`，不会每次重新生成图标。
 
 ## 8. 本地扩展与预装能力
 
@@ -318,11 +348,13 @@ petclaw-desktop/out/preload/index.js
 - `.env`、测试、源码映射、虚拟环境和无关文档不进入打包 runtime。
 - 版本升级必须显式修改 `package.json#openclaw.version` 并重建 runtime。
 - 本地 OpenClaw 源码开发只能作为开发模式输入，不应污染发布产物。
-- macOS 使用 hardened runtime、entitlements 和 notarize。
+- macOS 使用 hardened runtime 和 entitlements；Developer ID 签名与 notarize 是可选发布增强。
+  当前个人产品策略允许本地和 release 构建在缺少 Apple 凭据时跳过 notarize。未来面向普通用户
+  正式分发时，可设置 `PETCLAW_REQUIRE_MAC_NOTARIZATION=1` 强制缺凭据失败。
 - Windows 签名 secrets 只在 release workflow 注入。
 - GitHub release token 使用 `GITHUB_TOKEN`，只在发布 job 需要 `contents: write`。
 - `CSC_LINK`、`CSC_KEY_PASSWORD`、`APPLE_ID_PASSWORD` 等不得写入脚本默认值或文档示例。
-- SKILLs 打包过滤 `.env`、虚拟环境和测试目录，避免用户凭据或开发依赖进入安装包。
+- skills 打包过滤 `.env`、虚拟环境和测试目录，避免用户凭据或开发依赖进入安装包。
 
 ## 12. 与其它模块的关系
 
@@ -330,7 +362,7 @@ petclaw-desktop/out/preload/index.js
 |---|---|
 | RuntimeGateway | 读取 production runtime、Gateway 入口和运行时资源 |
 | ConfigSync | 生产 runtime 启动后写入 openclaw.json/AGENTS.md |
-| Skills | SKILLs 随包分发，用户目录中的 skill 仍走配置同步 |
+| Skills | skills 随包分发，用户目录中的 skill 仍走配置同步 |
 | MCP | 本地 `mcp-bridge` 扩展必须预编译进 runtime |
 | Cowork | 依赖 `ask-user-question` 审批扩展 |
 | SystemIntegration | 图标、协议、签名、更新和平台资源由打包提供 |

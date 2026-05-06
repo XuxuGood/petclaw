@@ -18,6 +18,7 @@ import {
 
 import type { ViewType } from '../App'
 import { useI18n } from '../i18n'
+import { Tooltip } from './Tooltip'
 import { WorkspaceHeader } from './workspace/WorkspaceHeader'
 
 interface DirectoryInfo {
@@ -539,7 +540,13 @@ export function Sidebar({
                               strokeWidth={1.75}
                               className="shrink-0 text-text-tertiary"
                             />
-                            <span className="min-w-0 flex-1 truncate text-left">{task.name}</span>
+                            <Tooltip
+                              content={task.name}
+                              side="right"
+                              contentClassName="ui-tooltip-selectable"
+                            >
+                              <span className="min-w-0 flex-1 truncate text-left">{task.name}</span>
+                            </Tooltip>
                             {task.state?.lastStatus === 'running' && (
                               <span className="rounded-full bg-bg-active px-1.5 py-0.5 text-[10px] text-text-secondary">
                                 {t('cron.statusRunning')}
@@ -562,9 +569,15 @@ export function Sidebar({
                                     disabled={!run.sessionId}
                                     className="no-drag ui-row-button ui-focus text-left disabled:cursor-default disabled:opacity-60"
                                   >
-                                    <span className="min-w-0 flex-1 truncate">
-                                      {run.taskName ?? task.name}
-                                    </span>
+                                    <Tooltip
+                                      content={run.taskName ?? task.name}
+                                      side="right"
+                                      contentClassName="ui-tooltip-selectable"
+                                    >
+                                      <span className="min-w-0 flex-1 truncate">
+                                        {run.taskName ?? task.name}
+                                      </span>
+                                    </Tooltip>
                                     <span className="shrink-0 text-[10px] text-text-tertiary">
                                       {getRunStatusLabel(run.status)}
                                     </span>
@@ -609,9 +622,15 @@ export function Sidebar({
                           className="shrink-0 text-text-tertiary"
                         />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate">
-                            {session.title || t('sidebar.defaultTitle')}
-                          </span>
+                          <Tooltip
+                            content={session.title || t('sidebar.defaultTitle')}
+                            side="right"
+                            contentClassName="ui-tooltip-selectable"
+                          >
+                            <span className="block truncate">
+                              {session.title || t('sidebar.defaultTitle')}
+                            </span>
+                          </Tooltip>
                           <span className="mt-0.5 block truncate text-[11px] font-normal text-text-tertiary">
                             {getSessionSubtitle(session)}
                           </span>

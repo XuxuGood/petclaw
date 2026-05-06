@@ -14,7 +14,7 @@
 - 订阅类 API 必须返回 unsubscribe。
 - 状态类能力使用 snapshot + push。
 - Phase A 只依赖 db、settings、boot、i18n、app version。
-- Phase B 可依赖 runtimeServices、Gateway 和业务 manager。
+- Phase B 可依赖 runtimeServices、Gateway 和业务 manager；必须在 boot 成功后、`boot:complete` 前注册，避免 renderer 进入主界面后先调用业务 IPC 时出现未注册 handler。
 
 注册拓扑：
 
@@ -27,6 +27,9 @@ Phase A
 Phase B
   -> registerAllIpcHandlers
   -> chat/window/directory/models/skills/mcp/memory/scheduler/im
+  -> boot:complete
+  -> renderer app:pet-ready
+  -> create pet window / PetEventBridge / shortcuts
   -> auto updater handlers
 ```
 
@@ -49,8 +52,9 @@ Phase B
 | Channel | 方向 | Preload API | 说明 |
 |---|---|---|---|
 | `window:move` | send | `moveWindow(dx, dy)` | 移动透明窗口 |
+| `window:composer-bounds:update` | send | `updateComposerBounds(bounds)` | Renderer 上报聊天输入框相对 Main Window 内容区的布局坐标，main 只用于计算 Pet 首次视觉锚点 |
 | `chat:toggle` | send | `toggleMainWindow()` | 显示或隐藏主窗口 |
-| `app:pet-ready` | send | `petReady()` | Pet window ready 后触发 Phase B |
+| `app:pet-ready` | send | `petReady()` | Renderer 主界面就绪后通知 main 创建 Pet Window、PetEventBridge 和快捷键；Pet Window ready 后恢复 Main Window 前台激活 |
 | `app:quit` | send | `quitApp()` | 退出应用 |
 | `panel:open` | main -> renderer | `onPanelOpen()` | 打开指定面板 |
 | `hook:event` | main -> renderer | `onHookEvent()` | Hook 事件透传 |

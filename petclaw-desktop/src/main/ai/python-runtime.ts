@@ -3,8 +3,7 @@ import { spawnSync } from 'child_process'
 import fs from 'fs'
 import path from 'path'
 import { cpRecursiveSync } from '../fs-compat'
-
-const PYTHON_RUNTIME_DIR_NAME = 'python-win'
+import { PYTHON_RUNTIME_DIR_NAME, resolveUserDataPaths } from '../user-data-paths'
 const PYTHON_RUNTIME_STATE_FILE = 'runtime.json'
 
 const REQUIRED_FILES = ['python.exe', 'python3.exe']
@@ -221,7 +220,7 @@ export function getBundledPythonRoot(): string | null {
 }
 
 export function getUserPythonRoot(): string {
-  return path.join(app.getPath('userData'), 'runtimes', PYTHON_RUNTIME_DIR_NAME)
+  return resolveUserDataPaths(app.getPath('userData')).pythonRuntimeRoot
 }
 
 // 将嵌入式 Python 路径注入到子进程 env 的 PATH 中，仅 Windows 生效

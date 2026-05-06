@@ -132,7 +132,7 @@ remote latest tag              -> 只在 schedule/workflow_dispatch 查远端
 |---|---|---|---|
 | secrets-scan | TruffleHog | 阻塞 | 扫描 verified secrets |
 | dependency-audit | pnpm audit | non-blocking | 高危依赖输出警告 |
-| skills-audit | npm audit per skill | non-blocking | SKILLs 独立依赖树 |
+| skills-audit | npm audit per skill | non-blocking | skills 独立依赖树 |
 | codeql | GitHub CodeQL | 阻塞/按 GitHub 配置 | 上传 Security tab |
 
 安全扫描不能注入发布 secrets。PR 场景只允许最低权限，外部 PR 不应得到签名、notarize 或 release 凭据。
@@ -159,6 +159,12 @@ Release 策略：
 - 每个平台上传 artifact，保留 30 天。
 - `create-release` 只在 `refs/tags/v*` 运行，下载所有 artifact 后创建 draft Release。
 - tag 包含 `-beta`、`-alpha`、`-rc` 时标记 prerelease。
+- Apple Developer Program 不是当前发布门槛。macOS release job 会注入可选的
+  `CSC_LINK`、`CSC_KEY_PASSWORD`、`APPLE_ID`、`APPLE_ID_PASSWORD`、`APPLE_TEAM_ID`；
+  配齐时执行 Developer ID 签名和 notarize，缺失时允许产出未 notarized 的个人产品包。
+- 未来如果要公开面向普通用户分发，可在 release job 中设置
+  `PETCLAW_REQUIRE_MAC_NOTARIZATION=1`，让 `scripts/notarize.js` 进入严格模式并在缺少
+  签名或 notarize secrets 时失败。
 
 ## 9. Secrets 与权限边界
 
@@ -174,6 +180,7 @@ Secrets 使用边界：
 | `WIN_CSC_LINK` / `WIN_CSC_KEY_PASSWORD` | Windows release job | Windows 签名证书 |
 
 这些 secrets 不进入 CI、Electron Verify、OpenClaw Check 或 Security Scan 的普通 PR 路径。
+如果启用 Apple notarize，`APPLE_ID_PASSWORD` 必须是 Apple app-specific password，不是 Apple ID 登录密码。
 
 ## 10. Artifact 与发布产物
 

@@ -84,6 +84,23 @@ app boot
 
 ## 6. 数据模型
 
+SQLite 数据库文件位于 Electron 标准用户数据目录 `{userData}/petclaw.db`。
+当前版本尚未上线，不做旧目录迁移兼容；`~/.petclaw` 不作为运行时事实源。
+
+`{userData}` 子目录约定由 `petclaw-desktop/src/main/user-data-paths.ts` 集中定义：
+
+```text
+{userData}/
+  petclaw.db                 SQLite 数据库
+  openclaw/                  OpenClaw runtime 状态、配置、日志和 workspace
+  skills/                    从打包资源同步后的内置 skills 和用户自定义 skills
+  logs/                      PetClaw 主进程、启动诊断和协作诊断日志
+  runtimes/                  用户可写 runtime 组件，例如 Windows Python
+  runtime-shims/
+    cowork/                  Cowork 使用的 node/npm/npx/bash 初始化 shim
+    mcp-bridge/              MCP bridge 平台辅助脚本
+```
+
 表结构事实源是 `petclaw-desktop/src/main/data/db.ts`。新增或修改表结构时必须同步字段注释和针对性测试。
 
 核心表所有权：
@@ -92,7 +109,7 @@ app boot
 |---|---|---|
 | `directories` | Directory/ConfigSync | 目录驱动 agent 配置 |
 | `cowork_sessions` / messages 相关表 | Cowork | 会话、消息和运行状态 |
-| `app_config` / cowork config | CoworkConfig / Settings | 领域配置 |
+| `app_config` / cowork config | CoworkConfig / Settings / SystemIntegration | 领域配置与窗口布局偏好 |
 | `mcp_servers` | MCP | MCP server 配置 |
 | `im_instances` | IM | IM 实例和凭据 |
 | `im_conversation_bindings` | IM | 对话级目录绑定 |

@@ -1,7 +1,9 @@
 const { spawnSync } = require('node:child_process')
 const { createHash } = require('node:crypto')
 const { existsSync } = require('node:fs')
+const { mkdirSync } = require('node:fs')
 const { readFileSync } = require('node:fs')
+const { writeFileSync } = require('node:fs')
 const { basename, join } = require('node:path')
 
 // AI 工具链共享工具模块。
@@ -9,6 +11,8 @@ const { basename, join } = require('node:path')
 // 所有函数都以“可降级”为原则：AI 上下文工具缺失时提醒开发者，而不是轻易阻断日常开发。
 const PROJECT_ROOT = join(__dirname, '..', '..')
 const AI_TOOLS_DIR = join(PROJECT_ROOT, '.petclaw', 'ai-tools')
+const AI_TOOLS_LOG_DIR = join(AI_TOOLS_DIR, 'logs')
+const AI_TOOLS_STATE_PATH = join(AI_TOOLS_DIR, 'state.json')
 const PROJECT_MCP_CONFIG = join(PROJECT_ROOT, '.mcp.json')
 let cachedGitNexusRepoName = null
 let cachedGitNexusList = null
@@ -69,6 +73,43 @@ function runCommand(command, args, options = {}) {
   }
 }
 
+function ensureAiToolsDir() {
+  // 所有状态和诊断日志都落在仓库内 .petclaw/ai-tools，避免写用户全局目录，也方便 AI 复用最近一次结果。
+  mkdirSync(AI_TOOLS_DIR, { recursive: true })
+  mkdirSync(AI_TOOLS_LOG_DIR, { recursive: true })
+}
+
+function createTimestamp() {
+  return new Date().toISOString().replace(/[:.]/g, '-')
+}
+
+function writeJsonArtifact(name, payload) {
+  // 自动化入口既要给终端输出，也要留下机器可读文件；后续 AI 可读最新 artifact，而不用重复跑重任务。
+  ensureAiToolsDir()
+  const filePath = join(AI_TOOLS_LOG_DIR, `${name}-${createTimestamp()}.json`)
+  writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`)
+  return filePath
+}
+
+function writeAiState(partialState) {
+  // state.json 记录当前索引和工作区指纹，让 prepare-change 能判断索引是否可能和本地代码脱节。
+  ensureAiToolsDir()
+  let previous = {}
+  try {
+    previous = JSON.parse(readFileSync(AI_TOOLS_STATE_PATH, 'utf8'))
+  } catch {
+    previous = {}
+  }
+
+  const next = {
+    ...previous,
+    ...partialState,
+    updatedAt: new Date().toISOString()
+  }
+  writeFileSync(AI_TOOLS_STATE_PATH, `${JSON.stringify(next, null, 2)}\n`)
+  return next
+}
+
 function sanitizeGitNexusRepoName(value) {
   // GitNexus repo alias 会出现在 CLI 参数和 MCP 资源里，因此只保留易读且 shell 友好的字符。
   return value
@@ -93,6 +134,48 @@ function getGitRemoteUrl() {
   }
 
   return result.stdout.trim()
+}
+
+function getGitHead() {
+  const result = runCommand('git', ['rev-parse', 'HEAD'])
+  return result.status === 0 ? result.stdout.trim() : ''
+}
+
+function getGitBranch() {
+  const result = runCommand('git', ['branch', '--show-current'])
+  return result.status === 0 ? result.stdout.trim() : ''
+}
+
+function getGitChangedFiles(scope = 'worktree') {
+  // worktree 用于 AI 改代码前感知草稿，staged 用于提交前保持影响分析边界。
+  const args = scope === 'staged'
+    ? ['-c', 'core.quotePath=false', 'diff', '--cached', '--name-only']
+    : ['-c', 'core.quotePath=false', 'diff', '--name-only']
+  const result = runCommand('git', args)
+  if (result.status !== 0) {
+    return []
+  }
+
+  return result.stdout.split('\n').map((item) => item.trim()).filter(Boolean)
+}
+
+function getGitWorkingTreeFingerprint() {
+  const status = runCommand('git', ['-c', 'core.quotePath=false', 'status', '--porcelain', '--untracked-files=no'])
+  const diff = runCommand('git', ['-c', 'core.quotePath=false', 'diff', '--name-only'])
+  const staged = runCommand('git', ['-c', 'core.quotePath=false', 'diff', '--cached', '--name-only'])
+  const content = [status.stdout, diff.stdout, staged.stdout].join('\n')
+  return createHash('sha1').update(content).digest('hex')
+}
+
+function getGitSnapshot() {
+  // 该快照不读文件内容，只记录 HEAD、分支、变更文件和工作区指纹，足够判断索引是否可能过期。
+  return {
+    head: getGitHead(),
+    branch: getGitBranch(),
+    workingTreeFingerprint: getGitWorkingTreeFingerprint(),
+    changedFiles: getGitChangedFiles('worktree'),
+    stagedFiles: getGitChangedFiles('staged')
+  }
 }
 
 function normalizePathForCompare(path) {
@@ -379,12 +462,16 @@ function looksLikeStaleIndex(output, status) {
 
 module.exports = {
   AI_TOOLS_DIR,
+  AI_TOOLS_LOG_DIR,
+  AI_TOOLS_STATE_PATH,
   PROJECT_MCP_CONFIG,
   PROJECT_ROOT,
   createMcpServersConfig,
   getCommandVersion,
+  getGitChangedFiles,
   getGitNexusListResult,
   getGitNexusRepoName,
+  getGitSnapshot,
   getSerenaDashboardUrls,
   hasCommand,
   isGitNexusRepoRegistered,
@@ -398,5 +485,7 @@ module.exports = {
   resolveGitNexusCommand,
   runCommand,
   runGitNexus,
-  runGitNexusForRepo
+  runGitNexusForRepo,
+  writeAiState,
+  writeJsonArtifact
 }

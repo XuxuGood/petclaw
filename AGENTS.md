@@ -19,6 +19,10 @@
 - 不确定时先查本地文档、代码、调用方和测试，不要把仓库内可自行发现的问题丢给用户。
 - 修改核心模块前必须做影响分析和调用方扫描。
 - 涉及用户可见行为时，必须考虑错误态、权限、安全边界和验证方式。
+- 做功能时必须按完整链路审视：用户入口、Renderer 状态与 UI、Preload 与 IPC 契约、Main service、SQLite 或本地配置、OpenClaw runtime、i18n、测试；即使只改一侧，也要确认另一侧契约不受影响，并在最终回复说明。
+- 默认按 macOS / Windows / Linux 三端桌面应用审视实现；涉及窗口、托盘、快捷键、文件系统、shell、runtime、打包安装、日志路径时必须明确平台差异。
+- 禁止把当前开发机行为当成跨平台事实源；路径使用 `path` / `os` / Electron API，不硬编码 `/tmp`、`~`、盘符、反斜杠或 macOS-only 能力。
+- 新增平台分支必须显式基于 `process.platform` / Electron platform，并提供 fallback、错误态和针对性测试或验证说明。
 
 ## 2. 写文件授权规则
 

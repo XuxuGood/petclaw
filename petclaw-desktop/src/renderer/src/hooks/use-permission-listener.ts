@@ -3,6 +3,8 @@ import { useEffect } from 'react'
 import { usePermissionStore } from '../stores/permission-store'
 import type { PermissionRequest } from '../stores/permission-store'
 
+type IncomingPermissionRequest = Omit<PermissionRequest, 'sessionId'>
+
 export function usePermissionListener(): void {
   const enqueue = usePermissionStore((s) => s.enqueue)
   const dequeue = usePermissionStore((s) => s.dequeue)
@@ -10,9 +12,9 @@ export function usePermissionListener(): void {
   useEffect(() => {
     // 权限/AskUser 请求到达 → 入队
     const unsubPermission = window.api.cowork.onPermission((data) => {
-      const d = data as { sessionId: string; request: PermissionRequest }
-      if (d.request) {
-        enqueue(d.request)
+      const d = data as { sessionId: string; request: IncomingPermissionRequest }
+      if (d.request && typeof d.sessionId === 'string') {
+        enqueue({ ...d.request, sessionId: d.sessionId })
       }
     })
 

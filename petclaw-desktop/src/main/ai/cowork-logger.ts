@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import fs from 'fs'
 import path from 'path'
+import { resolveUserDataPaths } from '../user-data-paths'
 
 // 单个日志文件上限 5MB，超出则轮转到 .old 备份
 const MAX_LOG_SIZE = 5 * 1024 * 1024
@@ -10,7 +11,7 @@ let logFilePath: string | null = null
 
 function getLogFilePath(): string {
   if (!logFilePath) {
-    const logDir = path.join(app.getPath('userData'), 'logs')
+    const logDir = resolveUserDataPaths(app.getPath('userData')).logsRoot
     if (!fs.existsSync(logDir)) {
       fs.mkdirSync(logDir, { recursive: true })
     }

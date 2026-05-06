@@ -149,16 +149,21 @@ RuntimeGateway 主要使用内存状态和本地 runtime 文件路径。需要�
 ```text
 {userData}/
   petclaw.db
-  openclaw/state/
-    openclaw.json
-    gateway-token
-    gateway-port.json
-    .compile-cache/
-    bin/
-      petclaw / openclaw / claw
+  openclaw/
+    state/
+      openclaw.json
+      gateway-token
+      gateway-port.json
+      .compile-cache/
+      bin/
+        petclaw / openclaw / claw
     logs/gateway.log
     workspace/
-    agents/main/
+    .openclaw/exec-approvals.json
+ runtime-shims/
+    cowork/                  Electron Node 与 npm/npx wrapper
+    mcp-bridge/              MCP bridge 平台辅助脚本
+  skills/                    OpenClaw 实际扫描的 PetClaw skills 根目录
 ```
 
 生产包只读资源：
@@ -166,7 +171,7 @@ RuntimeGateway 主要使用内存状态和本地 runtime 文件路径。需要�
 ```text
 Resources/
   petmind/                 OpenClaw runtime
-  SKILLs/                  PetClaw 定制 skills 模板
+  skills/                  PetClaw 内置 skills 打包只读源，启动时同步到 {userData}/skills
   openclaw-extensions/     ask-user-question、mcp-bridge 等本地扩展
 ```
 

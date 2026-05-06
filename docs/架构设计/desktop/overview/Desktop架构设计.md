@@ -163,23 +163,23 @@ Electron app ready
   │
   ├─ show Main Window BootCheck
   │
-  ├─ create Pet Window
-  │    └─ wait pet-ready
+  ├─ run BootCheck
+  │    ├─ ConfigSync.sync('boot')
+  │    ├─ EngineManager.startGateway()
+  │    └─ Gateway health check
   │
   ├─ initialize runtimeServices
-  │    ├─ stores/managers
-  │    ├─ OpenclawEngineManager
   │    ├─ OpenclawGateway
-  │    └─ ConfigSync
+  │    ├─ CoworkController / CoworkSessionManager
+  │    └─ CronJobService
   │
   ├─ register Phase B IPC
   │    └─ cowork:* / mcp:* / cron:* / im:* / skills:* ...
   │
-  ├─ ConfigSync.sync('boot')
+  ├─ send boot:complete
   │
-  ├─ EngineManager.startGateway()
-  │
-  ├─ GatewayClient.connect()
+  ├─ renderer sends app:pet-ready
+  │    └─ create Pet Window / PetEventBridge / shortcuts / re-activate Main Window
   │
   └─ Renderer queries snapshot + subscribes push events
 ```

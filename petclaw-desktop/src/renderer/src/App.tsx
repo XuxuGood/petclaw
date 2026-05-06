@@ -19,8 +19,7 @@ import { CronPage } from './views/cron/CronPage'
 import { ImChannelsPage } from './views/im/ImChannelsPage'
 import { SettingsPage } from './views/settings/SettingsPage'
 
-import { OnboardingPanel } from './views/onboarding/OnboardingPanel'
-import { BootCheckPanel } from './views/onboarding/BootCheckPanel'
+import { BootCheckPanel } from './views/boot/BootCheckPanel'
 import { usePermissionListener } from './hooks/use-permission-listener'
 import { usePermissionStore } from './stores/permission-store'
 import { useI18n } from './i18n'
@@ -30,7 +29,23 @@ import { CoworkQuestionWizard } from './views/chat/CoworkQuestionWizard'
 // 路由类型
 export type ViewType = 'chat' | 'skills' | 'expert-kits' | 'cron' | 'im-channels' | 'settings'
 
-type AppPhase = 'bootcheck' | 'onboarding' | 'main'
+type RestorableViewType = Exclude<ViewType, 'settings'>
+
+type AppPhase = 'bootcheck' | 'main'
+
+function isRestorableView(view: string | null): view is RestorableViewType {
+  return (
+    view === 'chat' ||
+    view === 'skills' ||
+    view === 'expert-kits' ||
+    view === 'cron' ||
+    view === 'im-channels'
+  )
+}
+
+function isAppView(view: string): view is ViewType {
+  return view === 'settings' || isRestorableView(view)
+}
 
 export function App() {
   // 全局权限请求监听：订阅 IPC 事件维护队列
@@ -58,12 +73,12 @@ export function App() {
   const [cronCreateSignal, setCronCreateSignal] = useState(0)
   const [cronRefreshSignal, setCronRefreshSignal] = useState(0)
   const [skillsRefreshSignal, setSkillsRefreshSignal] = useState(0)
+  const [chatDraftResetSignal, setChatDraftResetSignal] = useState(0)
 
   // 任务监控面板开关
   const [taskMonitorOpen, setTaskMonitorOpen] = useState(true)
   // 主侧栏开关：小窗用户需要把完整宽度留给当前任务。
   const [mainSidebarOpen, setMainSidebarOpen] = useState(true)
-  const [starterPrompt, setStarterPrompt] = useState<string | null>(null)
 
   // 权限弹窗响应：发送结果到主进程并出队
   const handlePermissionRespond = useCallback(
@@ -99,7 +114,9 @@ export function App() {
         setPreviousView(activeView === 'settings' ? 'chat' : activeView)
       }
       setActiveView(view)
-      window.api.setSetting('lastActiveTab', view)
+      if (isRestorableView(view)) {
+        void window.api.setSetting('lastActiveTab', view)
+      }
     },
     [activeView]
   )
@@ -114,12 +131,14 @@ export function App() {
     setSidebarTab('tasks')
     setActiveView('chat')
     setActiveSessionId(null)
+    setChatDraftResetSignal((value) => value + 1)
   }, [])
 
   // 新建任务：清空会话 ID，回到 chat
   const handleNewTask = useCallback(() => {
     setActiveView('chat')
     setActiveSessionId(null)
+    setChatDraftResetSignal((value) => value + 1)
   }, [])
 
   // Skills 搜索关键词（提升到 App 层以便在顶栏搜索框和 SkillsPage 之间共享）
@@ -325,15 +344,10 @@ export function App() {
   // 启动时恢复上次激活的 Tab
   useEffect(() => {
     window.api.getSetting('lastActiveTab').then((val) => {
-      if (
-        val === 'chat' ||
-        val === 'skills' ||
-        val === 'expert-kits' ||
-        val === 'cron' ||
-        val === 'im-channels' ||
-        val === 'settings'
-      ) {
-        setActiveView(val as ViewType)
+      if (isRestorableView(val)) {
+        setActiveView(val)
+      } else if (val === 'settings') {
+        void window.api.setSetting('lastActiveTab', 'chat')
       }
     })
   }, [])
@@ -365,9 +379,7 @@ export function App() {
   // 监听 boot 完成事件（push + 轮询兜底）
   useEffect(() => {
     function handleBootSuccess(): void {
-      window.api.getSetting('onboardingComplete').then((val) => {
-        setPhase(val === 'true' ? 'main' : 'onboarding')
-      })
+      setPhase('main')
     }
 
     const unsub = window.api.onBootComplete((success) => {
@@ -397,15 +409,8 @@ export function App() {
   // 监听主进程推送的面板切换指令（如托盘菜单点击）
   useEffect(() => {
     const unsub = window.api.onPanelOpen((panel) => {
-      if (
-        panel === 'chat' ||
-        panel === 'skills' ||
-        panel === 'expert-kits' ||
-        panel === 'cron' ||
-        panel === 'im-channels' ||
-        panel === 'settings'
-      ) {
-        handleViewChange(panel as ViewType)
+      if (isAppView(panel)) {
+        handleViewChange(panel)
       }
     })
     return unsub
@@ -416,21 +421,6 @@ export function App() {
       <>
         {renderPermissionModal()}
         <BootCheckPanel onRetry={() => window.api.retryBoot()} />
-      </>
-    )
-  }
-
-  if (phase === 'onboarding') {
-    return (
-      <>
-        {renderPermissionModal()}
-        <OnboardingPanel
-          onComplete={(prompt) => {
-            if (prompt) setStarterPrompt(prompt)
-            setActiveView('chat')
-            setPhase('main')
-          }}
-        />
       </>
     )
   }
@@ -503,8 +493,7 @@ export function App() {
                 activeSessionId={activeSessionId}
                 onSessionCreated={setActiveSessionId}
                 currentDirectoryId={currentDirectoryId}
-                starterPrompt={starterPrompt}
-                onStarterPromptConsumed={() => setStarterPrompt(null)}
+                draftResetSignal={chatDraftResetSignal}
               />
             )}
             {activeView === 'skills' && (
@@ -514,7 +503,7 @@ export function App() {
               <div className="page-scroll">
                 <div className="page-container-workbench workspace-page-container">
                   <div className="flex min-h-[360px] flex-col items-center justify-center text-center">
-                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-[12px] bg-bg-active text-text-secondary">
+                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-[10px] bg-bg-active text-text-secondary">
                       <Boxes size={22} strokeWidth={1.8} />
                     </div>
                     <h1 className="text-[18px] font-semibold text-text-primary">

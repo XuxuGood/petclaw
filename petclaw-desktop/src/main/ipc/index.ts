@@ -3,14 +3,14 @@
 // PetClaw IPC 分两阶段注册，由 index.ts 编排：
 //
 // Phase A — Boot 前（db 就绪后、runBootCheck 前）：
-//   registerBootIpcHandlers   → onboarding:*, i18n:*, app:version
+//   registerBootIpcHandlers   → i18n:*, app:version
 //   registerSettingsIpcHandlers → settings:get, settings:set
 //   + index.ts 中 boot:status, boot:retry（依赖启动闭包状态）
 //
-// Phase B — Pet-ready 后（双窗口 + runtime 就绪）：
+// Phase B — Runtime-ready 后（boot 成功后、boot:complete 前）：
 //   registerAllIpcHandlers → chat, window, directory, models,
 //                            skills, mcp, memory, scheduler, im
-//   + index.ts 中 app:pet-ready（依赖窗口创建编排）
+//   + index.ts 中 app:pet-ready（仅负责宠物窗口创建和双窗口桥接）
 //   + auto-updater.ts 中 updater:check, updater:download, updater:install
 //
 // 规则：

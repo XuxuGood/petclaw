@@ -8,10 +8,47 @@ export interface WindowIpcDeps {
   getPetWindow: () => BrowserWindow | null
   actions: SystemActions
   toggleMainWindow: () => void
+  updatePetWindowComposerAnchor: (bounds: {
+    x: number
+    y: number
+    width: number
+    height: number
+  }) => void
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
+function parseComposerBounds(value: unknown): {
+  x: number
+  y: number
+  width: number
+  height: number
+} | null {
+  if (!value || typeof value !== 'object') return null
+  const record = value as Record<string, unknown>
+  if (
+    !isFiniteNumber(record.x) ||
+    !isFiniteNumber(record.y) ||
+    !isFiniteNumber(record.width) ||
+    !isFiniteNumber(record.height) ||
+    record.width <= 0 ||
+    record.height <= 0
+  ) {
+    return null
+  }
+
+  return {
+    x: record.x,
+    y: record.y,
+    width: record.width,
+    height: record.height
+  }
 }
 
 export function registerWindowIpcHandlers(deps: WindowIpcDeps): void {
-  const { actions, getPetWindow, toggleMainWindow } = deps
+  const { actions, getPetWindow, toggleMainWindow, updatePetWindowComposerAnchor } = deps
 
   safeOn('window:move', (event, dx: number, dy: number) => {
     const win = BrowserWindow.fromWebContents(event.sender)
@@ -22,6 +59,12 @@ export function registerWindowIpcHandlers(deps: WindowIpcDeps): void {
 
   safeOn('chat:toggle', () => {
     toggleMainWindow()
+  })
+
+  safeOn('window:composer-bounds:update', (_event, bounds: unknown) => {
+    const parsed = parseComposerBounds(bounds)
+    if (!parsed) return
+    updatePetWindowComposerAnchor(parsed)
   })
 
   safeOn('pet:context-menu', (_event, paused: boolean) => {

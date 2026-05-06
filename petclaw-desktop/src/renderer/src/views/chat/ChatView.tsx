@@ -1,11 +1,22 @@
-import { useCallback, useEffect, useRef } from 'react'
-import { PawPrint } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  Calendar,
+  Check,
+  Clock,
+  Edit3,
+  FileText,
+  FolderOpen,
+  Image,
+  Paperclip,
+  PawPrint,
+  Search
+} from 'lucide-react'
 
 import { useChatStore } from '../../stores/chat-store'
-import { useI18n } from '../../i18n'
+import { i18nService, useI18n } from '../../i18n'
 import { ChatInputBox } from './ChatInputBox'
 import type { SelectedModel } from '../../components/ModelSelector'
-import { WelcomePage } from '../../components/WelcomePage'
+import { WelcomePage, type WelcomeSuggestionCategory } from '../../components/WelcomePage'
 
 interface ChatImageAttachment {
   name: string
@@ -23,51 +34,113 @@ interface ChatViewProps {
   activeSessionId?: string | null
   onSessionCreated?: (id: string) => void
   currentDirectoryId?: string
-  starterPrompt?: string | null
-  onStarterPromptConsumed?: () => void
+  draftResetSignal?: number
+}
+
+interface WelcomeSuggestion {
+  id: string
+  icon: typeof FileText
+  text: string
+}
+
+function getWelcomeSuggestions(
+  category: WelcomeSuggestionCategory | null,
+  t: (key: string) => string
+): WelcomeSuggestion[] {
+  if (!category) return []
+  const suggestionsByCategory: Record<
+    WelcomeSuggestionCategory,
+    Array<{ key: string; icon: typeof FileText }>
+  > = {
+    fileOrganize: [
+      { key: 'welcome.suggestion.fileOrganize.duplicateDownloads', icon: Search },
+      { key: 'welcome.suggestion.fileOrganize.sortDesktop', icon: FolderOpen },
+      { key: 'welcome.suggestion.fileOrganize.renamePhotos', icon: Image }
+    ],
+    contentCreation: [
+      { key: 'welcome.suggestion.contentCreation.brandGuide', icon: Paperclip },
+      { key: 'welcome.suggestion.contentCreation.meetingSubtitles', icon: Clock },
+      { key: 'welcome.suggestion.contentCreation.refractionLesson', icon: Edit3 }
+    ],
+    docProcess: [
+      { key: 'welcome.suggestion.docProcess.weeklyMeetings', icon: Check },
+      { key: 'welcome.suggestion.docProcess.paperReferences', icon: FileText },
+      { key: 'welcome.suggestion.docProcess.formatProposals', icon: Calendar }
+    ]
+  }
+  return suggestionsByCategory[category].map(({ key, icon }) => ({
+    id: key,
+    icon,
+    text: t(key)
+  }))
 }
 
 export function ChatView({
   activeSessionId,
   onSessionCreated,
   currentDirectoryId: _currentDirectoryId,
-  starterPrompt,
-  onStarterPromptConsumed
+  draftResetSignal = 0
 }: ChatViewProps) {
   const {
     messages,
     isLoading,
+    isHistoryLoading,
+    historyLoadError,
     addMessage,
     replaceLastAssistantMessage,
     setLoading,
+    beginHistoryLoad,
     loadHistory,
+    failHistoryLoad,
     setActiveSession,
     bindDraftToSession
   } = useChatStore()
   const { t } = useI18n()
+  const [welcomeCategory, setWelcomeCategory] = useState<WelcomeSuggestionCategory | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
-  const starterPromptRef = useRef<string | null>(null)
+  const loadRequestIdRef = useRef(0)
+  const welcomeSuggestions = getWelcomeSuggestions(welcomeCategory, t)
 
   useEffect(() => {
     setActiveSession(activeSessionId ?? null)
+    setWelcomeCategory(null)
     if (!activeSessionId) return
 
     let cancelled = false
+    const requestId = ++loadRequestIdRef.current
+    beginHistoryLoad(activeSessionId)
     window.api.cowork
       .getSession(activeSessionId)
       .then((raw) => {
-        if (cancelled || !raw || typeof raw !== 'object') return
+        if (cancelled || requestId !== loadRequestIdRef.current) return
+        if (!raw || typeof raw !== 'object') {
+          failHistoryLoad(activeSessionId, i18nService.t('chat.unknownError'))
+          return
+        }
         const maybeMessages = (raw as Record<string, unknown>).messages
-        if (!Array.isArray(maybeMessages)) return
+        if (!Array.isArray(maybeMessages)) {
+          failHistoryLoad(activeSessionId, i18nService.t('chat.unknownError'))
+          return
+        }
         loadHistory(parseDisplayMessages(maybeMessages), activeSessionId)
       })
       .catch(() => {
-        if (!cancelled) loadHistory([], activeSessionId)
+        if (!cancelled && requestId === loadRequestIdRef.current) {
+          failHistoryLoad(activeSessionId, i18nService.t('chat.unknownError'))
+        }
       })
     return () => {
       cancelled = true
     }
-  }, [activeSessionId, loadHistory, setActiveSession])
+  }, [activeSessionId, beginHistoryLoad, failHistoryLoad, loadHistory, setActiveSession])
+
+  useEffect(() => {
+    setWelcomeCategory(null)
+  }, [draftResetSignal])
+
+  useEffect(() => {
+    if (activeSessionId || messages.length > 0) setWelcomeCategory(null)
+  }, [activeSessionId, messages.length])
 
   // 订阅协作消息事件
   useEffect(() => {
@@ -78,9 +151,13 @@ export function ChatView({
       if (!sessionId) return
       const message = d.message as Record<string, unknown> | undefined
       if (message?.type === 'assistant') {
+        const sourceId = typeof message.id === 'string' ? message.id : undefined
         // 首次收到时表示新一轮响应开始
         setLoading(true, sessionId)
-        addMessage({ role: 'assistant', content: String(message.content ?? '') }, sessionId)
+        addMessage(
+          { role: 'assistant', content: String(message.content ?? ''), sourceId },
+          sessionId
+        )
       }
     })
 
@@ -88,8 +165,9 @@ export function ChatView({
     const unsubUpdate = window.api.cowork.onMessageUpdate((data) => {
       const d = data as Record<string, unknown>
       const sessionId = typeof d.sessionId === 'string' ? d.sessionId : null
+      const messageId = typeof d.messageId === 'string' ? d.messageId : null
       if (sessionId && typeof d.content === 'string') {
-        replaceLastAssistantMessage(d.content, sessionId)
+        replaceLastAssistantMessage(d.content, sessionId, messageId)
       }
     })
 
@@ -104,8 +182,11 @@ export function ChatView({
     const unsubError = window.api.cowork.onError((data) => {
       const d = data as Record<string, unknown>
       const sessionId = typeof d.sessionId === 'string' ? d.sessionId : null
-      const msg = typeof d.error === 'string' ? d.error : t('chat.unknownError')
-      addMessage({ role: 'assistant', content: t('chat.errorPrefix', { msg }) }, sessionId)
+      const msg = typeof d.error === 'string' ? d.error : i18nService.t('chat.unknownError')
+      addMessage(
+        { role: 'assistant', content: i18nService.t('chat.errorPrefix', { msg }) },
+        sessionId
+      )
       setLoading(false, sessionId)
     })
 
@@ -122,7 +203,7 @@ export function ChatView({
       unsubError()
       unsubSessionStopped()
     }
-  }, [addMessage, replaceLastAssistantMessage, setLoading, t])
+  }, [addMessage, replaceLastAssistantMessage, setLoading])
 
   // 消息列表更新时自动滚动到底部
   useEffect(() => {
@@ -193,33 +274,36 @@ export function ChatView({
     [activeSessionId, addMessage, bindDraftToSession, isLoading, onSessionCreated, setLoading, t]
   )
 
-  /** WelcomePage 快捷卡片点击时直接发送，使用空 cwd */
-  const handleSendFromWelcome = (text: string) => {
-    handleSend(text, '')
-  }
-
-  useEffect(() => {
-    if (!starterPrompt || starterPromptRef.current === starterPrompt) return
-    starterPromptRef.current = starterPrompt
-    handleSend(starterPrompt, '')
-    onStarterPromptConsumed?.()
-  }, [starterPrompt, handleSend, onStarterPromptConsumed])
-
   return (
     <div className="flex-1 flex min-h-0 flex-col">
       {activeSessionId || messages.length > 0 ? (
         <>
           <div ref={scrollRef} className="flex-1 overflow-y-auto">
-            <MessageList messages={messages} isLoading={isLoading} />
+            {isHistoryLoading && messages.length === 0 ? (
+              <SessionHistoryState text={t('common.loading')} />
+            ) : historyLoadError && messages.length === 0 ? (
+              <SessionHistoryState text={historyLoadError} />
+            ) : (
+              <MessageList messages={messages} isLoading={isLoading} />
+            )}
           </div>
-          <ChatInputBox onSend={handleSend} disabled={isLoading} />
+          <ChatInputBox
+            key={`session-${activeSessionId ?? 'draft'}`}
+            onSend={handleSend}
+            disabled={isLoading}
+          />
         </>
       ) : (
         <>
           <div ref={scrollRef} className="flex-1 overflow-y-auto flex flex-col">
-            <WelcomePage onSendPrompt={handleSendFromWelcome} />
+            <WelcomePage selectedCategory={welcomeCategory} onSelectCategory={setWelcomeCategory} />
           </div>
-          <ChatInputBox onSend={handleSend} disabled={isLoading} />
+          <ChatInputBox
+            key={`draft-${draftResetSignal}`}
+            onSend={handleSend}
+            disabled={isLoading}
+            promptSuggestions={welcomeSuggestions}
+          />
         </>
       )}
     </div>
@@ -235,6 +319,7 @@ function parseDisplayMessages(rawMessages: unknown[]): Array<Omit<Message, 'id'>
     if (record.type !== 'user' && record.type !== 'assistant') return []
     return [
       {
+        sourceId: typeof record.id === 'string' ? record.id : undefined,
         role: record.type,
         content: typeof record.content === 'string' ? record.content : ''
       }
@@ -244,8 +329,19 @@ function parseDisplayMessages(rawMessages: unknown[]): Array<Omit<Message, 'id'>
 
 interface Message {
   id: number
+  sourceId?: string
   role: 'user' | 'assistant'
   content: string
+}
+
+function SessionHistoryState({ text }: { text: string }) {
+  return (
+    <div className="flex h-full items-center justify-center px-[var(--space-page-x)] py-[var(--space-page-y)]">
+      <div className="rounded-[12px] border border-border bg-bg-surface px-4 py-3 text-[13px] text-text-secondary shadow-[var(--shadow-card)]">
+        {text}
+      </div>
+    </div>
+  )
 }
 
 function MessageList({ messages, isLoading }: { messages: Message[]; isLoading: boolean }) {
@@ -265,8 +361,8 @@ function MessageList({ messages, isLoading }: { messages: Message[]; isLoading: 
           <div
             className={`max-w-[75%] px-4 py-2.5 text-[13.5px] leading-[1.65] ${
               msg.role === 'user'
-                ? 'bg-bg-bubble-user text-text-bubble-user rounded-[12px] rounded-br-[6px]'
-                : 'bg-bg-bubble-ai text-text-bubble-ai rounded-[12px] rounded-bl-[6px] shadow-[var(--shadow-card)]'
+                ? 'message-bubble-user bg-bg-bubble-user text-text-bubble-user rounded-[12px] rounded-br-[6px]'
+                : 'message-bubble-ai bg-bg-bubble-ai text-text-bubble-ai rounded-[12px] rounded-bl-[6px] shadow-[var(--shadow-card)]'
             }`}
           >
             {msg.content ? (
