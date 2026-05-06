@@ -1,0 +1,81 @@
+import { shell } from 'electron'
+
+import { safeHandle } from '../ipc/ipc-registry'
+import { exportDiagnosticsBundle } from './diagnostics-bundle'
+import { getLoggingPlatform, type RendererLogReport } from './facade'
+import type { DiagnosticsExportOptions, LogSource } from './types'
+
+const ALLOWED_LOG_SOURCES: LogSource[] = [
+  'main',
+  'renderer',
+  'startup',
+  'cowork',
+  'mcp',
+  'gateway',
+  'runtime',
+  'updater',
+  'installer'
+]
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function readString(value: unknown, label: string, maxLength: number): string {
+  if (typeof value !== 'string' || value.length === 0 || value.length > maxLength) {
+    throw new Error(`Invalid renderer log ${label}`)
+  }
+  return value
+}
+
+export function validateRendererLogReport(value: unknown): RendererLogReport {
+  if (!isRecord(value)) throw new Error('Invalid renderer log report')
+  if (value.level !== 'warn' && value.level !== 'error') {
+    throw new Error('Invalid renderer log level')
+  }
+
+  return {
+    level: value.level,
+    module: readString(value.module, 'module', 80),
+    event: readString(value.event, 'event', 120),
+    ...(typeof value.message === 'string' ? { message: value.message.slice(0, 500) } : {}),
+    ...(isRecord(value.fields) ? { fields: value.fields } : {})
+  }
+}
+
+function validateExportOptions(value: unknown): DiagnosticsExportOptions {
+  if (!isRecord(value)) return { timeRangeDays: 3 }
+  const timeRangeDays =
+    value.timeRangeDays === 1 || value.timeRangeDays === 3 || value.timeRangeDays === 7
+      ? value.timeRangeDays
+      : 3
+  const includeSources = Array.isArray(value.includeSources)
+    ? value.includeSources.filter((source): source is LogSource =>
+        ALLOWED_LOG_SOURCES.includes(source as LogSource)
+      )
+    : undefined
+  return {
+    timeRangeDays,
+    ...(includeSources && includeSources.length > 0 ? { includeSources } : {})
+  }
+}
+
+export function registerLoggingIpcHandlers(): void {
+  safeHandle('logging:report', (_event, payload: unknown) => {
+    getLoggingPlatform().reportRendererLog(validateRendererLogReport(payload))
+  })
+
+  safeHandle('logging:snapshot', () => getLoggingPlatform().snapshot())
+
+  safeHandle('logging:export-diagnostics', async (_event, payload: unknown) =>
+    exportDiagnosticsBundle(validateExportOptions(payload))
+  )
+
+  safeHandle('logging:open-log-folder', async () => {
+    const snapshot = getLoggingPlatform().snapshot()
+    const mainSource = snapshot.sources.find((source) => source.source === 'main')
+    if (!mainSource) throw new Error('Main log source is unavailable')
+    const error = await shell.openPath(mainSource.dir)
+    if (error) throw new Error(error)
+  })
+}

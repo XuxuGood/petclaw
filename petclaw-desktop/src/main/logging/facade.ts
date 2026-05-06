@@ -19,6 +19,8 @@ export interface RendererLogReport {
 }
 
 export interface LoggingPlatform {
+  userDataPath: string
+  appVersion: string
   storage: LogStorage
   getLogger(module: string, source?: LogSource): ScopedLogger
   reportRendererLog(report: RendererLogReport): void
@@ -49,6 +51,8 @@ export function createLoggingPlatform(options: LoggingPlatformOptions): LoggingP
   }
 
   const platform: LoggingPlatform = {
+    userDataPath: options.userDataPath,
+    appVersion: options.appVersion,
     storage,
     getLogger(module: string, source: LogSource = 'main'): ScopedLogger {
       return {

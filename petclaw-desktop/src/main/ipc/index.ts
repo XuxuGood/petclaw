@@ -5,6 +5,7 @@
 // Phase A — Boot 前（db 就绪后、runBootCheck 前）：
 //   registerBootIpcHandlers   → i18n:*, app:version
 //   registerSettingsIpcHandlers → settings:get, settings:set
+//   registerLoggingIpcHandlers  → logging:*
 //   + index.ts 中 boot:status, boot:retry（依赖启动闭包状态）
 //
 // Phase B — Runtime-ready 后（boot 成功后、boot:complete 前）：
@@ -30,6 +31,7 @@ import { registerMcpIpcHandlers, type McpIpcDeps } from './mcp-ipc'
 import { registerMemoryIpcHandlers, type MemoryIpcDeps } from './memory-ipc'
 import { registerSchedulerIpcHandlers, type SchedulerIpcDeps } from './scheduler-ipc'
 import { registerImIpcHandlers, type ImIpcDeps } from './im-ipc'
+import { registerLoggingIpcHandlers } from '../logging/logging-ipc'
 
 // AllIpcDeps 合并全部模块的依赖接口，主进程统一注入
 export type AllIpcDeps = ChatIpcDeps &
@@ -58,5 +60,5 @@ export function registerAllIpcHandlers(deps: AllIpcDeps): void {
   registerImIpcHandlers(deps)
 }
 
-export { registerBootIpcHandlers, registerSettingsIpcHandlers }
+export { registerBootIpcHandlers, registerSettingsIpcHandlers, registerLoggingIpcHandlers }
 export type { BootIpcDeps, SettingsIpcDeps }

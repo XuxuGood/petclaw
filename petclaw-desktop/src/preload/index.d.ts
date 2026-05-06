@@ -112,6 +112,19 @@ interface ElectronAPI {
       }) => void
     ) => () => void
   }
+  // Logging / Diagnostics
+  logging: {
+    report: (event: {
+      level: 'warn' | 'error'
+      module: string
+      event: string
+      message?: string
+      fields?: Record<string, unknown>
+    }) => Promise<void>
+    snapshot: () => Promise<unknown>
+    exportDiagnostics: (options: { timeRangeDays: 1 | 3 | 7 }) => Promise<unknown>
+    openLogFolder: () => Promise<void>
+  }
   // Manager APIs
   directories: {
     list: () => Promise<unknown>

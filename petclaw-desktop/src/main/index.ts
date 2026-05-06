@@ -28,7 +28,12 @@ import { McpBridgeServer } from './mcp/mcp-bridge-server'
 import { MemoryManager } from './memory/memory-manager'
 import { MemorySearchConfigStore } from './memory/memory-search-config-store'
 import { PetEventBridge } from './pet/pet-event-bridge'
-import { registerAllIpcHandlers, registerBootIpcHandlers, registerSettingsIpcHandlers } from './ipc'
+import {
+  registerAllIpcHandlers,
+  registerBootIpcHandlers,
+  registerLoggingIpcHandlers,
+  registerSettingsIpcHandlers
+} from './ipc'
 import { safeHandle, safeOn } from './ipc/ipc-registry'
 import { HookServer } from './hooks/server'
 import {
@@ -387,6 +392,7 @@ app.whenReady().then(async () => {
   safeHandle('boot:status', () => bootSuccess)
   registerBootIpcHandlers({ db, refreshSystemMenus })
   registerSettingsIpcHandlers({ db })
+  registerLoggingIpcHandlers()
 
   chatWindow.webContents.on('did-finish-load', () => {
     diagWindowLoad('chat-window', chatWindow.webContents.getURL())

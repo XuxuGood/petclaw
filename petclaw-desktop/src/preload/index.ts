@@ -207,6 +207,21 @@ const api = {
     }
   },
 
+  // ── Logging / Diagnostics ──
+  logging: {
+    report: (event: {
+      level: 'warn' | 'error'
+      module: string
+      event: string
+      message?: string
+      fields?: Record<string, unknown>
+    }): Promise<void> => ipcRenderer.invoke('logging:report', event),
+    snapshot: (): Promise<unknown> => ipcRenderer.invoke('logging:snapshot'),
+    exportDiagnostics: (options: { timeRangeDays: 1 | 3 | 7 }): Promise<unknown> =>
+      ipcRenderer.invoke('logging:export-diagnostics', options),
+    openLogFolder: (): Promise<void> => ipcRenderer.invoke('logging:open-log-folder')
+  },
+
   // ── Manager APIs ──
   directories: {
     list: () => ipcRenderer.invoke('directory:list'),
