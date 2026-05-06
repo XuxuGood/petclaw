@@ -132,7 +132,7 @@ app.whenReady().then(async () => {
   // 初始化 i18n，读取系统语言偏好
   initI18n(db, app.getLocale())
 
-  // 2. EngineManager 初始化，OpenClaw runtime root 由 userData/openclaw 承载
+  // 2. EngineManager 初始化，userData/openclaw 仅承载 OpenClaw 状态、日志和工作区
   engineManager = new OpenclawEngineManager()
   workspacePath = userDataPaths.openclawWorkspace
   fs.mkdirSync(workspacePath, { recursive: true })
