@@ -4,6 +4,7 @@ import path from 'path'
 import { resolveLoggingPaths } from './paths'
 import { sanitizeLogEvent } from './sanitizer'
 import {
+  DEFAULT_LOG_RETENTION_DAYS,
   DEFAULT_LOG_MAX_SIZE_BYTES,
   type DiagnosticsSnapshot,
   type LogEventInput,
@@ -52,9 +53,27 @@ function sourceFilePattern(source: LogSource): RegExp {
   return new RegExp(`^${source}-\\d{4}-\\d{2}-\\d{2}(?:\\.\\d+)?\\.log$`)
 }
 
+function pruneOldFiles(source: LogSource, dir: string, retentionDays: number, date: Date): void {
+  if (!fs.existsSync(dir)) return
+  const cutoffMs = date.getTime() - retentionDays * 24 * 60 * 60 * 1000
+  const pattern = sourceFilePattern(source)
+  for (const name of fs.readdirSync(dir)) {
+    if (!pattern.test(name)) continue
+    const filePath = path.join(dir, name)
+    try {
+      if (fs.statSync(filePath).mtimeMs < cutoffMs) {
+        fs.unlinkSync(filePath)
+      }
+    } catch {
+      // 单个旧日志清理失败不影响当前事件写入。
+    }
+  }
+}
+
 export function createLogStorage(options: LogStorageOptions): LogStorage {
   const now = options.now ?? (() => new Date())
   const maxSizeBytes = options.maxSizeBytes ?? DEFAULT_LOG_MAX_SIZE_BYTES
+  const retentionDays = options.retentionDays ?? DEFAULT_LOG_RETENTION_DAYS
   const paths = resolveLoggingPaths(options.userDataPath, now())
   const errors: DiagnosticsSnapshot['errors'] = []
 
@@ -67,6 +86,7 @@ export function createLogStorage(options: LogStorageOptions): LogStorage {
     try {
       ensureDir(path.dirname(filePath))
       rotateIfNeeded(filePath, maxSizeBytes)
+      pruneOldFiles(input.source, path.dirname(filePath), retentionDays, now())
       const event = sanitizeLogEvent(input, {
         appVersion: options.appVersion,
         userDataPath: options.userDataPath

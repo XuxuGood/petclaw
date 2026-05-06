@@ -51,4 +51,31 @@ describe('createLogStorage', () => {
     expect(snapshot.sources.some((source) => source.source === 'main')).toBe(true)
     expect(snapshot.sources.some((source) => source.source === 'gateway')).toBe(true)
   })
+
+  test('prunes source logs older than the retention window', () => {
+    const storage = createLogStorage({
+      userDataPath: root,
+      appVersion: '0.1.0',
+      now: () => new Date('2026-05-05T10:00:00.000Z'),
+      retentionDays: 14
+    })
+    const logsDir = path.join(root, 'logs', 'main')
+    fs.mkdirSync(logsDir, { recursive: true })
+    const stalePath = path.join(logsDir, 'main-2026-04-01.log')
+    fs.writeFileSync(stalePath, 'old', 'utf8')
+    fs.utimesSync(
+      stalePath,
+      new Date('2026-04-01T10:00:00.000Z'),
+      new Date('2026-04-01T10:00:00.000Z')
+    )
+
+    storage.write({
+      level: 'info',
+      source: 'main',
+      module: 'App',
+      event: 'app.started'
+    })
+
+    expect(fs.existsSync(stalePath)).toBe(false)
+  })
 })

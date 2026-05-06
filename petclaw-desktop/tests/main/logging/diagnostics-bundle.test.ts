@@ -78,4 +78,30 @@ describe('createDiagnosticsBundle', () => {
     expect(gatewayLog).not.toContain('Bearer eyJ')
     expect(result.redactionCount).toBeGreaterThanOrEqual(1)
   })
+
+  test('keeps only the latest diagnostics bundles', async () => {
+    const storage = createLogStorage({
+      userDataPath: root,
+      appVersion: '0.1.0',
+      now: () => new Date('2026-05-05T10:00:00.000Z')
+    })
+
+    for (let index = 0; index < 6; index += 1) {
+      await createDiagnosticsBundle({
+        userDataPath: root,
+        appVersion: '0.1.0',
+        storage,
+        options: { timeRangeDays: 1 },
+        now: () => new Date(`2026-05-05T10:0${index}:00.000Z`)
+      })
+    }
+
+    const diagnosticsDir = path.join(root, 'logs', 'diagnostics')
+    const bundles = fs
+      .readdirSync(diagnosticsDir)
+      .filter((name) => name.startsWith('petclaw-diagnostics-'))
+
+    expect(bundles).toHaveLength(5)
+    expect(bundles).not.toContain('petclaw-diagnostics-20260505T100000.zip')
+  })
 })

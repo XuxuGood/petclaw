@@ -22,6 +22,7 @@
 Phase A
   -> registerBootIpcHandlers
   -> registerSettingsIpcHandlers
+  -> registerLoggingIpcHandlers
   -> boot status/retry closures
 
 Phase B
@@ -42,6 +43,10 @@ Phase B
 | `i18n:set-language` | invoke | `setLanguage(locale)` | 设置并持久化语言 |
 | `settings:get` | invoke | `getSetting(key)` | 获取 app_config 设置 |
 | `settings:set` | invoke | `setSetting(key, value)` | 保存 app_config 设置 |
+| `logging:report` | invoke | `logging.report(event)` | renderer 上报 warn/error 级诊断事件，main 校验并脱敏落盘 |
+| `logging:snapshot` | invoke | `logging.snapshot()` | 获取日志系统可写状态和各日志流当前路径 |
+| `logging:export-diagnostics` | invoke | `logging.exportDiagnostics(options)` | 导出最近 1/3/7 天脱敏诊断包 |
+| `logging:open-log-folder` | invoke | `logging.openLogFolder()` | 打开预定义主日志目录，不接受 renderer 传入路径 |
 | `boot:status` | invoke | `getBootStatus()` | 获取启动完成状态 |
 | `boot:retry` | send | `retryBoot()` | 重试启动检查 |
 | `boot:step-update` | main -> renderer | `onBootStepUpdate()` | BootCheck 步骤更新 |

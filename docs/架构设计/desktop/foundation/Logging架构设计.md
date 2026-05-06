@@ -76,13 +76,13 @@ Logging Platform
   installer/
     installer.log
   diagnostics/
-    petclaw-diagnostics-YYYYMMDD-HHmmss.zip
+    petclaw-diagnostics-YYYYMMDDTHHmmss.zip
 
 {userData}/openclaw/logs/
   gateway/
     gateway-YYYY-MM-DD.log
   runtime/
-    openclaw-YYYY-MM-DD.log
+    runtime-YYYY-MM-DD.log
 ```
 
 日志流职责：
@@ -114,7 +114,7 @@ Logging Platform
 写入策略：
 
 - 写入前确保目录存在。
-- 单条事件序列化后超过事件大小上限时截断字段，并记录 `truncated: true` 和 `originalSizeBytes`。
+- 单条事件序列化后超过事件大小上限时截断字段，并记录 `truncated: true`。
 - 单个日志流写入失败时只影响该日志流，不影响业务流程。
 - 日志系统降级状态通过 diagnostics snapshot 暴露给 UI。
 
@@ -217,9 +217,9 @@ logging:open-log-folder
 规则：
 
 - IPC 必须通过 `safeHandle` / `safeOn` 注册。
-- preload 负责 shape 校验、字段裁剪和事件大小限制。
-- main 负责权限判断、脱敏、落盘和导出。
-- renderer 不能传任意路径给 main 打开，只能请求预定义日志目录或刚导出的诊断包位置。
+- preload 只暴露受控方法，不透传 `ipcRenderer`。
+- main 负责 renderer payload shape 校验、字段裁剪、权限判断、脱敏、落盘和导出。
+- renderer 不能传任意路径给 main 打开，只能请求预定义日志目录。
 - renderer 默认只上报 error/warn、React 错误边界、不可恢复失败和关键用户操作失败。
 - 用户可见失败必须在 UI 展示本地化文案，不能只上报日志。
 
@@ -229,12 +229,11 @@ OpenClaw gateway、runtime 辅助进程、installer、updater 等子进程日志
 
 ```text
 attachProcessLogger({
+  platform,
   source,
-  process,
-  stdoutLevel,
-  stderrLevel,
-  redactPolicy,
-  milestonePatterns
+  module,
+  stdout,
+  stderr
 })
 ```
 
@@ -286,7 +285,7 @@ redactByKeyName(apiKey/token/secret/password/cookie/authorization...)
 
 - 脱敏失败时写入 `sanitization.failed` 元事件，不写原始 payload。
 - 序列化失败时写入 `serialization.failed` 和错误摘要，不写原始对象。
-- 字段过大时截断并记录 `truncated: true`、`originalSizeBytes`。
+- 字段过大时截断并记录 `truncated: true`。
 - 检测到疑似 secret 时替换为 `[redacted]`，并记录 `redactionCount`。
 
 诊断包导出必须对历史日志再次运行二次脱敏，防止旧日志或第三方输出绕过当前 sanitizer。
@@ -328,15 +327,14 @@ Cowork、MCP、Memory 和模型调用属于高敏感链路。
 
 ```text
 BootCheck 错误页
-  → 查看日志
+  → 打开日志目录
   → 导出诊断包
-  → 重试 / 打开设置
+  → 重试
 
 Settings / Engine
   → 查看 runtime 状态
   → 打开日志目录
   → 导出诊断包
-  → 复制脱敏诊断摘要
 
 Settings / About 或 Support
   → 导出诊断包
@@ -346,7 +344,7 @@ Settings / About 或 Support
 诊断包结构：
 
 ```text
-petclaw-diagnostics-YYYYMMDD-HHmmss.zip
+petclaw-diagnostics-YYYYMMDDTHHmmss.zip
   manifest.json
   logs/
     main/*.log
@@ -360,10 +358,6 @@ petclaw-diagnostics-YYYYMMDD-HHmmss.zip
   metadata/
     app.json
     platform.json
-    runtime-status.json
-    database-summary.json
-    config-summary.json
-    feature-flags.json
 ```
 
 `manifest.json` 字段：
@@ -377,7 +371,6 @@ logTimeRange
 includedSources
 redactionVersion
 redactionCounts
-truncatedFiles
 exportErrors
 ```
 
@@ -385,12 +378,9 @@ exportErrors
 
 metadata 边界：
 
-- `app.json`：版本、build channel、isPackaged、locale。
-- `platform.json`：OS、arch、Electron/Node/Chrome 版本。
-- `runtime-status.json`：OpenClaw 版本、phase、健康状态、端口是否存在，不写 token。
-- `database-summary.json`：表存在性、记录计数、迁移版本，不 dump row。
-- `config-summary.json`：配置 key 摘要、provider 是否配置、MCP server 数量，不写 credential。
-- `feature-flags.json`：功能开关状态，不写 secret。
+- `app.json`：应用版本。
+- `platform.json`：platform、arch、Electron/Node/Chrome 版本。
+- Logging foundation 不直接读取 SQLite、runtime token、provider credential 或业务配置。需要业务域元数据时，由对应 domain 提供已脱敏摘要，再纳入诊断包。
 
 部分日志缺失、读失败或二次脱敏失败时，导出仍应尽力完成，并在 manifest 的 `exportErrors` 中记录失败来源和脱敏后的错误摘要。
 

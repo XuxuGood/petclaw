@@ -6,7 +6,12 @@ import { getLoggingPlatform } from './facade'
 import { resolveLoggingPaths } from './paths'
 import { sanitizeUnknownForLog } from './sanitizer'
 import type { LogStorage } from './storage'
-import type { DiagnosticsExportOptions, DiagnosticsExportResult, LogSource } from './types'
+import {
+  DEFAULT_DIAGNOSTICS_RETAIN_COUNT,
+  type DiagnosticsExportOptions,
+  type DiagnosticsExportResult,
+  type LogSource
+} from './types'
 
 const DEFAULT_SOURCES: LogSource[] = [
   'main',
@@ -62,6 +67,26 @@ function countEmbeddedRedactions(content: string): number {
     }
   }
   return count
+}
+
+function pruneOldDiagnosticsBundles(dir: string, retainCount: number): void {
+  if (!fs.existsSync(dir)) return
+  const entries = fs
+    .readdirSync(dir)
+    .filter((name) => /^petclaw-diagnostics-\d{8}T\d{6}\.zip$/.test(name))
+    .map((name) => {
+      const filePath = path.join(dir, name)
+      return { filePath, mtimeMs: fs.statSync(filePath).mtimeMs }
+    })
+    .sort((a, b) => b.mtimeMs - a.mtimeMs)
+
+  for (const entry of entries.slice(retainCount)) {
+    try {
+      fs.unlinkSync(entry.filePath)
+    } catch {
+      // 旧诊断包清理失败不影响本次导出结果。
+    }
+  }
 }
 
 export async function createDiagnosticsBundle(
@@ -120,6 +145,7 @@ export async function createDiagnosticsBundle(
   })
 
   fs.writeFileSync(filePath, Buffer.from(zipSync(files)))
+  pruneOldDiagnosticsBundles(paths.diagnostics.dir, DEFAULT_DIAGNOSTICS_RETAIN_COUNT)
   const sizeBytes = fs.statSync(filePath).size
   return { filePath, sizeBytes, redactionCount, exportWarnings }
 }
