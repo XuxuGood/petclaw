@@ -207,6 +207,8 @@ window.api.logging.exportDiagnostics(options)
 window.api.logging.openLogFolder()
 ```
 
+Feedback 不直接读取日志文件。问题反馈链路需要诊断信息时，必须由 main 侧 FeedbackService 调用 diagnostics bundle 生成脱敏包，再提交给 Feedback API。Renderer 只展示诊断摘要和勾选状态。
+
 IPC channel：
 
 ```text

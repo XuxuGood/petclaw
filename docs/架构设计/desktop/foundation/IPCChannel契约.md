@@ -91,6 +91,9 @@ Phase B
 |---|---|---|---|
 | `dialog:select-attachments` | invoke | `chat.selectAttachments()` | 选择文件/目录/图片附件 |
 | `dialog:select-directory` | invoke | `directories.selectDirectory()` | 选择工作目录 |
+| `feedback:capture-window` | invoke | `feedback.captureWindow()` | 捕获当前窗口截图，供用户预览后随反馈提交 |
+| `feedback:diagnostics-summary` | invoke | `feedback.getDiagnosticsSummary()` | 获取将随反馈提交的脱敏诊断信息摘要，不返回日志原文 |
+| `feedback:submit` | invoke | `feedback.submit(payload)` | 提交问题描述、截图和可选诊断信息到 Feedback API |
 | `directory:list` | invoke | `directories.list()` | 目录列表 |
 | `directory:get` | invoke | `directories.get(agentId)` | 按 agentId 获取目录 |
 | `directory:get-by-path` | invoke | `directories.getByPath(path)` | 按路径获取目录 |

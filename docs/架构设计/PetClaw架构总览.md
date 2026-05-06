@@ -15,6 +15,7 @@ PetClaw 是 Electron 桌面宠物与 AI 协作应用。当前主体是 `petclaw-
 | 修改 IPC 或 preload | [`desktop/foundation/IPCPreload架构设计.md`](./desktop/foundation/IPCPreload架构设计.md) 和 [`desktop/foundation/IPCChannel契约.md`](./desktop/foundation/IPCChannel契约.md) |
 | 修改 SQLite/store | [`desktop/foundation/DataStorage架构设计.md`](./desktop/foundation/DataStorage架构设计.md) |
 | 修改 i18n | [`desktop/foundation/I18n架构设计.md`](./desktop/foundation/I18n架构设计.md) 和 [`shared/Shared架构设计.md`](./shared/Shared架构设计.md) |
+| 修改问题反馈链路 | [`desktop/foundation/Feedback架构设计.md`](./desktop/foundation/Feedback架构设计.md) 和 [`api/Feedback API架构设计.md`](./api/Feedback%20API架构设计.md) |
 | 修改 Desktop 打包或 OpenClaw runtime 分发 | [`desktop/runtime/Desktop打包与Runtime分发架构设计.md`](./desktop/runtime/Desktop打包与Runtime分发架构设计.md) |
 | 修改 AI 开发工具链 | [`engineering/AI代码上下文工程设计.md`](./engineering/AI代码上下文工程设计.md) |
 | 修改 GitHub Actions | [`engineering/CI-CD架构设计.md`](./engineering/CI-CD架构设计.md) |
