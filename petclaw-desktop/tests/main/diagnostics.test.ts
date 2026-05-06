@@ -6,6 +6,7 @@ import path from 'path'
 import { app } from 'electron'
 
 import { diagAppReady, diagBootResult } from '../../src/main/diagnostics'
+import { resetLoggingPlatformForTest } from '../../src/main/logging'
 
 let tmpDir: string
 
@@ -16,15 +17,17 @@ beforeEach(() => {
     return tmpDir
   })
   vi.mocked(app.getVersion).mockReturnValue('0.0.0-test')
+  resetLoggingPlatformForTest()
 })
 
 afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true })
   vi.restoreAllMocks()
+  resetLoggingPlatformForTest()
 })
 
 function diagnosticsLogPath(): string {
-  return path.join(tmpDir, 'logs', 'startup-diagnostics.log')
+  return path.join(tmpDir, 'logs', 'startup', 'startup-diagnostics.jsonl')
 }
 
 describe('diagnostics log path', () => {
@@ -33,7 +36,8 @@ describe('diagnostics log path', () => {
 
     const content = fs.readFileSync(diagnosticsLogPath(), 'utf8')
     expect(content).toContain('"event":"app-when-ready"')
-    expect(content).toContain('"appVersion":"0.0.0-test"')
+    expect(content).toContain('"source":"startup"')
+    expect(content).toContain('"module":"StartupDiagnostics"')
   })
 
   it('appends boot result without using legacy home directory', () => {

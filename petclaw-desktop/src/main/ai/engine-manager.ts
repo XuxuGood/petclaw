@@ -18,6 +18,7 @@ import {
 } from './openclaw-local-extensions'
 import { appendPythonRuntimeToEnv } from './python-runtime'
 import { isSystemProxyEnabled, resolveSystemProxyUrlForTargets } from './system-proxy'
+import { attachProcessLogger, getLoggingPlatform, type ProcessLogStream } from '../logging'
 
 // ── 类型 ──
 
@@ -130,15 +131,18 @@ function onceGatewayError(child: GatewayProcess, listener: (...args: unknown[]) 
   emitter.once('error', listener)
 }
 
+function toProcessLogStream(value: unknown): ProcessLogStream | null {
+  if (typeof value !== 'object' || value === null || !('on' in value)) return null
+  return value as ProcessLogStream
+}
+
 // ── EngineManager 类 ──
 
 export class OpenclawEngineManager extends EventEmitter {
   private readonly baseDir: string
   private readonly stateDir: string
-  private readonly logsDir: string
   private readonly gatewayTokenPath: string
   private readonly gatewayPortPath: string
-  private readonly gatewayLogPath: string
   private readonly configPath: string
 
   private desiredVersion: string
@@ -151,7 +155,6 @@ export class OpenclawEngineManager extends EventEmitter {
   private gatewayPort: number | null = null
   private startGatewayPromise: Promise<EngineStatus> | null = null
   private secretEnvVars: Record<string, string> = {}
-  private gatewaySpawnedAt: number | null = null
 
   constructor() {
     super()
@@ -159,16 +162,14 @@ export class OpenclawEngineManager extends EventEmitter {
     const userDataPaths = resolveUserDataPaths(app.getPath('userData'))
     this.baseDir = userDataPaths.openclawRoot
     this.stateDir = userDataPaths.openclawState
-    this.logsDir = userDataPaths.openclawLogs
 
     this.gatewayTokenPath = path.join(this.stateDir, 'gateway-token')
     this.gatewayPortPath = path.join(this.stateDir, 'gateway-port.json')
-    this.gatewayLogPath = path.join(this.logsDir, 'gateway.log')
     this.configPath = path.join(this.stateDir, 'openclaw.json')
 
     ensureDir(this.baseDir)
     ensureDir(this.stateDir)
-    ensureDir(this.logsDir)
+    ensureDir(userDataPaths.openclawLogs)
 
     const runtime = this.resolveRuntimeMetadata()
     this.desiredVersion = runtime.version || DEFAULT_OPENCLAW_VERSION
@@ -237,7 +238,7 @@ export class OpenclawEngineManager extends EventEmitter {
   }
 
   getGatewayLogPath(): string {
-    return this.gatewayLogPath
+    return getLoggingPlatform().storage.getCurrentFile('gateway')
   }
 
   /**
@@ -599,7 +600,6 @@ export class OpenclawEngineManager extends EventEmitter {
     }
 
     this.gatewayProcess = child
-    this.gatewaySpawnedAt = Date.now()
     this.attachGatewayProcessLogs(child)
     this.attachGatewayExitHandlers(child)
 
@@ -1354,38 +1354,15 @@ export class OpenclawEngineManager extends EventEmitter {
     })
   }
 
-  /** 将 gateway 进程的 stdout/stderr 追加到日志文件，并用 rewriteUtcTimestamps 转换时间戳 */
+  /** 将 gateway 进程的 stdout/stderr 写入统一日志平台。 */
   private attachGatewayProcessLogs(child: GatewayProcess): void {
-    ensureDir(path.dirname(this.gatewayLogPath))
-
-    const appendLog = (chunk: Buffer | string, stream: 'stdout' | 'stderr') => {
-      const text = typeof chunk === 'string' ? chunk : chunk.toString()
-      const line = `[${new Date().toISOString()}] [${stream}] ${text}`
-      fs.appendFile(this.gatewayLogPath, line, () => {
-        /* 尽力写入 */
-      })
-    }
-
-    const logMilestone = (text: string) => {
-      if (!this.gatewaySpawnedAt) return
-      if (/\[gateway\]/.test(text)) {
-        const elapsed = Date.now() - this.gatewaySpawnedAt
-        const summary = text.replace(/\n+$/g, '').split('\n')[0].trim()
-        console.warn(`[OpenClaw] 启动里程碑 (${elapsed}ms since spawn): ${summary}`)
-      }
-    }
-
-    child.stdout?.on('data', (chunk) => {
-      appendLog(chunk, 'stdout')
-      const text = typeof chunk === 'string' ? chunk : chunk.toString()
-      logMilestone(text)
-      console.warn(`[OpenClaw stdout] ${OpenclawEngineManager.rewriteUtcTimestamps(text)}`)
-    })
-    child.stderr?.on('data', (chunk) => {
-      appendLog(chunk, 'stderr')
-      const text = typeof chunk === 'string' ? chunk : chunk.toString()
-      logMilestone(text)
-      console.error(`[OpenClaw stderr] ${OpenclawEngineManager.rewriteUtcTimestamps(text)}`)
+    const platform = getLoggingPlatform()
+    attachProcessLogger({
+      platform,
+      source: 'gateway',
+      module: 'OpenClaw',
+      stdout: toProcessLogStream(child.stdout),
+      stderr: toProcessLogStream(child.stderr)
     })
   }
 

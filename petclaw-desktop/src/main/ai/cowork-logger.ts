@@ -1,63 +1,9 @@
-import { app } from 'electron'
-import fs from 'fs'
-import path from 'path'
-import { resolveUserDataPaths } from '../user-data-paths'
+import { getLogger, getLoggingPlatform, resetLoggingPlatformForTest } from '../logging'
 
-// 单个日志文件上限 5MB，超出则轮转到 .old 备份
-const MAX_LOG_SIZE = 5 * 1024 * 1024
-
-// 延迟初始化：Electron app ready 前不能调用 getPath
-let logFilePath: string | null = null
-
-function getLogFilePath(): string {
-  if (!logFilePath) {
-    const logDir = resolveUserDataPaths(app.getPath('userData')).logsRoot
-    if (!fs.existsSync(logDir)) {
-      fs.mkdirSync(logDir, { recursive: true })
-    }
-    logFilePath = path.join(logDir, 'cowork.log')
-  }
-  return logFilePath
-}
-
-// 超过大小上限时将当前日志重命名为 .old，旧备份直接覆盖
-function rotateIfNeeded(): void {
-  try {
-    const filePath = getLogFilePath()
-    if (!fs.existsSync(filePath)) return
-    const stat = fs.statSync(filePath)
-    if (stat.size > MAX_LOG_SIZE) {
-      const backupPath = filePath + '.old'
-      if (fs.existsSync(backupPath)) {
-        fs.unlinkSync(backupPath)
-      }
-      fs.renameSync(filePath, backupPath)
-    }
-  } catch {
-    // 轮转失败不影响主流程
-  }
-}
-
-// 格式化为带时区偏移的 ISO 8601 时间戳，精确到毫秒
-function formatTimestamp(): string {
-  const date = new Date()
-  const pad = (value: number, length = 2): string => value.toString().padStart(length, '0')
-  const year = date.getFullYear()
-  const month = pad(date.getMonth() + 1)
-  const day = pad(date.getDate())
-  const hour = pad(date.getHours())
-  const minute = pad(date.getMinutes())
-  const second = pad(date.getSeconds())
-  const millisecond = pad(date.getMilliseconds(), 3)
-
-  // 时区偏移：getTimezoneOffset 返回 UTC - 本地 分钟数，取反得到本地偏移
-  const offsetMinutes = -date.getTimezoneOffset()
-  const sign = offsetMinutes >= 0 ? '+' : '-'
-  const absOffset = Math.abs(offsetMinutes)
-  const offsetHour = pad(Math.floor(absOffset / 60))
-  const offsetMinute = pad(absOffset % 60)
-
-  return `${year}-${month}-${day}T${hour}:${minute}:${second}.${millisecond}${sign}${offsetHour}:${offsetMinute}`
+function levelToMethod(level: 'INFO' | 'WARN' | 'ERROR'): 'info' | 'warn' | 'error' {
+  if (level === 'ERROR') return 'error'
+  if (level === 'WARN') return 'warn'
+  return 'info'
 }
 
 /**
@@ -72,16 +18,8 @@ export function coworkLog(
   extra?: Record<string, unknown>
 ): void {
   try {
-    rotateIfNeeded()
-    const parts = [`[${formatTimestamp()}] [${level}] [${tag}] ${message}`]
-    if (extra) {
-      for (const [key, value] of Object.entries(extra)) {
-        const serialized = typeof value === 'string' ? value : JSON.stringify(value, null, 2)
-        parts.push(`  ${key}: ${serialized}`)
-      }
-    }
-    // 条目末尾加两个换行，确保相邻日志之间有一个空行
-    fs.appendFileSync(getLogFilePath(), parts.join('\n') + '\n\n', 'utf-8')
+    const logger = getLogger(tag, 'cowork')
+    logger[levelToMethod(level)](`cowork.${tag}.${message}`, extra)
   } catch {
     // 日志写入不能抛出异常
   }
@@ -89,10 +27,10 @@ export function coworkLog(
 
 /** 获取当前日志文件路径，供外部展示或上传使用 */
 export function getCoworkLogPath(): string {
-  return getLogFilePath()
+  return getLoggingPlatform().storage.getCurrentFile('cowork')
 }
 
-/** 仅测试用：重置路径缓存，使下次调用重新计算日志路径 */
+/** 仅测试用：重置统一日志平台，使下次调用重新读取 app.getPath('userData')。 */
 export function resetLogFilePathForTest(): void {
-  logFilePath = null
+  resetLoggingPlatformForTest()
 }

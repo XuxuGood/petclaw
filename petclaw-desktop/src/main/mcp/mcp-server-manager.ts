@@ -13,6 +13,7 @@ import path from 'path'
 import type { McpServer, McpToolManifestEntry, StdioConfig, HttpConfig } from '../ai/types'
 import { getElectronNodeRuntimePath, getEnhancedEnv } from '../ai/cowork-util'
 import { resolveUserDataPaths } from '../user-data-paths'
+import { getLogger } from '../logging'
 import {
   getToolTextPreview,
   looksLikeTransportErrorText,
@@ -37,12 +38,17 @@ const MAX_RECENT_STDERR_LINES = 20
 
 const log = (level: string, msg: string): void => {
   const formatted = `[McpBridge:SDK][${level}] ${msg}`
-  if (level === 'ERROR') {
-    console.error(formatted)
-  } else if (level === 'WARN') {
-    console.warn(formatted)
-  } else {
-    console.log(formatted)
+  try {
+    const logger = getLogger('McpBridgeSDK', 'mcp')
+    if (level === 'ERROR') {
+      logger.error('mcp.sdk.error', { message: formatted })
+    } else if (level === 'WARN') {
+      logger.warn('mcp.sdk.warn', { message: formatted })
+    } else {
+      logger.info('mcp.sdk.info', { message: formatted })
+    }
+  } catch {
+    // MCP 日志不能影响 server 连接生命周期。
   }
 }
 

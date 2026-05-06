@@ -96,3 +96,7 @@ export function getLoggingPlatform(): LoggingPlatform {
 export function getLogger(module: string, source?: LogSource): ScopedLogger {
   return getLoggingPlatform().getLogger(module, source)
 }
+
+export function resetLoggingPlatformForTest(): void {
+  activePlatform = null
+}

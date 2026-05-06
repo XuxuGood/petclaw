@@ -7,6 +7,11 @@ import { autoUpdater } from 'electron-updater'
 import log from 'electron-log'
 
 import { safeHandle } from './ipc/ipc-registry'
+import { getLogger } from './logging'
+
+function updaterLogger() {
+  return getLogger('AutoUpdater', 'updater')
+}
 
 // electron-updater 使用 electron-log 输出日志
 autoUpdater.logger = log
@@ -21,6 +26,7 @@ export interface UpdateInfo {
 
 export function initAutoUpdater(mainWindow: BrowserWindow): void {
   autoUpdater.on('checking-for-update', () => {
+    updaterLogger().info('updater.check.started')
     mainWindow.webContents.send('updater:status', { status: 'checking' })
   })
 
@@ -30,14 +36,21 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
       releaseDate: info.releaseDate,
       releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : null
     }
+    updaterLogger().info('updater.update.available', { version: updateInfo.version })
     mainWindow.webContents.send('updater:status', { status: 'available', info: updateInfo })
   })
 
   autoUpdater.on('update-not-available', () => {
+    updaterLogger().info('updater.update.notAvailable')
     mainWindow.webContents.send('updater:status', { status: 'up-to-date' })
   })
 
   autoUpdater.on('download-progress', (progress) => {
+    updaterLogger().debug('updater.download.progress', {
+      percent: progress.percent,
+      transferred: progress.transferred,
+      total: progress.total
+    })
     mainWindow.webContents.send('updater:status', {
       status: 'downloading',
       progress: {
@@ -50,21 +63,26 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
   })
 
   autoUpdater.on('update-downloaded', () => {
+    updaterLogger().info('updater.download.completed')
     mainWindow.webContents.send('updater:status', { status: 'downloaded' })
   })
 
   autoUpdater.on('error', (err) => {
+    updaterLogger().error('updater.error', undefined, err)
     mainWindow.webContents.send('updater:status', { status: 'error', error: err.message })
   })
 
   // 注册 IPC handlers
   safeHandle('updater:check', async () => {
+    updaterLogger().info('updater.check.requested')
     autoUpdater.checkForUpdates()
   })
   safeHandle('updater:download', async () => {
+    updaterLogger().info('updater.download.requested')
     autoUpdater.downloadUpdate()
   })
   safeHandle('updater:install', async () => {
+    updaterLogger().info('updater.install.requested')
     autoUpdater.quitAndInstall()
   })
 

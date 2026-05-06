@@ -15,6 +15,7 @@ const SENSITIVE_KEY_PATTERN =
   /(api[-_]?key|token|secret|password|authorization|cookie|session|refresh[-_]?token|access[-_]?token|gateway[-_]?token)/i
 
 const SENSITIVE_VALUE_PATTERNS = [
+  /\b(?:api[-_]?key|token|secret|password|authorization|cookie|session|refresh[-_]?token|access[-_]?token)=\S+/gi,
   /\bBearer\s+[A-Za-z0-9._~+/=-]+/g,
   /\bsk-[A-Za-z0-9_-]{8,}\b/g,
   /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g

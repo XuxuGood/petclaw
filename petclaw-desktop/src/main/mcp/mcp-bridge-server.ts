@@ -12,15 +12,21 @@ import {
   serializeToolContentForLog
 } from './mcp-log'
 import type { McpServerManager } from './mcp-server-manager'
+import { getLogger } from '../logging'
 
 const log = (level: string, msg: string): void => {
   const formatted = `[McpBridge:HTTP][${level}] ${msg}`
-  if (level === 'ERROR') {
-    console.error(formatted)
-  } else if (level === 'WARN') {
-    console.warn(formatted)
-  } else {
-    console.log(formatted)
+  try {
+    const logger = getLogger('McpBridgeHTTP', 'mcp')
+    if (level === 'ERROR') {
+      logger.error('mcp.http.error', { message: formatted })
+    } else if (level === 'WARN') {
+      logger.warn('mcp.http.warn', { message: formatted })
+    } else {
+      logger.info('mcp.http.info', { message: formatted })
+    }
+  } catch {
+    // MCP 日志不能影响本地 callback server。
   }
 }
 
@@ -57,7 +63,7 @@ export class McpBridgeServer {
   constructor(mcpManager: McpServerManager, secret: string) {
     this.mcpManager = mcpManager
     this.secret = secret
-    log('INFO', `McpBridgeServer created, secret prefix="${secret.slice(0, 8)}…"`)
+    log('INFO', 'McpBridgeServer created')
   }
 
   get port(): number | null {
