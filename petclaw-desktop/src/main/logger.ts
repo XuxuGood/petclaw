@@ -1,6 +1,7 @@
 import log from 'electron-log/main'
 
 import { getLoggingPlatform, initLoggingPlatform } from './logging'
+import { resolveConsoleCompatLog } from './logging/console-compat'
 
 let initialized = false
 
@@ -15,29 +16,36 @@ export function initLogger(): void {
   const originalInfo = console.info
   const originalDebug = console.debug
 
-  const consoleLogger = platform.getLogger('ConsoleCompat')
-
   console.log = (...args: unknown[]) => {
     originalLog.apply(console, args)
-    consoleLogger.info('console.log', { args })
+    const resolved = resolveConsoleCompatLog(args)
+    platform.getLogger(resolved.module).info('console.log', { args: resolved.args })
   }
   console.error = (...args: unknown[]) => {
     originalError.apply(console, args)
     const last = args.at(-1)
-    consoleLogger.error('console.error', { args }, last instanceof Error ? last : undefined)
+    const resolved = resolveConsoleCompatLog(args)
+    platform
+      .getLogger(resolved.module)
+      .error('console.error', { args: resolved.args }, last instanceof Error ? last : undefined)
   }
   console.warn = (...args: unknown[]) => {
     originalWarn.apply(console, args)
     const last = args.at(-1)
-    consoleLogger.warn('console.warn', { args }, last instanceof Error ? last : undefined)
+    const resolved = resolveConsoleCompatLog(args)
+    platform
+      .getLogger(resolved.module)
+      .warn('console.warn', { args: resolved.args }, last instanceof Error ? last : undefined)
   }
   console.info = (...args: unknown[]) => {
     originalInfo.apply(console, args)
-    consoleLogger.info('console.info', { args })
+    const resolved = resolveConsoleCompatLog(args)
+    platform.getLogger(resolved.module).info('console.info', { args: resolved.args })
   }
   console.debug = (...args: unknown[]) => {
     originalDebug.apply(console, args)
-    consoleLogger.debug('console.debug', { args })
+    const resolved = resolveConsoleCompatLog(args)
+    platform.getLogger(resolved.module).debug('console.debug', { args: resolved.args })
   }
 }
 

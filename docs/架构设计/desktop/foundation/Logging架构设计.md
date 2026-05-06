@@ -188,6 +188,7 @@ error?
 
 - `electron-log` 或底层 writer 不暴露给业务模块。
 - `console.*` 拦截保留为兼容层，新代码不依赖它作为规范入口。
+- 兼容层识别存量 `[Module] message` 前缀，并按真实 module 写入结构化日志；无前缀日志归入 `ConsoleCompat`。
 - 错误对象作为最后一个参数传入，保留 `name`、`message`、`stack`。
 - 日志消息使用英文，模块标签和 event name 保持稳定。
 - 高频轮询、心跳和 stream chunk 不使用 info 级别刷屏；必要时使用 debug 并限流。
