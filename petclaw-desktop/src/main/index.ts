@@ -445,6 +445,7 @@ app.whenReady().then(async () => {
 
   // 16. chat 窗口进入主界面后创建 pet 窗口。
   // 完整 IPC 已在 runtime 就绪后、boot:complete 前注册；这里仅处理双窗口相关编排。
+  // Pet Window 启动收尾不是用户主动打开主窗口的入口，不能复用强激活逻辑抢焦点。
   let petCreated = false
   safeOn('app:pet-ready', () => {
     if (petCreated) return
@@ -453,9 +454,6 @@ app.whenReady().then(async () => {
     const petWindow = createPetWindow(db)
     petWindow.webContents.on('did-finish-load', () => {
       diagWindowLoad('pet-window', petWindow.webContents.getURL())
-    })
-    petWindow.once('ready-to-show', () => {
-      activateMainWindow({ app, window: chatWindow })
     })
 
     if (petWindow && chatWindow && runtimeServices) {

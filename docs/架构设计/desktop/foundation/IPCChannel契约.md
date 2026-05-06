@@ -59,7 +59,7 @@ Phase B
 | `window:move` | send | `moveWindow(dx, dy)` | 移动透明窗口 |
 | `window:composer-bounds:update` | send | `updateComposerBounds(bounds)` | Renderer 上报聊天输入框相对 Main Window 内容区的布局坐标，main 只用于计算 Pet 首次视觉锚点 |
 | `chat:toggle` | send | `toggleMainWindow()` | 显示或隐藏主窗口 |
-| `app:pet-ready` | send | `petReady()` | Renderer 主界面就绪后通知 main 创建 Pet Window、PetEventBridge 和快捷键；Pet Window ready 后恢复 Main Window 前台激活 |
+| `app:pet-ready` | send | `petReady()` | Renderer 主界面就绪后通知 main 创建 Pet Window、PetEventBridge 和快捷键；不得重新激活 Main Window 或抢夺焦点 |
 | `app:quit` | send | `quitApp()` | 退出应用 |
 | `panel:open` | main -> renderer | `onPanelOpen()` | 打开指定面板 |
 | `hook:event` | main -> renderer | `onHookEvent()` | Hook 事件透传 |

@@ -56,20 +56,25 @@ describe('system integration startup order', () => {
     expect(rawShowIndex).toBe(-1)
   })
 
-  it('reactivates the main window after the pet window becomes visible', () => {
+  it('does not steal focus again after the pet window becomes visible during startup', () => {
     const source = fs.readFileSync(path.resolve(__dirname, '../../../src/main/index.ts'), 'utf-8')
 
     const petReadyIndex = source.indexOf("safeOn('app:pet-ready'")
-    const petCreateIndex = source.indexOf('const petWindow = createPetWindow(db)', petReadyIndex)
-    const petReadyShowIndex = source.indexOf("petWindow.once('ready-to-show'", petCreateIndex)
-    const petActivateIndex = source.indexOf(
-      'activateMainWindow({ app, window: chatWindow })',
-      petReadyShowIndex
+    const bootCompleteSectionIndex = source.indexOf(
+      '// 17. 通知 chat 窗口 boot 完成',
+      petReadyIndex
+    )
+    const petReadyHandlerSource = source.slice(petReadyIndex, bootCompleteSectionIndex)
+    const petCreateIndex = petReadyHandlerSource.indexOf('const petWindow = createPetWindow(db)')
+    const petReadyShowIndex = petReadyHandlerSource.indexOf("petWindow.once('ready-to-show'")
+    const petActivateIndex = petReadyHandlerSource.indexOf(
+      'activateMainWindow({ app, window: chatWindow })'
     )
 
     expect(petReadyIndex).toBeGreaterThan(-1)
-    expect(petCreateIndex).toBeGreaterThan(petReadyIndex)
-    expect(petReadyShowIndex).toBeGreaterThan(petCreateIndex)
-    expect(petActivateIndex).toBeGreaterThan(petReadyShowIndex)
+    expect(bootCompleteSectionIndex).toBeGreaterThan(petReadyIndex)
+    expect(petCreateIndex).toBeGreaterThan(-1)
+    expect(petReadyShowIndex).toBe(-1)
+    expect(petActivateIndex).toBe(-1)
   })
 })

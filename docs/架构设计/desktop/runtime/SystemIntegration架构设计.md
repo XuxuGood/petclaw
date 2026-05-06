@@ -341,9 +341,10 @@ Dock Menu、Application Menu 和非 macOS fallback tray 必须在主窗口创建
 运行前安装，不能依赖 `app:pet-ready`。这样启动页、BootCheck 失败态和主界面阶段都有
 一致的系统入口；宠物窗口创建前，宠物显示/隐藏动作允许安全 no-op。
 
-`app:pet-ready` 只负责双窗口阶段编排：创建 Pet Window、PetEventBridge 和快捷键，并在
-Pet Window ready 后重新激活 Main Window。Pet Window 是 non-focusable floating overlay，
-不能成为启动完成后的前台落点；否则 macOS 顶部 Application Menu 会因为应用不在前台而不可见。
+`app:pet-ready` 只负责双窗口阶段编排：创建 Pet Window、PetEventBridge 和快捷键，不再
+重新激活 Main Window。Pet Window 是 non-focusable floating overlay，不能成为启动完成后的
+前台落点；启动收尾不得抢焦点或重复触发 Dock/Application Menu 激活。只有 Dock、Application
+Menu、tray、快捷键、宠物点击等用户主动“打开主窗口”的入口才复用 `activateMainWindow`。
 
 macOS dev 模式不会读取 `electron-builder.json` 中的打包图标和产品名。开发态遵循
 Electron 默认 bundle 行为，不强行改写顶部菜单栏第一项的应用名；正式包的产品名、appId
@@ -361,10 +362,11 @@ packaged app 不在运行时覆盖 Dock 图标，确保 `.app` bundle 的 `.icns
 Windows/Linux 的 dev 主窗口可从 `build/icons/win/icon.ico` 或
 `build/icons/png/512x512.png` 读取窗口图标；正式包仍以 electron-builder 的平台图标配置为准。
 
-所有“打开主窗口”的入口必须复用 `activateMainWindow`。该激活原语在 macOS 上每次都会
+所有用户主动“打开主窗口”的入口必须复用 `activateMainWindow`。该激活原语在 macOS 上每次都会
 重新声明 `regular` activation policy、显示 Dock、解除 app hidden 状态、恢复最小化窗口、
 将 Main Window 移到前面并聚焦。这样 Dock/Menu、宠物点击、快捷键和 Application Menu
-不会因为某次隐藏、Pet 浮层或 dev Electron 激活状态漂移而走出不同逻辑。
+不会因为某次隐藏、Pet 浮层或 dev Electron 激活状态漂移而走出不同逻辑；启动内部阶段事件不得复用
+该强激活原语。
 
 | 依赖方 | 关系 |
 |---|---|
