@@ -213,6 +213,20 @@ export const en: Record<string, string> = {
   'about.feedback': 'Report Issues',
   'about.license': 'License',
 
+  // ── logging / diagnostics ──
+  'logging.diagnostics': 'Diagnostics',
+  'logging.openLogFolder': 'Open log folder',
+  'logging.openLogFolderFailed': 'Failed to open log folder: {error}',
+  'logging.exportDiagnostics': 'Export diagnostics',
+  'logging.exporting': 'Exporting...',
+  'logging.exportSuccess': 'Diagnostics exported',
+  'logging.exportFailed': 'Diagnostics export failed: {error}',
+  'logging.snapshotUnavailable': 'Logging status unavailable',
+  'logging.copySummary': 'Copy redacted diagnostics summary',
+  'logging.timeRange1': 'Last 1 day',
+  'logging.timeRange3': 'Last 3 days',
+  'logging.timeRange7': 'Last 7 days',
+
   // ── engine settings ──
   'engineSettings.title': 'Agent Engine',
   'engineSettings.subtitle': 'View engine status and version info',

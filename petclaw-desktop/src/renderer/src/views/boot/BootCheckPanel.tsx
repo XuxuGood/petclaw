@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 
-import { Check, AlertCircle, RefreshCw, PawPrint } from 'lucide-react'
+import { Check, AlertCircle, RefreshCw, PawPrint, FolderOpen, Archive } from 'lucide-react'
 
 import { useI18n } from '../../i18n'
 
@@ -256,11 +256,51 @@ export function BootCheckPanel({ onRetry }: { onRetry?: () => void }) {
   const [hasError, setHasError] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
   const [isRetrying, setIsRetrying] = useState(false)
+  const [diagnosticsStatus, setDiagnosticsStatus] = useState<string | null>(null)
+  const [isExportingDiagnostics, setIsExportingDiagnostics] = useState(false)
   const { t } = useI18n()
 
   const handleRetry = (): void => {
     setIsRetrying(true)
     onRetry?.()
+  }
+
+  const reportDiagnosticsActionError = async (event: string, message: string): Promise<void> => {
+    try {
+      await window.api.logging.report({
+        level: 'error',
+        module: 'BootCheckPanel',
+        event,
+        message
+      })
+    } catch {
+      // renderer 错误上报失败时不能阻断用户恢复操作。
+    }
+  }
+
+  const handleOpenLogFolder = async (): Promise<void> => {
+    try {
+      await window.api.logging.openLogFolder()
+      setDiagnosticsStatus(null)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setDiagnosticsStatus(t('logging.openLogFolderFailed', { error: message }))
+      await reportDiagnosticsActionError('renderer.logging.openLogFolder.failed', message)
+    }
+  }
+
+  const handleExportDiagnostics = async (): Promise<void> => {
+    setIsExportingDiagnostics(true)
+    try {
+      await window.api.logging.exportDiagnostics({ timeRangeDays: 3 })
+      setDiagnosticsStatus(t('logging.exportSuccess'))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setDiagnosticsStatus(t('logging.exportFailed', { error: message }))
+      await reportDiagnosticsActionError('renderer.logging.exportDiagnostics.failed', message)
+    } finally {
+      setIsExportingDiagnostics(false)
+    }
   }
 
   useEffect(() => {
@@ -392,6 +432,7 @@ export function BootCheckPanel({ onRetry }: { onRetry?: () => void }) {
               </div>
               {onRetry && (
                 <button
+                  type="button"
                   onClick={handleRetry}
                   disabled={isRetrying}
                   className="flex min-h-[44px] items-center justify-center gap-2 w-full py-3 bg-accent text-white text-[14px] font-medium rounded-[8px] hover:bg-accent-hover active:scale-[0.96] transition-all duration-[120ms] cursor-pointer shadow-sm disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100"
@@ -404,6 +445,32 @@ export function BootCheckPanel({ onRetry }: { onRetry?: () => void }) {
                   />
                   {t('common.retry')}
                 </button>
+              )}
+              <div className="grid w-full grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={handleOpenLogFolder}
+                  className="flex min-h-[40px] items-center justify-center gap-2 rounded-[8px] border border-border px-3 text-[13px] text-text-primary transition-colors duration-[120ms] hover:bg-bg-hover"
+                  style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+                >
+                  <FolderOpen size={14} />
+                  {t('logging.openLogFolder')}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportDiagnostics}
+                  disabled={isExportingDiagnostics}
+                  className="flex min-h-[40px] items-center justify-center gap-2 rounded-[8px] bg-text-primary px-3 text-[13px] text-bg-primary transition-all duration-[120ms] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+                >
+                  <Archive size={14} />
+                  {isExportingDiagnostics ? t('logging.exporting') : t('logging.exportDiagnostics')}
+                </button>
+              </div>
+              {diagnosticsStatus && (
+                <p className="w-full text-center text-[12px] leading-relaxed text-text-tertiary">
+                  {diagnosticsStatus}
+                </p>
               )}
             </div>
           )}

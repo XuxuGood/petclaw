@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 
-import { RefreshCw, Circle } from 'lucide-react'
+import { RefreshCw, Circle, FolderOpen, Archive } from 'lucide-react'
 
 import { useI18n } from '../../i18n'
 
@@ -13,8 +13,10 @@ interface EngineStatus {
 }
 
 export function EngineSettings() {
-  const { t } = useI18n()
   const [status, setStatus] = useState<EngineStatus | null>(null)
+  const [diagnosticsStatus, setDiagnosticsStatus] = useState<string | null>(null)
+  const [isExportingDiagnostics, setIsExportingDiagnostics] = useState(false)
+  const { t } = useI18n()
 
   // 订阅引擎状态推送
   useEffect(() => {
@@ -26,6 +28,44 @@ export function EngineSettings() {
   }, [])
 
   const isRunning = status?.running === true
+
+  const reportDiagnosticsActionError = async (event: string, message: string): Promise<void> => {
+    try {
+      await window.api.logging.report({
+        level: 'error',
+        module: 'EngineSettings',
+        event,
+        message
+      })
+    } catch {
+      // renderer 错误上报失败时不能阻断设置页操作。
+    }
+  }
+
+  const handleOpenLogFolder = async (): Promise<void> => {
+    try {
+      await window.api.logging.openLogFolder()
+      setDiagnosticsStatus(null)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setDiagnosticsStatus(t('logging.openLogFolderFailed', { error: message }))
+      await reportDiagnosticsActionError('renderer.logging.openLogFolder.failed', message)
+    }
+  }
+
+  const handleExportDiagnostics = async (): Promise<void> => {
+    setIsExportingDiagnostics(true)
+    try {
+      await window.api.logging.exportDiagnostics({ timeRangeDays: 3 })
+      setDiagnosticsStatus(t('logging.exportSuccess'))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setDiagnosticsStatus(t('logging.exportFailed', { error: message }))
+      await reportDiagnosticsActionError('renderer.logging.exportDiagnostics.failed', message)
+    } finally {
+      setIsExportingDiagnostics(false)
+    }
+  }
 
   return (
     <div>
@@ -81,7 +121,34 @@ export function EngineSettings() {
             </span>
           </div>
         )}
+
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-t border-border">
+          <span className="text-[14px] text-text-primary">{t('logging.diagnostics')}</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleOpenLogFolder}
+              className="inline-flex min-h-[36px] items-center gap-2 rounded-[8px] border border-border px-3 text-[13px] text-text-primary transition-colors duration-[120ms] hover:bg-bg-hover"
+            >
+              <FolderOpen size={14} />
+              {t('logging.openLogFolder')}
+            </button>
+            <button
+              type="button"
+              onClick={handleExportDiagnostics}
+              disabled={isExportingDiagnostics}
+              className="inline-flex min-h-[36px] items-center gap-2 rounded-[8px] bg-text-primary px-3 text-[13px] text-bg-primary transition-all duration-[120ms] hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Archive size={14} />
+              {isExportingDiagnostics ? t('logging.exporting') : t('logging.exportDiagnostics')}
+            </button>
+          </div>
+        </div>
       </div>
+
+      {diagnosticsStatus && (
+        <p className="mb-3 text-[12px] leading-relaxed text-text-tertiary">{diagnosticsStatus}</p>
+      )}
 
       {/* 说明文字 */}
       <p className="text-[12px] text-text-tertiary flex items-center gap-1.5">

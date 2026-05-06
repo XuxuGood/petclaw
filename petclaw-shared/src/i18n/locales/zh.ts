@@ -213,6 +213,20 @@ export const zh: Record<string, string> = {
   'about.feedback': '问题反馈',
   'about.license': '开源协议',
 
+  // ── logging / diagnostics ──
+  'logging.diagnostics': '诊断日志',
+  'logging.openLogFolder': '打开日志目录',
+  'logging.openLogFolderFailed': '日志目录打开失败：{error}',
+  'logging.exportDiagnostics': '导出诊断包',
+  'logging.exporting': '正在导出...',
+  'logging.exportSuccess': '诊断包已导出',
+  'logging.exportFailed': '诊断包导出失败：{error}',
+  'logging.snapshotUnavailable': '日志状态暂不可用',
+  'logging.copySummary': '复制脱敏诊断摘要',
+  'logging.timeRange1': '最近 1 天',
+  'logging.timeRange3': '最近 3 天',
+  'logging.timeRange7': '最近 7 天',
+
   // ── engine settings ──
   'engineSettings.title': 'Agent 引擎',
   'engineSettings.subtitle': '查看引擎运行状态和版本信息',
