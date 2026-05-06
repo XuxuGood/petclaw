@@ -1,7 +1,7 @@
 /**
  * Unit tests for logger.ts logic:
  *   - Log filename pattern (daily rotation naming)
- *   - pruneOldLogs: which files get deleted
+ *   - retention logic: which files fall outside the window
  *   - getRecentMainLogEntries: which files are included and ordering
  *
  * Logic is mirrored inline because electron-log cannot be loaded outside the
@@ -14,8 +14,8 @@ import { test, expect } from 'vitest'
 // Mirrors from logger.ts
 // ---------------------------------------------------------------------------
 
-const LOG_RETENTION_DAYS = 7
-const LOG_FILE_RE = /^main-\d{4}-\d{2}-\d{2}(\.old)?\.log$/
+const LOG_RETENTION_DAYS = 14
+const LOG_FILE_RE = /^main-\d{4}-\d{2}-\d{2}(\.\d+)?\.log$/
 
 type FileEntry = { name: string; mtimeMs: number }
 
@@ -65,8 +65,8 @@ test('pattern: matches normal daily log', () => {
   expect(LOG_FILE_RE.test('main-2026-04-26.log')).toBeTruthy()
 })
 
-test('pattern: matches .old variant', () => {
-  expect(LOG_FILE_RE.test('main-2026-04-25.old.log')).toBeTruthy()
+test('pattern: matches indexed rotation variant', () => {
+  expect(LOG_FILE_RE.test('main-2026-04-25.1.log')).toBeTruthy()
 })
 
 test('pattern: rejects plain main.log', () => {
@@ -115,14 +115,19 @@ test('prune: file from 6 days ago is kept', () => {
   expect(filesToPrune(files, NOW)).toEqual([])
 })
 
-test('prune: file from 8 days ago is deleted', () => {
+test('prune: file from 8 days ago is kept', () => {
   const files = [{ name: 'main-2026-04-18.log', mtimeMs: daysAgo(8) }]
-  expect(filesToPrune(files, NOW)).toEqual(['main-2026-04-18.log'])
+  expect(filesToPrune(files, NOW)).toEqual([])
 })
 
-test('prune: .old variant from 8 days ago is deleted', () => {
-  const files = [{ name: 'main-2026-04-18.old.log', mtimeMs: daysAgo(8) }]
-  expect(filesToPrune(files, NOW)).toEqual(['main-2026-04-18.old.log'])
+test('prune: file from 15 days ago is deleted', () => {
+  const files = [{ name: 'main-2026-04-11.log', mtimeMs: daysAgo(15) }]
+  expect(filesToPrune(files, NOW)).toEqual(['main-2026-04-11.log'])
+})
+
+test('prune: indexed rotation variant from 15 days ago is deleted', () => {
+  const files = [{ name: 'main-2026-04-11.1.log', mtimeMs: daysAgo(15) }]
+  expect(filesToPrune(files, NOW)).toEqual(['main-2026-04-11.1.log'])
 })
 
 test('prune: non-matching files are never pruned', () => {
@@ -138,10 +143,10 @@ test('prune: mixed — only old main-date files are deleted', () => {
   const files = [
     { name: 'main-2026-04-26.log', mtimeMs: daysAgo(0) },
     { name: 'main-2026-04-21.log', mtimeMs: daysAgo(5) },
-    { name: 'main-2026-04-18.log', mtimeMs: daysAgo(8) },
+    { name: 'main-2026-04-11.log', mtimeMs: daysAgo(15) },
     { name: 'cowork.log', mtimeMs: daysAgo(30) }
   ]
-  expect(filesToPrune(files, NOW)).toEqual(['main-2026-04-18.log'])
+  expect(filesToPrune(files, NOW)).toEqual(['main-2026-04-11.log'])
 })
 
 // ---------------------------------------------------------------------------
@@ -167,22 +172,22 @@ test("entries: today's file is included", () => {
   expect(result[0].archiveName).toBe('main-2026-04-26.log')
 })
 
-test('entries: file from exactly 7 days ago (at cutoff) is included', () => {
+test('entries: file from exactly 14 days ago (at cutoff) is included', () => {
   const cutoffMs = NOW - LOG_RETENTION_DAYS * DAY_MS
-  const files = [{ name: 'main-2026-04-19.log', mtimeMs: cutoffMs }]
+  const files = [{ name: 'main-2026-04-12.log', mtimeMs: cutoffMs }]
   expect(recentEntries(files, NOW).length).toBe(1)
 })
 
-test('entries: file older than 7 days is excluded', () => {
-  const files = [{ name: 'main-2026-04-18.log', mtimeMs: daysAgo(8) }]
+test('entries: file older than 14 days is excluded', () => {
+  const files = [{ name: 'main-2026-04-11.log', mtimeMs: daysAgo(15) }]
   expect(recentEntries(files, NOW).length).toBe(0)
 })
 
-test('entries: .old variant within retention is included', () => {
-  const files = [{ name: 'main-2026-04-25.old.log', mtimeMs: daysAgo(1) }]
+test('entries: indexed rotation variant within retention is included', () => {
+  const files = [{ name: 'main-2026-04-25.1.log', mtimeMs: daysAgo(1) }]
   const result = recentEntries(files, NOW)
   expect(result.length).toBe(1)
-  expect(result[0].archiveName).toBe('main-2026-04-25.old.log')
+  expect(result[0].archiveName).toBe('main-2026-04-25.1.log')
 })
 
 test('entries: results are sorted alphabetically', () => {
@@ -201,12 +206,12 @@ test('entries: results are sorted alphabetically', () => {
   ])
 })
 
-test('entries: full 7-day window all included, day 8 excluded', () => {
-  const files = Array.from({ length: 9 }, (_, i) => ({
+test('entries: full 14-day window all included, day 15 excluded', () => {
+  const files = Array.from({ length: 16 }, (_, i) => ({
     name: `main-2026-04-${String(26 - i).padStart(2, '0')}.log`,
     mtimeMs: daysAgo(i)
   }))
   const result = recentEntries(files, NOW)
-  expect(result.length >= 7).toBeTruthy()
-  expect(result.some((e) => e.archiveName === 'main-2026-04-18.log')).toBeFalsy()
+  expect(result.length >= 14).toBeTruthy()
+  expect(result.some((e) => e.archiveName === 'main-2026-04-11.log')).toBeFalsy()
 })
