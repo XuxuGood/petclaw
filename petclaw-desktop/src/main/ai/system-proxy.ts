@@ -123,7 +123,7 @@ export async function resolveSystemProxyUrl(targetUrl: string): Promise<string |
       }
     }
   } catch (error) {
-    logger.error('proxy.resolve.failed', undefined, error)
+    logger.error('proxy.resolve.failed', 'Failed to resolve system proxy', error)
   }
 
   return null

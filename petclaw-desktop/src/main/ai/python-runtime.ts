@@ -265,34 +265,48 @@ export async function ensurePythonRuntimeReady(): Promise<{ success: boolean; er
       try {
         ensureEmbedSitePackages(userRoot)
       } catch (error) {
-        logger.warn('userRuntime.embedSitePackages.normalize.failed', { userRoot }, error)
+        logger.warn(
+          'userRuntime.embedSitePackages.normalize.failed',
+          'Failed to normalize embedded Python site-packages',
+          { userRoot },
+          error
+        )
       }
     }
     const userHealth = runtimeHealth(userRoot)
     if (userHealth.ok) {
       ensureRuntimeStateFile(userRoot, 'existing-user-runtime')
       if (!hasPipSupport(userRoot)) {
-        logger.warn('userRuntime.pipSupport.incomplete', { userRoot })
+        logger.warn(
+          'userRuntime.pipSupport.incomplete',
+          'Python runtime pip support is incomplete',
+          {
+            userRoot
+          }
+        )
       }
-      logger.info('userRuntime.healthy', { userRoot })
+      logger.info('userRuntime.healthy', 'User Python runtime is healthy', { userRoot })
       return { success: true }
     }
 
     const bundledRoot = getBundledPythonRoot()
     if (!bundledRoot) {
       const message = 'Bundled python runtime not found in application resources.'
-      logger.error('bundledRuntime.missing', { message })
+      logger.error('bundledRuntime.missing', 'Bundled Python runtime is missing', { message })
       return { success: false, error: message }
     }
 
     const bundledHealth = runtimeHealth(bundledRoot, { requireEmbedSiteConfig: false })
     if (!bundledHealth.ok) {
       const message = `Bundled python runtime is unhealthy (missing: ${bundledHealth.missing.join(', ')})`
-      logger.error('bundledRuntime.unhealthy', { missing: bundledHealth.missing, message })
+      logger.error('bundledRuntime.unhealthy', 'Bundled Python runtime is unhealthy', {
+        missing: bundledHealth.missing,
+        message
+      })
       return { success: false, error: message }
     }
 
-    logger.warn('userRuntime.sync.started', { userRoot })
+    logger.warn('userRuntime.sync.started', 'Python runtime sync started', { userRoot })
     if (fs.existsSync(userRoot)) {
       fs.rmSync(userRoot, { recursive: true, force: true })
     }
@@ -303,19 +317,31 @@ export async function ensurePythonRuntimeReady(): Promise<{ success: boolean; er
     const syncedHealth = runtimeHealth(userRoot)
     if (!syncedHealth.ok) {
       const message = `Synced python runtime is unhealthy (missing: ${syncedHealth.missing.join(', ')})`
-      logger.error('userRuntime.synced.unhealthy', { missing: syncedHealth.missing, message })
+      logger.error('userRuntime.synced.unhealthy', 'Synced Python runtime is unhealthy', {
+        missing: syncedHealth.missing,
+        message
+      })
       return { success: false, error: message }
     }
 
     ensureRuntimeStateFile(userRoot, bundledRoot)
     if (!hasPipSupport(userRoot)) {
-      logger.warn('userRuntime.synced.pipSupport.incomplete', { userRoot })
+      logger.warn(
+        'userRuntime.synced.pipSupport.incomplete',
+        'Synced Python runtime pip support is incomplete',
+        { userRoot }
+      )
     }
-    logger.info('userRuntime.sync.completed', { userRoot })
+    logger.info('userRuntime.sync.completed', 'Python runtime sync completed', { userRoot })
     return { success: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    logger.error('runtime.ensureReady.failed', { message }, error)
+    logger.error(
+      'runtime.ensureReady.failed',
+      'Failed to ensure Python runtime is ready',
+      { message },
+      error
+    )
     return { success: false, error: message }
   }
 }
@@ -384,18 +410,25 @@ export async function ensurePythonPipReady(): Promise<{ success: boolean; error?
     if (bootstrapResult.ok) {
       const finalHealth = runtimeHealth(userRoot, { requirePip: true })
       if (finalHealth.ok) {
-        logger.warn('pip.ensurepip.restored', { userRoot })
+        logger.warn('pip.ensurepip.restored', 'Python pip support was restored with ensurepip', {
+          userRoot
+        })
         return { success: true }
       }
     }
 
     const errorDetail = bootstrapResult.detail ? ` (${bootstrapResult.detail})` : ''
     const message = `pip is unavailable in bundled runtime${errorDetail}`
-    logger.error('pip.unavailable', { message })
+    logger.error('pip.unavailable', 'Python pip is unavailable', { message })
     return { success: false, error: message }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    logger.error('pip.ensureReady.failed', { message }, error)
+    logger.error(
+      'pip.ensureReady.failed',
+      'Failed to ensure Python pip is ready',
+      { message },
+      error
+    )
     return { success: false, error: message }
   }
 }

@@ -345,7 +345,11 @@ describe('macOS system integration', () => {
     })
     await Promise.resolve()
 
-    expect(loggingMock.warn).toHaveBeenCalledWith('dock.show.failed', undefined, expect.any(Error))
+    expect(loggingMock.warn).toHaveBeenCalledWith(
+      'dock.show.failed',
+      'Failed to show Dock icon',
+      expect.any(Error)
+    )
   })
 
   it('refreshes native menus without re-registering activate handlers or changing the Dock icon', () => {

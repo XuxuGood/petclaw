@@ -15,19 +15,6 @@ export function AboutSettings() {
     window.api.getAppVersion().then((v) => setVersion(v))
   }, [])
 
-  const reportDiagnosticsActionError = async (event: string, message: string): Promise<void> => {
-    try {
-      await window.api.logging.report({
-        level: 'error',
-        module: 'AboutSettings',
-        event,
-        message
-      })
-    } catch {
-      // renderer 错误上报失败时不能阻断关于页操作。
-    }
-  }
-
   const handleOpenLogFolder = async (): Promise<void> => {
     try {
       await window.api.logging.openLogFolder()
@@ -35,7 +22,17 @@ export function AboutSettings() {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       setDiagnosticsStatus(t('logging.openLogFolderFailed', { error: message }))
-      await reportDiagnosticsActionError('renderer.logging.openLogFolder.failed', message)
+      try {
+        await window.api.logging.report({
+          level: 'error',
+          module: 'AboutSettings',
+          event: 'renderer.logging.openLogFolder.failed',
+          message: 'Failed to open log folder from about settings',
+          fields: { errorMessage: message }
+        })
+      } catch {
+        // renderer 错误上报失败时不能阻断关于页操作。
+      }
     }
   }
 
@@ -47,7 +44,17 @@ export function AboutSettings() {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       setDiagnosticsStatus(t('logging.exportFailed', { error: message }))
-      await reportDiagnosticsActionError('renderer.logging.exportDiagnostics.failed', message)
+      try {
+        await window.api.logging.report({
+          level: 'error',
+          module: 'AboutSettings',
+          event: 'renderer.logging.exportDiagnostics.failed',
+          message: 'Failed to export diagnostics from about settings',
+          fields: { errorMessage: message }
+        })
+      } catch {
+        // renderer 错误上报失败时不能阻断关于页操作。
+      }
     } finally {
       setIsExportingDiagnostics(false)
     }

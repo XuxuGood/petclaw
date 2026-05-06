@@ -41,11 +41,11 @@ const log = (level: string, msg: string): void => {
   try {
     const logger = getLogger('McpBridgeSDK', 'mcp')
     if (level === 'ERROR') {
-      logger.error('mcp.sdk.error', { message: formatted })
+      logger.error('mcp.sdk.error', 'MCP SDK emitted an error', { message: formatted })
     } else if (level === 'WARN') {
-      logger.warn('mcp.sdk.warn', { message: formatted })
+      logger.warn('mcp.sdk.warn', 'MCP SDK emitted a warning', { message: formatted })
     } else {
-      logger.info('mcp.sdk.info', { message: formatted })
+      logger.info('mcp.sdk.info', 'MCP SDK emitted an info message', { message: formatted })
     }
   } catch {
     // MCP 日志不能影响 server 连接生命周期。

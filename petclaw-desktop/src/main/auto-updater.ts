@@ -26,7 +26,7 @@ export interface UpdateInfo {
 
 export function initAutoUpdater(mainWindow: BrowserWindow): void {
   autoUpdater.on('checking-for-update', () => {
-    updaterLogger().info('updater.check.started')
+    updaterLogger().info('updater.check.started', 'Auto updater check started')
     mainWindow.webContents.send('updater:status', { status: 'checking' })
   })
 
@@ -36,17 +36,19 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
       releaseDate: info.releaseDate,
       releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : null
     }
-    updaterLogger().info('updater.update.available', { version: updateInfo.version })
+    updaterLogger().info('updater.update.available', 'Application update is available', {
+      version: updateInfo.version
+    })
     mainWindow.webContents.send('updater:status', { status: 'available', info: updateInfo })
   })
 
   autoUpdater.on('update-not-available', () => {
-    updaterLogger().info('updater.update.notAvailable')
+    updaterLogger().info('updater.update.notAvailable', 'Application update is not available')
     mainWindow.webContents.send('updater:status', { status: 'up-to-date' })
   })
 
   autoUpdater.on('download-progress', (progress) => {
-    updaterLogger().debug('updater.download.progress', {
+    updaterLogger().debug('updater.download.progress', 'Auto updater download progress changed', {
       percent: progress.percent,
       transferred: progress.transferred,
       total: progress.total
@@ -63,26 +65,26 @@ export function initAutoUpdater(mainWindow: BrowserWindow): void {
   })
 
   autoUpdater.on('update-downloaded', () => {
-    updaterLogger().info('updater.download.completed')
+    updaterLogger().info('updater.download.completed', 'Application update download completed')
     mainWindow.webContents.send('updater:status', { status: 'downloaded' })
   })
 
   autoUpdater.on('error', (err) => {
-    updaterLogger().error('updater.error', undefined, err)
+    updaterLogger().error('updater.error', 'Auto updater failed', err)
     mainWindow.webContents.send('updater:status', { status: 'error', error: err.message })
   })
 
   // 注册 IPC handlers
   safeHandle('updater:check', async () => {
-    updaterLogger().info('updater.check.requested')
+    updaterLogger().info('updater.check.requested', 'Auto updater check was requested')
     autoUpdater.checkForUpdates()
   })
   safeHandle('updater:download', async () => {
-    updaterLogger().info('updater.download.requested')
+    updaterLogger().info('updater.download.requested', 'Auto updater download was requested')
     autoUpdater.downloadUpdate()
   })
   safeHandle('updater:install', async () => {
-    updaterLogger().info('updater.install.requested')
+    updaterLogger().info('updater.install.requested', 'Auto updater install was requested')
     autoUpdater.quitAndInstall()
   })
 

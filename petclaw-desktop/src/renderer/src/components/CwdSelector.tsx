@@ -110,7 +110,7 @@ export function CwdSelector({ value, onChange }: CwdSelectorProps) {
         level: 'error',
         module: 'CwdSelector',
         event: 'directory.select.failed',
-        message: err instanceof Error ? err.message : 'Failed to select directory',
+        message: 'Failed to select directory',
         fields: {
           errorName: err instanceof Error ? err.name : typeof err,
           errorMessage: err instanceof Error ? err.message : String(err)

@@ -239,7 +239,7 @@ export class OpenclawGateway extends EventEmitter {
       this.gatewayClientEntryPath !== null &&
       this.gatewayClientEntryPath !== connectionInfo.clientEntryPath
     if (versionChanged || pathChanged) {
-      logger.warn('client.versionOrPath.changed', {
+      logger.warn('client.versionOrPath.changed', 'Gateway client version or entry path changed', {
         previousVersion: this.gatewayClientVersion,
         nextVersion: connectionInfo.version ?? null,
         previousEntryPath: this.gatewayClientEntryPath,
@@ -342,9 +342,13 @@ export class OpenclawGateway extends EventEmitter {
 
   private scheduleGatewayReconnect(): void {
     if (this.gatewayReconnectAttempt >= OpenclawGateway.GATEWAY_RECONNECT_MAX_ATTEMPTS) {
-      logger.error('reconnect.maxAttempts.reached', {
-        maxAttempts: OpenclawGateway.GATEWAY_RECONNECT_MAX_ATTEMPTS
-      })
+      logger.error(
+        'reconnect.maxAttempts.reached',
+        'Gateway reconnect reached the maximum attempts',
+        {
+          maxAttempts: OpenclawGateway.GATEWAY_RECONNECT_MAX_ATTEMPTS
+        }
+      )
       return
     }
 
@@ -352,7 +356,7 @@ export class OpenclawGateway extends EventEmitter {
     const delay = delays[Math.min(this.gatewayReconnectAttempt, delays.length - 1)]
     this.gatewayReconnectAttempt++
 
-    logger.warn('reconnect.scheduled', {
+    logger.warn('reconnect.scheduled', 'Gateway reconnect was scheduled', {
       attempt: this.gatewayReconnectAttempt,
       maxAttempts: OpenclawGateway.GATEWAY_RECONNECT_MAX_ATTEMPTS,
       delayMs: delay
@@ -370,7 +374,7 @@ export class OpenclawGateway extends EventEmitter {
       await this.connectIfNeeded(this.lastConnectionInfo)
       this.gatewayReconnectAttempt = 0
     } catch (error) {
-      logger.warn('reconnect.failed', undefined, error)
+      logger.warn('reconnect.failed', 'Gateway reconnect attempt failed', error)
       this.scheduleGatewayReconnect()
     }
   }
@@ -403,7 +407,7 @@ export class OpenclawGateway extends EventEmitter {
     const elapsed = Date.now() - this.lastTickTimestamp
     if (elapsed <= OpenclawGateway.TICK_TIMEOUT_MS) return
 
-    logger.warn('tickWatchdog.timeout', {
+    logger.warn('tickWatchdog.timeout', 'Gateway tick watchdog timed out', {
       elapsedMs: elapsed,
       thresholdMs: OpenclawGateway.TICK_TIMEOUT_MS
     })

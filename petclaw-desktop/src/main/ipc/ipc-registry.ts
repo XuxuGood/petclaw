@@ -16,7 +16,10 @@ export function safeHandle(
   handler: (event: IpcMainInvokeEvent, ...args: any[]) => any
 ): void {
   if (registered.has(channel)) {
-    logger.warn('channel.duplicate.skipped', { channel, mode: 'handle' })
+    logger.warn('channel.duplicate.skipped', 'Duplicate IPC handler registration skipped', {
+      channel,
+      mode: 'handle'
+    })
     return
   }
   registered.add(channel)
@@ -30,7 +33,10 @@ export function safeOn(
   listener: (event: IpcMainEvent, ...args: any[]) => void
 ): void {
   if (registered.has(channel)) {
-    logger.warn('channel.duplicate.skipped', { channel, mode: 'on' })
+    logger.warn('channel.duplicate.skipped', 'Duplicate IPC listener registration skipped', {
+      channel,
+      mode: 'on'
+    })
     return
   }
   registered.add(channel)

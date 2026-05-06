@@ -265,19 +265,6 @@ export function BootCheckPanel({ onRetry }: { onRetry?: () => void }) {
     onRetry?.()
   }
 
-  const reportDiagnosticsActionError = async (event: string, message: string): Promise<void> => {
-    try {
-      await window.api.logging.report({
-        level: 'error',
-        module: 'BootCheckPanel',
-        event,
-        message
-      })
-    } catch {
-      // renderer 错误上报失败时不能阻断用户恢复操作。
-    }
-  }
-
   const handleOpenLogFolder = async (): Promise<void> => {
     try {
       await window.api.logging.openLogFolder()
@@ -285,7 +272,17 @@ export function BootCheckPanel({ onRetry }: { onRetry?: () => void }) {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       setDiagnosticsStatus(t('logging.openLogFolderFailed', { error: message }))
-      await reportDiagnosticsActionError('renderer.logging.openLogFolder.failed', message)
+      try {
+        await window.api.logging.report({
+          level: 'error',
+          module: 'BootCheckPanel',
+          event: 'renderer.logging.openLogFolder.failed',
+          message: 'Failed to open log folder from boot panel',
+          fields: { errorMessage: message }
+        })
+      } catch {
+        // renderer 错误上报失败时不能阻断用户恢复操作。
+      }
     }
   }
 
@@ -297,7 +294,17 @@ export function BootCheckPanel({ onRetry }: { onRetry?: () => void }) {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       setDiagnosticsStatus(t('logging.exportFailed', { error: message }))
-      await reportDiagnosticsActionError('renderer.logging.exportDiagnostics.failed', message)
+      try {
+        await window.api.logging.report({
+          level: 'error',
+          module: 'BootCheckPanel',
+          event: 'renderer.logging.exportDiagnostics.failed',
+          message: 'Failed to export diagnostics from boot panel',
+          fields: { errorMessage: message }
+        })
+      } catch {
+        // renderer 错误上报失败时不能阻断用户恢复操作。
+      }
     } finally {
       setIsExportingDiagnostics(false)
     }

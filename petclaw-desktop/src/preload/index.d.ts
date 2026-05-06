@@ -118,7 +118,7 @@ interface ElectronAPI {
       level: 'warn' | 'error'
       module: string
       event: string
-      message?: string
+      message: string
       fields?: Record<string, unknown>
     }) => Promise<void>
     snapshot: () => Promise<unknown>

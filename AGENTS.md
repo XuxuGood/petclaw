@@ -226,9 +226,12 @@ i18n：
 
 日志：
 
-- 主进程使用 `petclaw-desktop/src/main/logger.ts`。
-- 日志消息使用英文，前缀 `[ModuleName]`。
-- 错误日志保留 error 对象作为最后一个参数。
+- 主进程使用 `petclaw-desktop/src/main/logging` 的 `getLogger(module, source)`。
+- 日志事件使用字符串字面量，点分 lowerCamelCase，变量上下文放入 `fields`。
+- debug/info/warn/error 所有日志等级都必须提供固定英文 `message`，禁止动态拼接 message。
+- 错误日志保留 error 对象作为最后一个参数；无 fields 时可写 `logger.error(event, message, error)`，禁止用 `undefined` 占位。
+- 生产源码禁止 `console.*`，禁止恢复独立业务日志 wrapper 或直接导入 `electron-log/main`。
+- 启动诊断和诊断包归属 `petclaw-desktop/src/main/diagnostics`，Logging 只负责日志底座。
 - 高频轮询和心跳不得使用 info 级别刷屏。
 
 ## 11. 编码风格

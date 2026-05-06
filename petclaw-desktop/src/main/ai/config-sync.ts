@@ -185,7 +185,7 @@ export class ConfigSync {
 
       // 诊断日志：记录每次同步结果和变更明细
       if (configChanged || agentsMdChanged || needsGatewayRestart) {
-        logger.warn('sync.changed', {
+        logger.warn('sync.changed', 'Config sync changed runtime inputs', {
           reason,
           configChanged,
           agentsMdChanged,
@@ -205,7 +205,7 @@ export class ConfigSync {
         needsGatewayRestart
       }
     } catch (err) {
-      logger.error('sync.failed', { reason }, err)
+      logger.error('sync.failed', 'Config sync failed', { reason }, err)
       return {
         ok: false,
         changed: false,

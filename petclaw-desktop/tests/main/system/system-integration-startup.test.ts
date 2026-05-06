@@ -3,6 +3,37 @@ import path from 'path'
 import { describe, expect, it } from 'vitest'
 
 describe('system integration startup order', () => {
+  it('claims the single instance lock before running the app startup chain', () => {
+    const source = fs.readFileSync(path.resolve(__dirname, '../../../src/main/index.ts'), 'utf-8')
+
+    const lockIndex = source.indexOf('app.requestSingleInstanceLock()')
+    const quitIndex = source.indexOf('app.quit()', lockIndex)
+    const appReadyIndex = source.indexOf('app.whenReady().then')
+    const createMainWindowIndex = source.indexOf('const chatWindow = createMainWindow(db)')
+
+    expect(lockIndex).toBeGreaterThan(-1)
+    expect(quitIndex).toBeGreaterThan(lockIndex)
+    expect(appReadyIndex).toBeGreaterThan(-1)
+    expect(createMainWindowIndex).toBeGreaterThan(-1)
+    expect(lockIndex).toBeLessThan(appReadyIndex)
+    expect(lockIndex).toBeLessThan(createMainWindowIndex)
+  })
+
+  it('routes duplicate launches to the existing main window instead of booting twice', () => {
+    const source = fs.readFileSync(path.resolve(__dirname, '../../../src/main/index.ts'), 'utf-8')
+
+    const secondInstanceIndex = source.indexOf("app.on('second-instance'")
+    const appReadyIndex = source.indexOf('app.whenReady().then')
+    const secondInstanceSection = source.slice(secondInstanceIndex, appReadyIndex)
+
+    expect(secondInstanceIndex).toBeGreaterThan(-1)
+    expect(appReadyIndex).toBeGreaterThan(secondInstanceIndex)
+    expect(secondInstanceSection).toContain('const mainWindow = getMainWindow()')
+    expect(secondInstanceSection).toContain('activateMainWindow({ app, window: mainWindow })')
+    expect(secondInstanceSection).not.toContain('createMainWindow')
+    expect(secondInstanceSection).not.toContain('runBootCheck')
+  })
+
   it('installs desktop system menus before BootCheck and pet readiness', () => {
     const source = fs.readFileSync(path.resolve(__dirname, '../../../src/main/index.ts'), 'utf-8')
 

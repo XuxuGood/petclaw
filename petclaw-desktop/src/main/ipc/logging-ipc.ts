@@ -1,7 +1,7 @@
 import { shell } from 'electron'
 
 import { safeHandle } from './ipc-registry'
-import { exportDiagnosticsBundle } from '../logging/diagnostics-bundle'
+import { exportDiagnosticsBundle } from '../diagnostics'
 import { getLoggingPlatform, type RendererLogReport } from '../logging/facade'
 import type { DiagnosticsExportOptions, LogSource } from '../logging/types'
 
@@ -38,7 +38,7 @@ export function validateRendererLogReport(value: unknown): RendererLogReport {
     level: value.level,
     module: readString(value.module, 'module', 80),
     event: readString(value.event, 'event', 120),
-    ...(typeof value.message === 'string' ? { message: value.message.slice(0, 500) } : {}),
+    message: readString(value.message, 'message', 500),
     ...(isRecord(value.fields) ? { fields: value.fields } : {})
   }
 }
@@ -78,13 +78,18 @@ export function registerLoggingIpcHandlers(): void {
     const mainSource = snapshot.sources.find((source) => source.source === 'main')
     if (!mainSource) {
       const error = new Error('Main log source is unavailable')
-      logger.error('logging.openLogFolder.failed', undefined, error)
+      logger.error('logging.openLogFolder.failed', 'Failed to open log folder', error)
       throw error
     }
     const error = await shell.openPath(mainSource.dir)
     if (error) {
       const openError = new Error(error)
-      logger.error('logging.openLogFolder.failed', { dir: mainSource.dir }, openError)
+      logger.error(
+        'logging.openLogFolder.failed',
+        'Failed to open log folder',
+        { dir: mainSource.dir },
+        openError
+      )
       throw openError
     }
   })

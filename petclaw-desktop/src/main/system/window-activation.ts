@@ -17,7 +17,7 @@ export function activateMainWindow(options: MainWindowActivationOptions): void {
   if (platform === 'darwin') {
     options.app.setActivationPolicy?.('regular')
     void options.app.dock?.show().catch((error) => {
-      logger.warn('dock.show.failed', undefined, error)
+      logger.warn('dock.show.failed', 'Failed to show Dock icon', error)
     })
     options.app.show()
   }

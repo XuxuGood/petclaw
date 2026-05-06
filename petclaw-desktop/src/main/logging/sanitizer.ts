@@ -211,9 +211,7 @@ export function sanitizeLogEvent(
   options: SanitizeOptions & { appVersion: string }
 ): SanitizedLogEvent {
   const fields = sanitizeUnknownForLog(input.fields ?? {}, options)
-  const message = input.message
-    ? String(sanitizeUnknownForLog(input.message, options).value)
-    : input.event
+  const message = String(sanitizeUnknownForLog(input.message, options).value)
   const error = sanitizeError(input.error, options)
 
   return {

@@ -19,7 +19,12 @@ export class ConfigInstaller {
       try {
         settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'))
       } catch (error) {
-        logger.warn('claudeHooks.settings.invalidJson', { settingsPath }, error)
+        logger.warn(
+          'claudeHooks.settings.invalidJson',
+          'Claude hooks settings file contains invalid JSON',
+          { settingsPath },
+          error
+        )
         settings = {}
       }
     }
@@ -58,7 +63,12 @@ export class ConfigInstaller {
     try {
       settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'))
     } catch (error) {
-      logger.warn('claudeHooks.uninstall.invalidJson', { settingsPath }, error)
+      logger.warn(
+        'claudeHooks.uninstall.invalidJson',
+        'Claude hooks settings file contains invalid JSON during uninstall',
+        { settingsPath },
+        error
+      )
       return
     }
     if (!settings.hooks) return

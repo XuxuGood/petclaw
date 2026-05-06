@@ -16,7 +16,6 @@ import {
 import { delimiter, dirname, join } from 'path'
 
 import { buildEnvForConfig, getCurrentApiConfig, resolveRawApiConfig } from './claude-settings'
-import { coworkLog } from './cowork-logger'
 import {
   buildAnthropicMessagesUrl,
   buildGeminiGenerateContentUrl,
@@ -99,20 +98,16 @@ function resolveElectronNodeRuntimePath(): string {
       const helperExeName = helperApp.replace(/\.app$/, '')
       const helperExePath = join(frameworksDir, helperApp, 'Contents', 'MacOS', helperExeName)
       if (existsSync(helperExePath)) {
-        coworkLog(
-          'INFO',
-          'resolveNodeShim',
-          `Using Electron helper runtime for node shim: ${helperExePath}`
-        )
+        logger.info('electronNodeRuntime.resolved', 'Electron helper runtime was resolved', {
+          helperExePath
+        })
         return helperExePath
       }
     }
   } catch (error) {
-    coworkLog(
-      'WARN',
-      'resolveNodeShim',
-      `Failed to resolve Electron helper runtime: ${error instanceof Error ? error.message : String(error)}`
-    )
+    logger.warn('electronNodeRuntime.resolve.failed', 'Failed to resolve Electron helper runtime', {
+      errorMessage: error instanceof Error ? error.message : String(error)
+    })
   }
 
   return process.execPath
@@ -174,7 +169,7 @@ function resolveUserShellPath(): string | null {
     }
     cachedUserShellPath = resolved
   } catch (error) {
-    logger.warn('shellPath.resolve.failed', undefined, error)
+    logger.warn('shellPath.resolve.failed', 'Failed to resolve user shell PATH', error)
     cachedUserShellPath = null
   }
 
@@ -245,20 +240,16 @@ function resolveWindowsRegistryPath(): string | null {
         .filter(Boolean)
       const unique = Array.from(new Set(entries))
       cachedWindowsRegistryPath = unique.join(';')
-      coworkLog(
-        'INFO',
-        'resolveWindowsRegistryPath',
-        `Resolved ${unique.length} PATH entries from Windows registry`
-      )
+      logger.info('windowsRegistryPath.resolved', 'Windows registry PATH was resolved', {
+        pathEntryCount: unique.length
+      })
     } else {
       cachedWindowsRegistryPath = null
     }
   } catch (error) {
-    coworkLog(
-      'WARN',
-      'resolveWindowsRegistryPath',
-      `Failed to read PATH from Windows registry: ${error instanceof Error ? error.message : String(error)}`
-    )
+    logger.warn('windowsRegistryPath.resolve.failed', 'Failed to read PATH from Windows registry', {
+      errorMessage: error instanceof Error ? error.message : String(error)
+    })
     cachedWindowsRegistryPath = null
   }
 
@@ -298,10 +289,13 @@ function ensureWindowsRegistryPathEntries(env: Record<string, string | undefined
     env.PATH = currentPath
       ? `${currentPath}${delimiter}${missingEntries.join(delimiter)}`
       : missingEntries.join(delimiter)
-    coworkLog(
-      'INFO',
-      'ensureWindowsRegistryPathEntries',
-      `Appended ${missingEntries.length} missing PATH entries from Windows registry: ${missingEntries.join(', ')}`
+    logger.info(
+      'windowsRegistryPathEntries.injected',
+      'Windows registry PATH entries were injected',
+      {
+        missingEntryCount: missingEntries.length,
+        missingEntries
+      }
     )
   }
 }
@@ -495,11 +489,11 @@ export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string)
   try {
     const shimDir = resolveUserDataPaths(app.getPath('userData')).coworkShimBin
     mkdirSync(shimDir, { recursive: true })
-    coworkLog(
-      'INFO',
-      'resolveNodeShim',
-      `Shim directory: ${shimDir}, electronPath: ${electronPath}, npmBinDir: ${npmBinDir || '(none)'}`
-    )
+    logger.info('nodeShim.directory.resolved', 'Electron Node shim directory was resolved', {
+      shimDir,
+      electronPath,
+      npmBinDir
+    })
 
     // --- node shim ---
     // 生成 bash 版本的 node 包装器，供 macOS/Linux 以及 Windows git-bash 使用。
@@ -521,7 +515,7 @@ export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string)
     } catch {
       // 某些文件系统不支持 POSIX 权限位，写入成功即可，不因 chmod 失败中断。
     }
-    coworkLog('INFO', 'resolveNodeShim', `Created node bash shim: ${nodeSh}`)
+    logger.info('nodeShim.node.generated', 'Node bash shim was generated', { shimPath: nodeSh })
 
     // Windows cmd 包装器只在 Windows 原生命令环境中需要。
     if (process.platform === 'win32') {
@@ -537,7 +531,9 @@ export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string)
         ''
       ].join('\r\n')
       writeFileSync(nodeCmd, nodeCmdContent, 'utf8')
-      coworkLog('INFO', 'resolveNodeShim', `Created node.cmd shim: ${nodeCmd}`)
+      logger.info('nodeShim.nodeCmd.generated', 'Node command shim was generated', {
+        shimPath: nodeCmd
+      })
     }
 
     // --- npx / npm shims ---
@@ -552,11 +548,11 @@ export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string)
       const npxCliJsPosix = npxCliJs.replace(/\\/g, '/')
       const npmCliJsPosix = npmCliJs.replace(/\\/g, '/')
 
-      coworkLog(
-        'INFO',
-        'resolveNodeShim',
-        `npmBinDir exists: true, npx-cli.js exists: ${existsSync(npxCliJs)}, npm-cli.js exists: ${existsSync(npmCliJs)}`
-      )
+      logger.info('nodeShim.npmBin.resolved', 'Node shim npm bin directory was resolved', {
+        npmBinDir,
+        hasNpxCli: existsSync(npxCliJs),
+        hasNpmCli: existsSync(npmCliJs)
+      })
 
       if (existsSync(npxCliJs)) {
         // npx 的 bash 包装器，供 POSIX shell / git-bash 路径解析使用。
@@ -573,7 +569,10 @@ export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string)
         } catch {
           /* 忽略不支持 POSIX 权限位的文件系统 */
         }
-        coworkLog('INFO', 'resolveNodeShim', `Created npx bash shim: ${npxSh} -> ${npxCliJsPosix}`)
+        logger.info('nodeShim.npx.generated', 'Npx bash shim was generated', {
+          shimPath: npxSh,
+          cliPath: npxCliJsPosix
+        })
 
         // Windows .cmd 版本通过环境变量引用 npm bin 目录，避免把可能含中文的路径
         // 直接写进批处理文件；GBK code page 下硬编码非 ASCII 路径容易被 cmd.exe 误解。
@@ -585,14 +584,13 @@ export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string)
             ''
           ].join('\r\n')
           writeFileSync(npxCmd, npxCmdContent, 'utf8')
-          coworkLog(
-            'INFO',
-            'resolveNodeShim',
-            `Created npx.cmd shim: ${npxCmd} (using env var PETCLAW_NPM_BIN_DIR)`
-          )
+          logger.info('nodeShim.npxCmd.generated', 'Npx command shim was generated', {
+            shimPath: npxCmd,
+            cliEnvVar: 'PETCLAW_NPM_BIN_DIR'
+          })
         }
       } else {
-        coworkLog('WARN', 'resolveNodeShim', `npx-cli.js not found at: ${npxCliJs}`)
+        logger.warn('nodeShim.npxCli.missing', 'Npx CLI file was missing', { cliPath: npxCliJs })
       }
 
       if (existsSync(npmCliJs)) {
@@ -610,7 +608,10 @@ export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string)
         } catch {
           /* 忽略不支持 POSIX 权限位的文件系统 */
         }
-        coworkLog('INFO', 'resolveNodeShim', `Created npm bash shim: ${npmSh} -> ${npmCliJsPosix}`)
+        logger.info('nodeShim.npm.generated', 'Npm bash shim was generated', {
+          shimPath: npmSh,
+          cliPath: npmCliJsPosix
+        })
 
         // Windows .cmd 版本同样通过环境变量引用 npm bin 目录，避免非 ASCII 路径编码问题。
         if (process.platform === 'win32') {
@@ -621,23 +622,23 @@ export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string)
             ''
           ].join('\r\n')
           writeFileSync(npmCmd, npmCmdContent, 'utf8')
-          coworkLog(
-            'INFO',
-            'resolveNodeShim',
-            `Created npm.cmd shim: ${npmCmd} (using env var PETCLAW_NPM_BIN_DIR)`
-          )
+          logger.info('nodeShim.npmCmd.generated', 'Npm command shim was generated', {
+            shimPath: npmCmd,
+            cliEnvVar: 'PETCLAW_NPM_BIN_DIR'
+          })
         }
       } else {
-        coworkLog('WARN', 'resolveNodeShim', `npm-cli.js not found at: ${npmCliJs}`)
+        logger.warn('nodeShim.npmCli.missing', 'Npm CLI file was missing', { cliPath: npmCliJs })
       }
 
-      coworkLog('INFO', 'resolveNodeShim', `Created npx/npm shims pointing to: ${npmBinDir}`)
+      logger.info('nodeShim.packageManagers.generated', 'Npx and npm shims were generated', {
+        npmBinDir
+      })
     } else {
-      coworkLog(
-        'WARN',
-        'resolveNodeShim',
-        `npmBinDir not available: ${npmBinDir || '(not provided)'}, exists: ${npmBinDir ? existsSync(npmBinDir) : 'N/A'}`
-      )
+      logger.warn('nodeShim.npmBin.missing', 'Node shim npm bin directory was missing', {
+        npmBinDir,
+        exists: npmBinDir ? existsSync(npmBinDir) : false
+      })
     }
 
     // 写完后做一次轻量校验，日志里记录路径、权限和大小，方便定位用户机器上的
@@ -649,30 +650,29 @@ export function ensureElectronNodeShim(electronPath: string, npmBinDir?: string)
       if (shimExists) {
         try {
           const stat = statSync(shimPath)
-          coworkLog(
-            'INFO',
-            'resolveNodeShim',
-            `Shim verify: ${name} exists, mode=0o${stat.mode.toString(8)}, size=${stat.size}`
-          )
+          logger.info('nodeShim.file.resolved', 'Node shim file was resolved', {
+            name,
+            shimPath,
+            mode: `0o${stat.mode.toString(8)}`,
+            size: stat.size
+          })
         } catch (e) {
-          coworkLog(
-            'WARN',
-            'resolveNodeShim',
-            `Shim verify: ${name} exists but stat failed: ${e instanceof Error ? e.message : String(e)}`
-          )
+          logger.warn('nodeShim.file.stat.failed', 'Failed to stat node shim file', {
+            name,
+            shimPath,
+            errorMessage: e instanceof Error ? e.message : String(e)
+          })
         }
       } else {
-        coworkLog('WARN', 'resolveNodeShim', `Shim verify: ${name} NOT found at ${shimPath}`)
+        logger.warn('nodeShim.file.missing', 'Node shim file was missing', { name, shimPath })
       }
     }
 
     return shimDir
   } catch (error) {
-    coworkLog(
-      'WARN',
-      'resolveNodeShim',
-      `Failed to prepare Electron Node shim: ${error instanceof Error ? error.message : String(error)}`
-    )
+    logger.warn('nodeShim.prepare.failed', 'Failed to prepare Electron Node shim', {
+      errorMessage: error instanceof Error ? error.message : String(error)
+    })
     return null
   }
 }
@@ -779,11 +779,10 @@ function resolveWindowsGitBashPath(): string | null {
 
     const health = checkWindowsGitBashHealth(candidate.path)
     if (health.ok) {
-      coworkLog(
-        'INFO',
-        'resolveGitBash',
-        `Selected git-bash (${candidate.source}): ${candidate.path}`
-      )
+      logger.info('gitBash.resolved', 'Git Bash was resolved', {
+        source: candidate.source,
+        bashPath: candidate.path
+      })
       cachedGitBashPath = candidate.path
       cachedGitBashResolutionError = null
       return candidate.path
@@ -791,14 +790,22 @@ function resolveWindowsGitBashPath(): string | null {
 
     const failure = `${candidate.path} [${candidate.source}] failed health check (${health.reason || 'unknown reason'})`
     failedCandidates.push(failure)
-    coworkLog('WARN', 'resolveGitBash', failure)
+    logger.warn('gitBash.healthCheck.failed', 'Git Bash candidate health check failed', {
+      bashPath: candidate.path,
+      source: candidate.source,
+      reason: health.reason
+    })
   }
 
   const diagnostic =
     failedCandidates.length > 0
       ? `No healthy git-bash found. Failures: ${failedCandidates.join('; ')}`
       : 'No git-bash candidates found on this system'
-  coworkLog('WARN', 'resolveGitBash', diagnostic)
+  logger.warn('gitBash.resolve.failed', 'Failed to resolve Git Bash', {
+    failureCount: failedCandidates.length,
+    failures: failedCandidates,
+    diagnostic
+  })
   cachedGitBashPath = null
   cachedGitBashResolutionError = truncateDiagnostic(diagnostic)
   return null
@@ -860,11 +867,9 @@ function ensureWindowsSystemEnvVars(env: Record<string, string | undefined>): vo
   }
 
   if (injected.length > 0) {
-    coworkLog(
-      'INFO',
-      'ensureWindowsSystemEnvVars',
-      `Injected missing Windows system env vars: ${injected.join(', ')}`
-    )
+    logger.info('windowsSystemEnv.injected', 'Windows system environment variables were injected', {
+      injected
+    })
   }
 }
 
@@ -902,11 +907,9 @@ function ensureWindowsSystemPathEntries(env: Record<string, string | undefined>)
     env.PATH = currentPath
       ? `${currentPath}${delimiter}${missingDirs.join(delimiter)}`
       : missingDirs.join(delimiter)
-    coworkLog(
-      'INFO',
-      'ensureWindowsSystemPathEntries',
-      `Appended missing Windows system PATH entries: ${missingDirs.join(', ')}`
-    )
+    logger.info('windowsSystemPath.injected', 'Windows system PATH entries were injected', {
+      missingDirs
+    })
   }
 }
 
@@ -935,11 +938,9 @@ function ensureWindowsBashBootstrapPath(env: Record<string, string | undefined>)
   }
 
   env.PATH = `${bootstrapToken}${delimiter}${currentPath}`
-  coworkLog(
-    'INFO',
-    'ensureWindowsBashBootstrapPath',
-    `Prepended bash bootstrap PATH token: ${bootstrapToken}`
-  )
+  logger.info('windowsBashBootstrapPath.injected', 'Windows Bash bootstrap PATH was injected', {
+    bootstrapToken
+  })
 }
 
 /**
@@ -1015,11 +1016,9 @@ function ensureWindowsOriginalPath(env: Record<string, string | undefined>): voi
 
   const posixPath = convertWindowsPathToMsys(currentPath)
   env.ORIGINAL_PATH = posixPath
-  coworkLog(
-    'INFO',
-    'ensureWindowsOriginalPath',
-    `Set ORIGINAL_PATH with ${posixPath.split(':').length} POSIX-format entries`
-  )
+  logger.info('windowsOriginalPath.injected', 'Windows ORIGINAL_PATH was injected', {
+    pathEntryCount: posixPath.split(':').length
+  })
 }
 
 /**
@@ -1057,10 +1056,10 @@ function ensureWindowsBashUtf8InitScript(): string | null {
 
     return initScript
   } catch (error) {
-    coworkLog(
-      'WARN',
-      'ensureWindowsBashUtf8InitScript',
-      `Failed to create bash UTF-8 init script: ${error instanceof Error ? error.message : String(error)}`
+    logger.warn(
+      'windowsBashUtf8InitScript.create.failed',
+      'Failed to create Bash UTF-8 init script',
+      { errorMessage: error instanceof Error ? error.message : String(error) }
     )
     return null
   }
@@ -1116,11 +1115,9 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
         // BASH_ENV 路径提前转换成 MSYS2 POSIX 格式，避免中文用户名等非 ASCII 路径在
         // LANG=C.UTF-8 生效前被 MSYS2 自动转换逻辑错误解码。
         env.BASH_ENV = singleWindowsPathToPosix(initScript)
-        coworkLog(
-          'INFO',
-          'applyPackagedEnvOverrides',
-          `Set BASH_ENV for UTF-8 console code page: ${env.BASH_ENV}`
-        )
+        logger.info('windowsBashEnv.injected', 'Windows Bash UTF-8 environment was injected', {
+          bashEnv: env.BASH_ENV
+        })
       }
     }
 
@@ -1147,18 +1144,22 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
       if (!configuredHealth.ok) {
         const fallbackPath = resolveWindowsGitBashPath()
         if (fallbackPath && fallbackPath !== configuredBashPath) {
-          coworkLog(
-            'WARN',
-            'resolveGitBash',
-            `Configured bash is unhealthy (${configuredBashPath}): ${configuredHealth.reason || 'unknown reason'}. Falling back to: ${fallbackPath}`
-          )
+          logger.warn('gitBash.configured.unhealthy', 'Configured Git Bash was unhealthy', {
+            configuredBashPath,
+            reason: configuredHealth.reason,
+            fallbackPath
+          })
           bashPath = fallbackPath
         } else {
           const diagnostic = truncateDiagnostic(
             `Configured bash is unhealthy (${configuredBashPath}): ${configuredHealth.reason || 'unknown reason'}`
           )
           env.PETCLAW_GIT_BASH_RESOLUTION_ERROR = diagnostic
-          coworkLog('WARN', 'resolveGitBash', diagnostic)
+          logger.warn('gitBash.configured.unhealthy', 'Configured Git Bash was unhealthy', {
+            configuredBashPath,
+            reason: configuredHealth.reason,
+            diagnostic
+          })
           bashPath = null
         }
       }
@@ -1167,14 +1168,12 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
     if (bashPath) {
       env.CLAUDE_CODE_GIT_BASH_PATH = bashPath
       delete env.PETCLAW_GIT_BASH_RESOLUTION_ERROR
-      coworkLog('INFO', 'resolveGitBash', `Using Windows git-bash: ${bashPath}`)
+      logger.info('gitBash.used', 'Windows Git Bash was used', { bashPath })
       const gitToolDirs = getWindowsGitToolDirs(bashPath)
       env.PATH = appendEnvPath(env.PATH, gitToolDirs)
-      coworkLog(
-        'INFO',
-        'resolveGitBash',
-        `Injected Windows Git toolchain PATH entries: ${gitToolDirs.join(', ')}`
-      )
+      logger.info('gitToolchainPath.injected', 'Windows Git toolchain PATH entries were injected', {
+        gitToolDirs
+      })
       ensureWindowsBashBootstrapPath(env)
     } else {
       const diagnostic =
@@ -1189,11 +1188,9 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
     // 丢掉上面补齐的 Python、Node.js、npm、pip 等用户工具路径。
     if (!env.MSYS2_PATH_TYPE) {
       env.MSYS2_PATH_TYPE = 'inherit'
-      coworkLog(
-        'INFO',
-        'applyPackagedEnvOverrides',
-        'Set MSYS2_PATH_TYPE=inherit to preserve PATH in git-bash'
-      )
+      logger.info('msys2PathType.injected', 'MSYS2 PATH type was injected', {
+        value: 'inherit'
+      })
     }
 
     // 预先把 ORIGINAL_PATH 设置为 POSIX 格式，供 git-bash 的 /etc/profile 使用。
@@ -1213,11 +1210,9 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
     const devBinDir = join(app.getAppPath(), 'node_modules', '.bin')
     if (existsSync(devBinDir)) {
       env.PATH = [devBinDir, env.PATH].filter(Boolean).join(delimiter)
-      coworkLog(
-        'INFO',
-        'applyPackagedEnvOverrides',
-        `Dev mode: prepended node_modules/.bin to PATH: ${devBinDir}`
-      )
+      logger.info('devBinPath.injected', 'Development node_modules bin path was injected', {
+        devBinDir
+      })
     }
 
     // 开发模式把 Openclaw runtime 的 node_modules 加到 NODE_PATH，使 exec 工具能访问
@@ -1239,10 +1234,10 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
     })()
     if (devRuntimeNodeModules) {
       env.NODE_PATH = appendEnvPath(env.NODE_PATH, [devRuntimeNodeModules])
-      coworkLog(
-        'INFO',
-        'applyPackagedEnvOverrides',
-        `Dev mode: added openclaw runtime node_modules to NODE_PATH: ${devRuntimeNodeModules}`
+      logger.info(
+        'devRuntimeNodePath.injected',
+        'Development runtime node_modules path was injected',
+        { devRuntimeNodeModules }
       )
     }
     return
@@ -1256,17 +1251,14 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
   const userPath = resolveUserShellPath()
   if (userPath) {
     env.PATH = userPath
-    coworkLog(
-      'INFO',
-      'applyPackagedEnvOverrides',
-      `Resolved user shell PATH (${userPath.split(delimiter).length} entries)`
-    )
+    logger.info('userShellPath.resolved', 'User shell PATH was resolved', {
+      pathEntryCount: userPath.split(delimiter).length
+    })
     for (const entry of userPath.split(delimiter)) {
-      coworkLog(
-        'INFO',
-        'applyPackagedEnvOverrides',
-        `  PATH entry: ${entry} (exists: ${existsSync(entry)})`
-      )
+      logger.info('userShellPath.entry.resolved', 'User shell PATH entry was resolved', {
+        entry,
+        exists: existsSync(entry)
+      })
     }
   } else {
     // shell PATH 解析失败时追加常见 Node.js 安装目录，作为弱兜底。
@@ -1279,25 +1271,24 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
       `${home}/.fnm/current/bin`
     ]
     env.PATH = [env.PATH, ...commonPaths].filter(Boolean).join(delimiter)
-    coworkLog(
-      'WARN',
-      'applyPackagedEnvOverrides',
-      'Failed to resolve user shell PATH, using fallback common paths'
-    )
+    logger.warn('userShellPath.resolve.failed', 'Failed to resolve user shell PATH', {
+      commonPaths
+    })
   }
 
   const resourcesPath = process.resourcesPath
-  coworkLog('INFO', 'applyPackagedEnvOverrides', `Packaged mode: resourcesPath=${resourcesPath}`)
+  logger.info('packagedResources.resolved', 'Packaged resources path was resolved', {
+    resourcesPath
+  })
 
   // 创建 node/npx/npm shim：用 ELECTRON_RUN_AS_NODE=1 让 Electron 充当 Node.js runtime，
   // 并让 npx/npm 指向打包进来的 npm 包。这样无需依赖系统 Node.js，也规避 Windows
   // 跨平台构建中 node_modules/.bin 符号链接不可用的问题。
   const npmBinDir = join(resourcesPath, 'app.asar.unpacked', 'node_modules', 'npm', 'bin')
-  coworkLog(
-    'INFO',
-    'applyPackagedEnvOverrides',
-    `npmBinDir=${npmBinDir}, exists=${existsSync(npmBinDir)}`
-  )
+  logger.info('packagedNpmBin.resolved', 'Packaged npm bin directory was resolved', {
+    npmBinDir,
+    exists: existsSync(npmBinDir)
+  })
 
   // .cmd shim 通过环境变量引用 npmBinDir，避免把含中文的绝对路径硬编码进批处理文件。
   // 在 GBK code page 下，硬编码非 ASCII 路径容易被 cmd.exe 误读。
@@ -1316,17 +1307,11 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
     if (shimDir) {
       env.PATH = [shimDir, env.PATH].filter(Boolean).join(delimiter)
       env.PETCLAW_NODE_SHIM_ACTIVE = '1'
-      coworkLog(
-        'INFO',
-        'resolveNodeShim',
-        `Injected Electron Node/npx/npm shim PATH entry: ${shimDir}`
-      )
+      logger.info('nodeShimPath.injected', 'Electron Node shim PATH entry was injected', {
+        shimDir
+      })
       if (shouldForcePackagedDarwinShim) {
-        coworkLog(
-          'INFO',
-          'resolveNodeShim',
-          'Packaged macOS build: forcing bundled Electron node/npx/npm shims to avoid stale system Node versions'
-        )
+        logger.info('nodeShim.macos.used', 'Bundled macOS Node shims were used')
       }
 
       // shim 注入后重新计算 ORIGINAL_PATH，确保 git-bash 也能看到内置 node/npx/npm。
@@ -1336,11 +1321,11 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
     }
   } else {
     delete env.PETCLAW_NODE_SHIM_ACTIVE
-    coworkLog(
-      'INFO',
-      'resolveNodeShim',
-      'System node/npx/npm detected; skipped Electron node shim injection'
-    )
+    logger.info('nodeShim.inject.skipped', 'Electron Node shim injection was skipped', {
+      hasSystemNode,
+      hasSystemNpx,
+      hasSystemNpm
+    })
   }
 
   const nodePaths = [
@@ -1369,11 +1354,19 @@ function verifyNodeEnvironment(env: Record<string, string | undefined>): void {
 
   // 逐项记录最终 PATH，方便从日志判断目录是否存在、顺序是否符合预期。
   const pathEntries = pathValue.split(delimiter)
-  coworkLog('INFO', tag, `Final PATH has ${pathEntries.length} entries:`)
+  logger.info('nodeEnvironment.path.resolved', 'Node environment PATH was resolved', {
+    tag,
+    pathEntryCount: pathEntries.length
+  })
   for (let i = 0; i < pathEntries.length; i++) {
     const entry = pathEntries[i]
     const entryExists = entry ? existsSync(entry) : false
-    coworkLog('INFO', tag, `  [${i}] ${entry} (exists: ${entryExists})`)
+    logger.info('nodeEnvironment.pathEntry.resolved', 'Node environment PATH entry was resolved', {
+      tag,
+      index: i,
+      entry,
+      exists: entryExists
+    })
   }
 
   // 使用平台原生命令解析 node/npx/npm：macOS/Linux 用 which，Windows 用 where。
@@ -1388,7 +1381,12 @@ function verifyNodeEnvironment(env: Record<string, string | undefined>): void {
       })
       if (result.status === 0 && result.stdout) {
         const resolved = result.stdout.trim()
-        coworkLog('INFO', tag, `${whichCmd} ${tool} => ${resolved}`)
+        logger.info('nodeEnvironment.tool.resolved', 'Node environment tool was resolved', {
+          tag,
+          whichCmd,
+          tool,
+          resolved
+        })
         const resolvedCandidates = resolved
           .split(/\r?\n/)
           .map((line) => line.trim())
@@ -1412,46 +1410,58 @@ function verifyNodeEnvironment(env: Record<string, string | undefined>): void {
               timeout: 5000,
               windowsHide: process.platform === 'win32'
             })
-            coworkLog(
-              'INFO',
+            logger.info('nodeEnvironment.version.resolved', 'Node version was resolved', {
               tag,
-              `node --version (${execTarget}) => ${(versionResult.stdout || '').trim()} (exit: ${versionResult.status})`
-            )
+              execTarget,
+              stdout: (versionResult.stdout || '').trim(),
+              status: versionResult.status
+            })
             if (versionResult.error) {
-              coworkLog('WARN', tag, `node --version spawn error: ${versionResult.error.message}`)
+              logger.warn('nodeEnvironment.version.failed', 'Node version spawn failed', {
+                tag,
+                errorMessage: versionResult.error.message
+              })
             }
             if (versionResult.stderr) {
-              coworkLog('WARN', tag, `node --version stderr: ${versionResult.stderr.trim()}`)
+              logger.warn('nodeEnvironment.version.stderr', 'Node version wrote to stderr', {
+                tag,
+                stderr: versionResult.stderr.trim()
+              })
             }
           } catch (e) {
-            coworkLog(
-              'WARN',
+            logger.warn('nodeEnvironment.version.failed', 'Node version check failed', {
               tag,
-              `node --version failed: ${e instanceof Error ? e.message : String(e)}`
-            )
+              errorMessage: e instanceof Error ? e.message : String(e)
+            })
           }
         }
       } else {
-        coworkLog(
-          'WARN',
+        logger.warn('nodeEnvironment.tool.missing', 'Node environment tool was missing', {
           tag,
-          `${whichCmd} ${tool} => NOT FOUND (exit: ${result.status}, stderr: ${(result.stderr || '').trim()})`
-        )
+          whichCmd,
+          tool,
+          status: result.status,
+          stderr: (result.stderr || '').trim()
+        })
       }
     } catch (e) {
-      coworkLog(
-        'WARN',
+      logger.warn('nodeEnvironment.tool.failed', 'Node environment tool lookup failed', {
         tag,
-        `${whichCmd} ${tool} threw: ${e instanceof Error ? e.message : String(e)}`
-      )
+        whichCmd,
+        tool,
+        errorMessage: e instanceof Error ? e.message : String(e)
+      })
     }
   }
 
   // 记录关键环境变量，便于和 PATH 解析结果一起排查。
-  coworkLog('INFO', tag, `NODE_PATH=${env.NODE_PATH || '(not set)'}`)
-  coworkLog('INFO', tag, `PETCLAW_ELECTRON_PATH=${env.PETCLAW_ELECTRON_PATH || '(not set)'}`)
-  coworkLog('INFO', tag, `PETCLAW_NPM_BIN_DIR=${env.PETCLAW_NPM_BIN_DIR || '(not set)'}`)
-  coworkLog('INFO', tag, `HOME=${env.HOME || '(not set)'}`)
+  logger.info('nodeEnvironment.env.resolved', 'Node environment variables were resolved', {
+    tag,
+    nodePath: env.NODE_PATH,
+    petclawElectronPath: env.PETCLAW_ELECTRON_PATH,
+    petclawNpmBinDir: env.PETCLAW_NPM_BIN_DIR,
+    home: env.HOME
+  })
 }
 
 /**
@@ -1531,7 +1541,9 @@ export async function getEnhancedEnv(
     env.https_proxy = proxyUrl
     env.HTTP_PROXY = proxyUrl
     env.HTTPS_PROXY = proxyUrl
-    logger.warn('systemProxy.injected', { targetUrl })
+    logger.warn('systemProxy.injected', 'System proxy was injected into cowork environment', {
+      targetUrl
+    })
   }
 
   return env
@@ -1551,9 +1563,14 @@ export function ensureCoworkTempDir(cwd: string): string {
   if (!existsSync(tempDir)) {
     try {
       mkdirSync(tempDir, { recursive: true })
-      logger.info('tempDir.created', { tempDir })
+      logger.info('tempDir.created', 'Cowork temporary directory was created', { tempDir })
     } catch (error) {
-      logger.error('tempDir.create.failed', { tempDir }, error)
+      logger.error(
+        'tempDir.create.failed',
+        'Failed to create cowork temporary directory',
+        { tempDir },
+        error
+      )
       // 临时目录创建失败时不阻断会话启动，回退到 cwd 让 SDK 仍有可写位置。
       return cwd
     }
@@ -1806,7 +1823,11 @@ export async function generateSessionTitle(userIntent: string | null): Promise<s
   const { config, error } = resolveSessionTitleApiConfig()
   if (!config) {
     if (error) {
-      logger.warn('titleGeneration.skipped.missingApiConfig', undefined, error)
+      logger.warn(
+        'titleGeneration.skipped.missingApiConfig',
+        'Session title generation was skipped because API config is missing',
+        error
+      )
     }
     return fallbackTitle
   }
@@ -1820,7 +1841,7 @@ export async function generateSessionTitle(userIntent: string | null): Promise<s
         ? buildGeminiGenerateContentUrl(config.baseURL, config.model)
         : buildAnthropicMessagesUrl(config.baseURL)
     const prompt = `Generate a short title from this input, keep the same language, return plain text only (no markdown), and keep it within ${SESSION_TITLE_MAX_CHARS} characters: ${normalizedInput}`
-    logger.debug('titleGeneration.request.started', {
+    logger.debug('titleGeneration.request.started', 'Session title generation request started', {
       protocol: config.protocol,
       baseURL: config.baseURL,
       requestUrl: url,
@@ -1861,7 +1882,7 @@ export async function generateSessionTitle(userIntent: string | null): Promise<s
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => '')
-      logger.warn('titleGeneration.response.failed', {
+      logger.warn('titleGeneration.response.failed', 'Session title generation response failed', {
         status: response.status,
         errorSnippet: errorText.slice(0, 240)
       })
@@ -1869,24 +1890,32 @@ export async function generateSessionTitle(userIntent: string | null): Promise<s
     }
 
     const payload = await response.json()
-    logger.debug('titleGeneration.response.received', {
-      payloadSize: JSON.stringify(payload).length
-    })
+    logger.debug(
+      'titleGeneration.response.received',
+      'Session title generation response received',
+      {
+        payloadSize: JSON.stringify(payload).length
+      }
+    )
     // 不同协议的响应结构不同，解析后仍统一经过 normalizeTitleToPlainText 清洗。
     // 这样即使模型返回 Markdown 或超长文本，最终落到 UI 的标题也保持稳定。
     const llmTitle =
       config.protocol === CoworkModelProtocol.GeminiNative
         ? extractTextFromGeminiResponse(payload)
         : extractTextFromAnthropicResponse(payload)
-    logger.debug('titleGeneration.title.extracted', { titleLength: llmTitle.length })
+    logger.debug('titleGeneration.title.extracted', 'Session title was extracted from response', {
+      titleLength: llmTitle.length
+    })
     return normalizeTitleToPlainText(llmTitle, fallbackTitle)
   } catch (titleError) {
     if (isAbortError(titleError)) {
       const timeoutSeconds = Math.ceil(SESSION_TITLE_TIMEOUT_MS / 1000)
-      logger.warn('titleGeneration.timeout', { timeoutSeconds })
+      logger.warn('titleGeneration.timeout', 'Session title generation timed out', {
+        timeoutSeconds
+      })
       return fallbackTitle
     }
-    logger.error('titleGeneration.failed', undefined, titleError)
+    logger.error('titleGeneration.failed', 'Failed to generate session title', titleError)
     return fallbackTitle
   } finally {
     clearTimeout(timeoutId)

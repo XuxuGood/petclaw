@@ -19,11 +19,17 @@ const log = (level: string, msg: string): void => {
   try {
     const logger = getLogger('McpBridgeHTTP', 'mcp')
     if (level === 'ERROR') {
-      logger.error('mcp.http.error', { message: formatted })
+      logger.error('mcp.http.error', 'MCP bridge HTTP server emitted an error', {
+        message: formatted
+      })
     } else if (level === 'WARN') {
-      logger.warn('mcp.http.warn', { message: formatted })
+      logger.warn('mcp.http.warn', 'MCP bridge HTTP server emitted a warning', {
+        message: formatted
+      })
     } else {
-      logger.info('mcp.http.info', { message: formatted })
+      logger.info('mcp.http.info', 'MCP bridge HTTP server emitted an info message', {
+        message: formatted
+      })
     }
   } catch {
     // MCP 日志不能影响本地 callback server。

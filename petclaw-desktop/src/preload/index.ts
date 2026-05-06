@@ -213,7 +213,7 @@ const api = {
       level: 'warn' | 'error'
       module: string
       event: string
-      message?: string
+      message: string
       fields?: Record<string, unknown>
     }): Promise<void> => ipcRenderer.invoke('logging:report', event),
     snapshot: (): Promise<unknown> => ipcRenderer.invoke('logging:snapshot'),

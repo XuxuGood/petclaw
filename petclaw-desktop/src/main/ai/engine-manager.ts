@@ -330,7 +330,9 @@ export class OpenclawEngineManager extends EventEmitter {
     // 同步本地扩展到运行时目录
     const localExtensionSync = syncLocalOpenClawExtensionsIntoRuntime(runtime.root)
     if (localExtensionSync.copied.length > 0) {
-      logger.info('localExtensions.synced', { copied: localExtensionSync.copied })
+      logger.info('localExtensions.synced', 'Local OpenClaw extensions were synced', {
+        copied: localExtensionSync.copied
+      })
     }
 
     // 清理可能残留在 dist/extensions/ 中的过期第三方插件
@@ -344,7 +346,9 @@ export class OpenclawEngineManager extends EventEmitter {
       const allNonBundledIds = [...new Set([...thirdPartyIds, ...localIds, ...renamedIds])]
       const cleaned = cleanupStaleThirdPartyPluginsFromBundledDir(runtime.root, allNonBundledIds)
       if (cleaned.length > 0) {
-        logger.info('thirdPartyPlugins.cleaned', { cleaned })
+        logger.info('thirdPartyPlugins.cleaned', 'Stale third-party plugins were cleaned', {
+          cleaned
+        })
       }
     } catch {
       // 尽力清理，不阻塞启动
@@ -367,7 +371,7 @@ export class OpenclawEngineManager extends EventEmitter {
   /** 启动 Gateway 进程（去重：重复调用复用同一个 Promise） */
   async startGateway(): Promise<EngineStatus> {
     if (this.startGatewayPromise) {
-      logger.warn('gateway.start.reused')
+      logger.warn('gateway.start.reused', 'Gateway start reused existing process')
       return this.startGatewayPromise
     }
     this.startGatewayPromise = this.doStartGateway().finally(() => {
@@ -386,9 +390,9 @@ export class OpenclawEngineManager extends EventEmitter {
     }
 
     if (this.gatewayProcess) {
-      logger.warn('gateway.stop.started')
+      logger.warn('gateway.stop.started', 'Gateway stop started')
       await this.stopGatewayProcess(this.gatewayProcess)
-      logger.warn('gateway.stop.completed')
+      logger.warn('gateway.stop.completed', 'Gateway stop completed')
       this.gatewayProcess = null
     }
 
@@ -405,10 +409,13 @@ export class OpenclawEngineManager extends EventEmitter {
 
   /** 重启 Gateway（先停后启，重置重启计数） */
   async restartGateway(): Promise<EngineStatus> {
-    logger.warn('gateway.restart.stopExisting.started')
+    logger.warn(
+      'gateway.restart.stopExisting.started',
+      'Gateway restart is stopping the existing process'
+    )
     await this.stopGateway()
     this.gatewayRestartAttempt = 0
-    logger.warn('gateway.restart.startNew.started')
+    logger.warn('gateway.restart.startNew.started', 'Gateway restart is starting a new process')
     return this.startGateway()
   }
 
@@ -419,10 +426,14 @@ export class OpenclawEngineManager extends EventEmitter {
     const t0 = Date.now()
 
     const ensured = await this.ensureReady()
-    logger.info('gateway.start.ensureReady.completed', {
-      elapsedMs: Date.now() - t0,
-      phase: ensured.phase
-    })
+    logger.info(
+      'gateway.start.ensureReady.completed',
+      'Gateway startup readiness check completed',
+      {
+        elapsedMs: Date.now() - t0,
+        phase: ensured.phase
+      }
+    )
     // 接受 ready 和 running（gateway 已在运行）两种状态
     if (ensured.phase !== 'ready' && ensured.phase !== 'running') {
       return ensured
@@ -433,11 +444,15 @@ export class OpenclawEngineManager extends EventEmitter {
       const port = this.gatewayPort ?? this.readGatewayPort()
       if (port) {
         const healthy = await this.isGatewayHealthy(port)
-        logger.info('gateway.existingProcess.healthChecked', {
-          elapsedMs: Date.now() - t0,
-          healthy,
-          port
-        })
+        logger.info(
+          'gateway.existingProcess.healthChecked',
+          'Existing gateway process health was checked',
+          {
+            elapsedMs: Date.now() - t0,
+            healthy,
+            port
+          }
+        )
         if (healthy) {
           if (this.status.phase !== 'running') {
             this.setStatus({
@@ -456,7 +471,7 @@ export class OpenclawEngineManager extends EventEmitter {
     }
 
     const runtime = this.resolveRuntimeMetadata()
-    logger.info('runtime.metadata.resolved', {
+    logger.info('runtime.metadata.resolved', 'Runtime metadata was resolved', {
       elapsedMs: Date.now() - t0,
       hasRoot: Boolean(runtime.root)
     })
@@ -472,10 +487,17 @@ export class OpenclawEngineManager extends EventEmitter {
 
     // asar 解压：确保入口文件和 control-ui 在磁盘上可用
     this.ensureBareEntryFiles(runtime.root)
-    logger.info('runtime.bareEntryFiles.ensure.completed', { elapsedMs: Date.now() - t0 })
+    logger.info(
+      'runtime.bareEntryFiles.ensure.completed',
+      'Runtime bare entry files check completed',
+      { elapsedMs: Date.now() - t0 }
+    )
 
     const openclawEntry = this.resolveOpenClawEntry(runtime.root)
-    logger.info('runtime.entry.resolved', { elapsedMs: Date.now() - t0, openclawEntry })
+    logger.info('runtime.entry.resolved', 'Runtime entry was resolved', {
+      elapsedMs: Date.now() - t0,
+      openclawEntry
+    })
     if (!openclawEntry) {
       this.setStatus({
         phase: 'error',
@@ -487,9 +509,14 @@ export class OpenclawEngineManager extends EventEmitter {
     }
 
     const token = this.ensureGatewayToken()
-    logger.info('gateway.token.ensure.completed', { elapsedMs: Date.now() - t0 })
+    logger.info('gateway.token.ensure.completed', 'Gateway token check completed', {
+      elapsedMs: Date.now() - t0
+    })
     const port = await this.resolveGatewayPort()
-    logger.info('gateway.port.resolved', { elapsedMs: Date.now() - t0, port })
+    logger.info('gateway.port.resolved', 'Gateway port was resolved', {
+      elapsedMs: Date.now() - t0,
+      port
+    })
     this.gatewayPort = port
     this.writeGatewayPort(port)
     this.ensureConfigFile()
@@ -544,7 +571,13 @@ export class OpenclawEngineManager extends EventEmitter {
       const hostTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
       if (hostTimezone) {
         env.TZ = hostTimezone
-        logger.info('gateway.env.timezone.injected', { timezone: hostTimezone })
+        logger.info(
+          'gateway.env.timezone.injected',
+          'Host timezone was injected into gateway environment',
+          {
+            timezone: hostTimezone
+          }
+        )
       }
     }
 
@@ -576,7 +609,11 @@ export class OpenclawEngineManager extends EventEmitter {
         env.https_proxy = proxyUrl
         env.HTTP_PROXY = proxyUrl
         env.HTTPS_PROXY = proxyUrl
-        logger.warn('gateway.env.systemProxy.injected', { targetUrl })
+        logger.warn(
+          'gateway.env.systemProxy.injected',
+          'System proxy was injected into gateway environment',
+          { targetUrl }
+        )
       }
     }
 
@@ -590,7 +627,11 @@ export class OpenclawEngineManager extends EventEmitter {
       token,
       '--verbose'
     ]
-    logger.warn('gateway.spawn.started', { openclawEntry, cwd: runtime.root, port })
+    logger.warn('gateway.spawn.started', 'Gateway process spawn started', {
+      openclawEntry,
+      cwd: runtime.root,
+      port
+    })
 
     // Windows 使用 child_process.spawn + ELECTRON_RUN_AS_NODE，其他平台使用 utilityProcess.fork
     let child: GatewayProcess
@@ -615,11 +656,17 @@ export class OpenclawEngineManager extends EventEmitter {
     this.attachGatewayExitHandlers(child)
 
     child.once('spawn', () => {
-      logger.warn('gateway.spawn.completed', { elapsedMs: Date.now() - t0, pid: child.pid })
+      logger.warn('gateway.spawn.completed', 'Gateway process spawn completed', {
+        elapsedMs: Date.now() - t0,
+        pid: child.pid
+      })
     })
 
     const ready = await this.waitForGatewayReady(port, GATEWAY_BOOT_TIMEOUT_MS)
-    logger.warn('gateway.waitForReady.completed', { elapsedMs: Date.now() - t0, ready })
+    logger.warn('gateway.waitForReady.completed', 'Gateway readiness wait completed', {
+      elapsedMs: Date.now() - t0,
+      ready
+    })
     if (!ready) {
       this.setStatus({
         phase: 'error',
@@ -715,13 +762,17 @@ export class OpenclawEngineManager extends EventEmitter {
     // 快速路径：bundle 存在时只需确保 control-ui 可用
     const bundlePath = path.join(runtimeRoot, 'gateway-bundle.mjs')
     if (fs.existsSync(bundlePath)) {
-      logger.info('runtime.bareEntryFiles.bundleFound')
+      logger.info('runtime.bareEntryFiles.bundleFound', 'Runtime gateway bundle was found')
       this.ensureControlUiFiles(runtimeRoot)
-      logger.info('runtime.bareEntryFiles.ensure.completed', { elapsedMs: Date.now() - t0 })
+      logger.info(
+        'runtime.bareEntryFiles.ensure.completed',
+        'Runtime bare entry files check completed',
+        { elapsedMs: Date.now() - t0 }
+      )
       return
     }
 
-    logger.info('runtime.bareEntryFiles.bundleMissing')
+    logger.info('runtime.bareEntryFiles.bundleMissing', 'Runtime gateway bundle was missing')
     const bareEntry = path.join(runtimeRoot, 'openclaw.mjs')
     const bareDistEntry = path.join(runtimeRoot, 'dist', 'entry.js')
 
@@ -735,24 +786,38 @@ export class OpenclawEngineManager extends EventEmitter {
       return
     }
 
-    logger.warn('runtime.bareEntryFiles.extract.started')
+    logger.warn(
+      'runtime.bareEntryFiles.extract.started',
+      'Runtime bare entry file extraction started'
+    )
 
     try {
       if (!fs.existsSync(bareEntry)) {
         fs.writeFileSync(bareEntry, fs.readFileSync(asarEntry))
-        logger.info('runtime.bareEntryFiles.openclawEntry.extracted')
+        logger.info(
+          'runtime.bareEntryFiles.openclawEntry.extracted',
+          'Runtime OpenClaw entry file was extracted'
+        )
       }
 
       const asarDist = path.join(asarRoot, 'dist')
       const bareDist = path.join(runtimeRoot, 'dist')
       if (fs.existsSync(asarDist) && !fs.existsSync(bareDistEntry)) {
         this.copyDirFromAsar(asarDist, bareDist)
-        logger.info('runtime.bareEntryFiles.dist.extracted')
+        logger.info('runtime.bareEntryFiles.dist.extracted', 'Runtime dist files were extracted')
       }
 
-      logger.warn('runtime.bareEntryFiles.extract.completed')
+      logger.warn(
+        'runtime.bareEntryFiles.extract.completed',
+        'Runtime bare entry file extraction completed'
+      )
     } catch (err) {
-      logger.error('runtime.bareEntryFiles.extract.failed', { runtimeRoot }, err)
+      logger.error(
+        'runtime.bareEntryFiles.extract.failed',
+        'Runtime bare entry file extraction failed',
+        { runtimeRoot },
+        err
+      )
     }
   }
 
@@ -771,12 +836,17 @@ export class OpenclawEngineManager extends EventEmitter {
       return
     }
 
-    logger.warn('runtime.controlUi.extract.started')
+    logger.warn('runtime.controlUi.extract.started', 'Runtime control UI extraction started')
     try {
       this.copyDirFromAsar(asarControlUi, path.join(runtimeRoot, 'dist', 'control-ui'))
-      logger.warn('runtime.controlUi.extract.completed')
+      logger.warn('runtime.controlUi.extract.completed', 'Runtime control UI extraction completed')
     } catch (err) {
-      logger.error('runtime.controlUi.extract.failed', { runtimeRoot }, err)
+      logger.error(
+        'runtime.controlUi.extract.failed',
+        'Runtime control UI extraction failed',
+        { runtimeRoot },
+        err
+      )
     }
   }
 
@@ -855,7 +925,7 @@ export class OpenclawEngineManager extends EventEmitter {
 
       return shimDir
     } catch (error) {
-      logger.error('cliShim.prepare.failed', undefined, error)
+      logger.error('cliShim.prepare.failed', 'Failed to prepare CLI shim', error)
       return null
     }
   }
@@ -868,7 +938,9 @@ export class OpenclawEngineManager extends EventEmitter {
     if (process.platform === 'win32') {
       const bundlePath = path.join(runtimeRoot, 'gateway-bundle.mjs')
       if (fs.existsSync(bundlePath)) {
-        logger.info('runtime.entry.bundleFastPath.used', { runtimeRoot })
+        logger.info('runtime.entry.bundleFastPath.used', 'Runtime bundle fast path was used', {
+          runtimeRoot
+        })
         return this.ensureGatewayLauncherCjsForBundle(runtimeRoot)
       }
     }
@@ -973,10 +1045,18 @@ export class OpenclawEngineManager extends EventEmitter {
       const existing = fs.existsSync(launcherPath) ? fs.readFileSync(launcherPath, 'utf8') : ''
       if (existing !== expectedContent) {
         fs.writeFileSync(launcherPath, expectedContent, 'utf8')
-        logger.info('gatewayLauncher.generated', { launcherPath, mode: 'esm-wrapper' })
+        logger.info('gatewayLauncher.generated', 'Gateway launcher was generated', {
+          launcherPath,
+          mode: 'esm-wrapper'
+        })
       }
     } catch (err) {
-      logger.error('gatewayLauncher.write.failed', { launcherPath }, err)
+      logger.error(
+        'gatewayLauncher.write.failed',
+        'Failed to write gateway launcher',
+        { launcherPath },
+        err
+      )
       return esmEntry
     }
     return launcherPath
@@ -1029,13 +1109,24 @@ export class OpenclawEngineManager extends EventEmitter {
       const existing = fs.existsSync(launcherPath) ? fs.readFileSync(launcherPath, 'utf8') : ''
       if (existing !== expectedContent) {
         if (existing) {
-          logger.warn('gatewayLauncher.overwritten', { launcherPath, mode: 'bundle-only' })
+          logger.warn('gatewayLauncher.overwritten', 'Gateway launcher was overwritten', {
+            launcherPath,
+            mode: 'bundle-only'
+          })
         }
         fs.writeFileSync(launcherPath, expectedContent, 'utf8')
-        logger.info('gatewayLauncher.generated', { launcherPath, mode: 'bundle-only' })
+        logger.info('gatewayLauncher.generated', 'Gateway launcher was generated', {
+          launcherPath,
+          mode: 'bundle-only'
+        })
       }
     } catch (err) {
-      logger.error('gatewayLauncher.write.failed', { launcherPath }, err)
+      logger.error(
+        'gatewayLauncher.write.failed',
+        'Failed to write gateway launcher',
+        { launcherPath },
+        err
+      )
       // 回退到旧版 launcher 生成
       const fallbackEsm = findPath([
         path.join(runtimeRoot, 'openclaw.mjs'),
@@ -1229,7 +1320,10 @@ export class OpenclawEngineManager extends EventEmitter {
 
     if (verbose && !healthy) {
       const tcpResult = results[results.length - 1] ? 'reachable' : 'unreachable'
-      logger.warn('gateway.healthProbe.failed', { tcpResult, httpResults })
+      logger.warn('gateway.healthProbe.failed', 'Gateway health probe failed', {
+        tcpResult,
+        httpResults
+      })
     }
     return healthy
   }
@@ -1242,13 +1336,19 @@ export class OpenclawEngineManager extends EventEmitter {
     return new Promise((resolve) => {
       const tick = async () => {
         if (this.shutdownRequested) {
-          logger.warn('gateway.waitForReady.aborted.shutdownRequested')
+          logger.warn(
+            'gateway.waitForReady.aborted.shutdownRequested',
+            'Gateway readiness wait aborted because shutdown was requested'
+          )
           resolve(false)
           return
         }
 
         if (!this.gatewayProcess) {
-          logger.warn('gateway.waitForReady.aborted.processExited')
+          logger.warn(
+            'gateway.waitForReady.aborted.processExited',
+            'Gateway readiness wait aborted because process exited'
+          )
           resolve(false)
           return
         }
@@ -1259,13 +1359,19 @@ export class OpenclawEngineManager extends EventEmitter {
         const healthy = await this.isGatewayHealthy(port, verboseProbe)
 
         if (healthy) {
-          logger.warn('gateway.waitForReady.ready', { elapsedMs, pollCount })
+          logger.warn('gateway.waitForReady.ready', 'Gateway became ready', {
+            elapsedMs,
+            pollCount
+          })
           resolve(true)
           return
         }
 
         if (elapsedMs >= timeoutMs) {
-          logger.warn('gateway.waitForReady.timeout', { timeoutMs, pollCount })
+          logger.warn('gateway.waitForReady.timeout', 'Gateway readiness wait timed out', {
+            timeoutMs,
+            pollCount
+          })
           resolve(false)
           return
         }
@@ -1283,7 +1389,11 @@ export class OpenclawEngineManager extends EventEmitter {
         })
 
         if (pollCount % 5 === 0) {
-          logger.info('gateway.waitForReady.poll', { pollCount, elapsedMs, progress })
+          logger.info('gateway.waitForReady.poll', 'Gateway readiness wait poll completed', {
+            pollCount,
+            elapsedMs,
+            progress
+          })
         }
 
         setTimeout(() => {
@@ -1378,7 +1488,7 @@ export class OpenclawEngineManager extends EventEmitter {
     onceGatewayError(child, (...args: unknown[]) => {
       const errorMsg =
         args[0] instanceof Error ? args[0].message : `${args[0]}${args[1] ? ` (${args[1]})` : ''}`
-      logger.error('gateway.process.error', { errorMsg })
+      logger.error('gateway.process.error', 'Gateway process emitted an error', { errorMsg })
       if (this.expectedGatewayExits.has(child)) return
       if (this.shutdownRequested) return
       this.setStatus({
@@ -1390,7 +1500,7 @@ export class OpenclawEngineManager extends EventEmitter {
     })
 
     onceGatewayExit(child, (code) => {
-      logger.warn('gateway.process.exited', { code })
+      logger.warn('gateway.process.exited', 'Gateway process exited', { code })
       if (this.gatewayProcess === child) {
         this.gatewayProcess = null
       }
@@ -1416,9 +1526,13 @@ export class OpenclawEngineManager extends EventEmitter {
     if (this.gatewayRestartTimer) return
 
     if (this.gatewayRestartAttempt >= GATEWAY_MAX_RESTART_ATTEMPTS) {
-      logger.error('gateway.restart.maxAttempts.reached', {
-        maxAttempts: GATEWAY_MAX_RESTART_ATTEMPTS
-      })
+      logger.error(
+        'gateway.restart.maxAttempts.reached',
+        'Gateway restart reached maximum attempts',
+        {
+          maxAttempts: GATEWAY_MAX_RESTART_ATTEMPTS
+        }
+      )
       this.setStatus({
         phase: 'error',
         version: this.status.version,
@@ -1433,7 +1547,7 @@ export class OpenclawEngineManager extends EventEmitter {
         Math.min(this.gatewayRestartAttempt, GATEWAY_RESTART_DELAYS.length - 1)
       ]
     this.gatewayRestartAttempt++
-    logger.warn('gateway.restart.scheduled', {
+    logger.warn('gateway.restart.scheduled', 'Gateway restart scheduled', {
       attempt: this.gatewayRestartAttempt,
       maxAttempts: GATEWAY_MAX_RESTART_ATTEMPTS,
       delayMs: delay

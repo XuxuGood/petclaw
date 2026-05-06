@@ -59,7 +59,12 @@ export function registerChatIpcHandlers(deps: ChatIpcDeps): void {
     const config = coworkConfigStore.setConfig(patch)
     const syncResult: ConfigSyncResult = configSync.sync('cowork-config-change')
     if (!syncResult.ok) {
-      logger.warn('configSync.afterCoworkConfigUpdate.failed', {}, syncResult.error)
+      logger.warn(
+        'configSync.afterCoworkConfigUpdate.failed',
+        'Config sync failed after cowork config update',
+        {},
+        syncResult.error
+      )
     }
     return config
   })

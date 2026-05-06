@@ -98,7 +98,11 @@ export class SkillManager extends EventEmitter {
       fs.mkdirSync(userRoot, { recursive: true })
       configuredSkillIds = this.loadConfiguredSkillIds(bundledRoot)
     } catch (error) {
-      logger.warn('bundledSkills.prepareSync.failed', undefined, error)
+      logger.warn(
+        'bundledSkills.prepareSync.failed',
+        'Failed to prepare bundled skills sync',
+        error
+      )
       return
     }
 
@@ -116,14 +120,19 @@ export class SkillManager extends EventEmitter {
       try {
         this.syncBundledSkill(sourceDir, path.join(userRoot, dirName), skillId)
       } catch (error) {
-        logger.warn('bundledSkills.syncSkill.failed', { skillId }, error)
+        logger.warn(
+          'bundledSkills.syncSkill.failed',
+          'Failed to sync bundled skill',
+          { skillId },
+          error
+        )
       }
     }
 
     try {
       this.syncSkillsConfig(bundledRoot, userRoot)
     } catch (error) {
-      logger.warn('bundledSkills.syncConfig.failed', undefined, error)
+      logger.warn('bundledSkills.syncConfig.failed', 'Failed to sync bundled skills config', error)
     }
   }
 
@@ -466,7 +475,12 @@ function restoreBackupIfNeeded(
       fs.renameSync(backupPath, targetDir)
       return
     } catch (error) {
-      logger.warn('bundledSkills.restoreBackup.failed', { targetDir }, error)
+      logger.warn(
+        'bundledSkills.restoreBackup.failed',
+        'Failed to restore bundled skill backup',
+        { targetDir },
+        error
+      )
     }
   }
 

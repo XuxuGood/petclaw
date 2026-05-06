@@ -50,8 +50,7 @@ import { diagAppReady, diagBootResult, diagWindowLoad, diagError } from './diagn
 import { resolveDatabasePath } from './database-path'
 import { initAutoUpdater } from './auto-updater'
 import { initI18n } from './i18n'
-import { initLogger } from './logger'
-import { getLogger } from './logging/facade'
+import { getLogger, initLoggingPlatform } from './logging/facade'
 import { getSkillsRoot } from './ai/cowork-util'
 import { GatewayRestartScheduler } from './ai/gateway-restart-scheduler'
 import { setupRuntimeServices, type RuntimeServices } from './runtime-services'
@@ -94,11 +93,27 @@ let hookServer: HookServer
 let restartScheduler: GatewayRestartScheduler
 
 // Initialize logging before anything else
-initLogger()
+initLoggingPlatform()
 const mcpBridgeLogger = getLogger('McpBridge', 'mcp')
 const askUserLogger = getLogger('AskUser')
 const gatewayRestartLogger = getLogger('GatewayRestart', 'runtime')
 const hookServerLogger = getLogger('HookServer')
+
+function installSingleInstanceGuard(): boolean {
+  const hasSingleInstanceLock = app.requestSingleInstanceLock()
+  if (!hasSingleInstanceLock) {
+    app.quit()
+    return false
+  }
+
+  app.on('second-instance', () => {
+    const mainWindow = getMainWindow()
+    if (!mainWindow || mainWindow.isDestroyed()) return
+    activateMainWindow({ app, window: mainWindow })
+  })
+
+  return true
+}
 
 async function initializeRuntimeServices(): Promise<RuntimeServices> {
   runtimeServices = await setupRuntimeServices({
@@ -124,7 +139,11 @@ function resolveBundledSkillsRoot(): string | null {
   return null
 }
 
+const shouldStartApp = installSingleInstanceGuard()
+
 app.whenReady().then(async () => {
+  if (!shouldStartApp) return
+
   initializeMacosApplicationIdentity()
   diagAppReady()
 
@@ -177,12 +196,26 @@ app.whenReady().then(async () => {
   if (enabledServers.length > 0) {
     mcpServerManager
       .startServers(enabledServers)
-      .catch((err) => mcpBridgeLogger.error('startup.failed', { fatal: false }, err))
+      .catch((err) =>
+        mcpBridgeLogger.error(
+          'startup.failed',
+          'Failed to start MCP servers',
+          { fatal: false },
+          err
+        )
+      )
   }
   // 始终启动 HTTP server（AskUser 也需要，即使没有 MCP servers）
   mcpBridgeServer
     .start()
-    .catch((err) => mcpBridgeLogger.error('httpServer.start.failed', { fatal: false }, err))
+    .catch((err) =>
+      mcpBridgeLogger.error(
+        'httpServer.start.failed',
+        'Failed to start MCP bridge HTTP server',
+        { fatal: false },
+        err
+      )
+    )
 
   // AskUser 回调：ask-user-question 扩展通过 HTTP 请求到 McpBridgeServer，
   // 转发到 renderer 弹出确认弹窗，复用 cowork:stream:permission 通道。
@@ -200,7 +233,12 @@ app.whenReady().then(async () => {
         }
       })
     } catch (error) {
-      askUserLogger.error('permissionRequest.send.failed', { requestId: request.requestId }, error)
+      askUserLogger.error(
+        'permissionRequest.send.failed',
+        'Failed to send AskUser permission request to renderer',
+        { requestId: request.requestId },
+        error
+      )
     }
   })
 
@@ -264,7 +302,7 @@ app.whenReady().then(async () => {
       return false
     },
     executeRestart: async (reason) => {
-      gatewayRestartLogger.warn('restart.executing', { reason })
+      gatewayRestartLogger.warn('restart.executing', 'Gateway restart is executing', { reason })
       await engineManager.restartGateway()
     }
   })
@@ -286,7 +324,7 @@ app.whenReady().then(async () => {
 
   async function refreshMcpBridge(): Promise<void> {
     try {
-      mcpBridgeLogger.info('refresh.started')
+      mcpBridgeLogger.info('refresh.started', 'MCP bridge refresh started')
       getMainWindow()?.webContents.send('mcp:bridge:syncStart')
 
       // 1. 停止现有 MCP servers（HTTP callback server 保持运行，端口不变）
@@ -298,7 +336,9 @@ app.whenReady().then(async () => {
         await mcpServerManager.startServers(servers)
       }
       const toolCount = mcpServerManager.toolManifest.length
-      mcpBridgeLogger.info('refresh.tools.discovered', { toolCount })
+      mcpBridgeLogger.info('refresh.tools.discovered', 'MCP bridge tools were discovered', {
+        toolCount
+      })
 
       // 3. sync openclaw.json —— mcp-bridge plugin config 变更会触发 needsGatewayRestart，
       // gateway 在启动时固化 plugin 配置快照，必须硬重启才能生效
@@ -308,7 +348,7 @@ app.whenReady().then(async () => {
         restartScheduler.requestRestart('mcp-bridge-changed')
       }
 
-      mcpBridgeLogger.info('refresh.completed', {
+      mcpBridgeLogger.info('refresh.completed', 'MCP bridge refresh completed', {
         toolCount,
         changed: result.changed,
         needsGatewayRestart: result.needsGatewayRestart
@@ -316,7 +356,12 @@ app.whenReady().then(async () => {
       getMainWindow()?.webContents.send('mcp:bridge:syncDone', { tools: toolCount })
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
-      mcpBridgeLogger.error('refresh.failed', { message: msg }, error)
+      mcpBridgeLogger.error(
+        'refresh.failed',
+        'Failed to refresh MCP bridge',
+        { message: msg },
+        error
+      )
       getMainWindow()?.webContents.send('mcp:bridge:syncDone', { tools: 0, error: msg })
     }
   }
@@ -447,7 +492,7 @@ app.whenReady().then(async () => {
   // 15. 启动 Hook Server
   hookServer = new HookServer()
   hookServer.start().then((socketPath) => {
-    hookServerLogger.info('server.listening', { socketPath })
+    hookServerLogger.info('server.listening', 'Hook server started listening', { socketPath })
   })
 
   // 16. chat 窗口进入主界面后创建 pet 窗口。
@@ -512,10 +557,12 @@ app.on('before-quit', () => {
   // 停止 MCP 连接和 HTTP callback server
   mcpServerManager
     ?.stopServers()
-    .catch((err) => mcpBridgeLogger.error('stopServers.failed', undefined, err))
+    .catch((err) => mcpBridgeLogger.error('stopServers.failed', 'Failed to stop MCP servers', err))
   mcpBridgeServer
     ?.stop()
-    .catch((err) => mcpBridgeLogger.error('httpServer.stop.failed', undefined, err))
+    .catch((err) =>
+      mcpBridgeLogger.error('httpServer.stop.failed', 'Failed to stop MCP bridge HTTP server', err)
+    )
 })
 
 // Capture unhandled errors to diagnostics log

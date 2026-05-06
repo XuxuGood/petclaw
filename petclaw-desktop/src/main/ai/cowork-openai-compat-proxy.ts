@@ -1117,7 +1117,10 @@ function readRequestBody(req: http.IncomingMessage): Promise<string> {
         }
 
         if (gbDecoded && !utf8Decoded) {
-          logger.warn('requestBody.decoded.gb18030Fallback')
+          logger.warn(
+            'requestBody.decoded.gb18030Fallback',
+            'Request body was decoded with GB18030 fallback'
+          )
           return gbDecoded
         }
       }
@@ -2177,7 +2180,7 @@ async function handleChatCompletionsStreamResponse(
   })
 
   if (!upstreamResponse.body) {
-    logger.warn('stream.upstream.emptyBody')
+    logger.warn('stream.upstream.emptyBody', 'Upstream stream response had an empty body')
     emitSSE(
       res,
       'error',
@@ -2197,7 +2200,10 @@ async function handleChatCompletionsStreamResponse(
 
   const flushDone = () => {
     if (!state.hasMessageStart) {
-      logger.warn('stream.flushDone.missingMessageStart')
+      logger.warn(
+        'stream.flushDone.missingMessageStart',
+        'Stream done marker was flushed before message start'
+      )
       return
     }
     if (!state.hasMessageStop) {
@@ -2209,12 +2215,15 @@ async function handleChatCompletionsStreamResponse(
     }
   }
 
-  logger.debug('stream.read.started')
+  logger.debug('stream.read.started', 'Upstream stream read started')
 
   while (true) {
     const { value, done } = await reader.read()
     if (done) {
-      logger.debug('stream.read.completed', { chunkCount, sawDoneMarker })
+      logger.debug('stream.read.completed', 'Upstream stream read completed', {
+        chunkCount,
+        sawDoneMarker
+      })
       break
     }
 
@@ -2277,7 +2286,11 @@ async function handleChatCompletionsStreamResponse(
 async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
   // DNS Rebinding protection: reject requests with non-loopback Host header
   if (!isAllowedProxyHost(req)) {
-    logger.warn('request.rejected.disallowedHost', { host: req.headers.host })
+    logger.warn(
+      'request.rejected.disallowedHost',
+      'Request was rejected because the host is not allowed',
+      { host: req.headers.host }
+    )
     res.writeHead(403, { 'Content-Type': 'text/plain' })
     res.end('Forbidden')
     return
@@ -2308,7 +2321,10 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     }
   }
 
-  logger.debug('request.received', { method, pathname: url.pathname })
+  logger.debug('request.received', 'Proxy request was received', {
+    method,
+    pathname: url.pathname
+  })
 
   if (method === 'POST' && url.pathname === '/api/event_logging/batch') {
     writeJSON(res, 200, { ok: true })
@@ -2386,7 +2402,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     const upstreamUrl = upstreamBase.endsWith('/chat/completions')
       ? upstreamBase
       : `${upstreamBase}/chat/completions`
-    logger.info('passthrough.request.started', {
+    logger.info('passthrough.request.started', 'Passthrough request started', {
       upstreamUrl,
       provider: upstreamConfig.provider ?? null
     })
@@ -2403,7 +2419,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       ) {
         const refresher = tokenRefreshers.get(upstreamConfig.provider)
         if (refresher) {
-          logger.warn('passthrough.tokenRefresh.started', {
+          logger.warn('passthrough.tokenRefresh.started', 'Passthrough token refresh started', {
             provider: upstreamConfig.provider
           })
           try {
@@ -2416,13 +2432,18 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
                 headers: upstreamHeaders,
                 body
               })
-              logger.warn('passthrough.tokenRefresh.retry.completed', {
-                status: upstreamResponse.status
-              })
+              logger.warn(
+                'passthrough.tokenRefresh.retry.completed',
+                'Passthrough token refresh retry completed',
+                {
+                  status: upstreamResponse.status
+                }
+              )
             }
           } catch (refreshErr) {
             logger.warn(
               'passthrough.tokenRefresh.failed',
+              'Passthrough token refresh failed',
               { provider: upstreamConfig.provider },
               refreshErr
             )
@@ -2452,7 +2473,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         res.end(text)
       }
     } catch (proxyError) {
-      logger.error('passthrough.failed', undefined, proxyError)
+      logger.error('passthrough.failed', 'Passthrough request failed', proxyError)
       writeJSON(
         res,
         502,
@@ -2532,7 +2553,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   ) {
     const requestModel = typeof openAIRequest.model === 'string' ? openAIRequest.model : ''
     if (requestModel !== upstreamConfig.model) {
-      logger.info('request.model.remapped', {
+      logger.info('request.model.remapped', 'Request model was remapped to upstream model', {
         requestModel,
         upstreamModel: upstreamConfig.model,
         provider: upstreamConfig.provider
@@ -2559,7 +2580,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       : openAIRequest
   const stream = Boolean(upstreamRequest.stream)
 
-  logger.info('upstream.request.prepared', {
+  logger.info('upstream.request.prepared', 'Upstream request was prepared', {
     apiType: upstreamAPIType,
     model: upstreamRequest.model,
     stream,
@@ -2585,7 +2606,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     targetURL: string
   ): Promise<Response> => {
     currentTargetURL = targetURL
-    logger.info('upstream.request.sending', { targetURL })
+    logger.info('upstream.request.sending', 'Upstream request is being sent', { targetURL })
     return session.defaultSession.fetch(targetURL, {
       method: 'POST',
       headers,
@@ -2596,10 +2617,13 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   let upstreamResponse: Response
   const fetchStartTime = Date.now()
   try {
-    logger.debug('upstream.fetch.awaiting', { stream, model: upstreamRequest.model })
+    logger.debug('upstream.fetch.awaiting', 'Waiting for upstream fetch response', {
+      stream,
+      model: upstreamRequest.model
+    })
     upstreamResponse = await sendUpstreamRequest(upstreamRequest, targetURLs[0])
     const fetchDuration = Date.now() - fetchStartTime
-    logger.info('upstream.fetch.completed', {
+    logger.info('upstream.fetch.completed', 'Upstream fetch completed', {
       status: upstreamResponse.status,
       ok: upstreamResponse.ok,
       fetchDurationMs: fetchDuration,
@@ -2610,6 +2634,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     const message = error instanceof Error ? error.message : 'Network error'
     logger.error(
       'upstream.fetch.failed',
+      'Upstream fetch failed',
       { fetchDurationMs: fetchDuration, stream, message },
       error
     )
@@ -2627,7 +2652,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     ) {
       const refresher = tokenRefreshers.get(upstreamConfig.provider)
       if (refresher) {
-        logger.warn('upstream.tokenRefresh.started', {
+        logger.warn('upstream.tokenRefresh.started', 'Upstream token refresh started', {
           status: upstreamResponse.status,
           provider: upstreamConfig.provider
         })
@@ -2644,15 +2669,20 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
             }
             upstreamResponse = await sendUpstreamRequest(upstreamRequest, currentTargetURL)
             const retryDuration = Date.now() - fetchStartTime
-            logger.warn('upstream.tokenRefresh.retry.completed', {
-              status: upstreamResponse.status,
-              ok: upstreamResponse.ok,
-              retryDurationMs: retryDuration
-            })
+            logger.warn(
+              'upstream.tokenRefresh.retry.completed',
+              'Upstream token refresh retry completed',
+              {
+                status: upstreamResponse.status,
+                ok: upstreamResponse.ok,
+                retryDurationMs: retryDuration
+              }
+            )
           }
         } catch (refreshError) {
           logger.warn(
             'upstream.tokenRefresh.failed',
+            'Upstream token refresh failed',
             { provider: upstreamConfig.provider },
             refreshError
           )
@@ -2679,7 +2709,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 
     if (!upstreamResponse.ok) {
       const firstErrorText = await upstreamResponse.text()
-      logger.error('upstream.response.failed', {
+      logger.error('upstream.response.failed', 'Upstream response failed', {
         status: upstreamResponse.status,
         bodySnippet: firstErrorText.slice(0, 500)
       })
@@ -2700,7 +2730,10 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
                 const retryErrorText = await upstreamResponse.text()
                 firstErrorMessage = extractErrorMessage(retryErrorText)
               } else {
-                logger.info('upstream.retry.stripUnsupportedTools.succeeded')
+                logger.info(
+                  'upstream.retry.stripUnsupportedTools.succeeded',
+                  'Upstream retry without unsupported tools succeeded'
+                )
               }
             } catch (error) {
               const message = error instanceof Error ? error.message : 'Network error'
@@ -2720,9 +2753,13 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
                 const retryErrorText = await upstreamResponse.text()
                 firstErrorMessage = extractErrorMessage(retryErrorText)
               } else {
-                logger.info('upstream.retry.maxCompletionTokens.succeeded', {
-                  convertedTo: convertResult.convertedTo
-                })
+                logger.info(
+                  'upstream.retry.maxCompletionTokens.succeeded',
+                  'Upstream retry with max completion tokens succeeded',
+                  {
+                    convertedTo: convertResult.convertedTo
+                  }
+                )
               }
             } catch (error) {
               const message = error instanceof Error ? error.message : 'Network error'
@@ -2744,9 +2781,13 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
                 const retryErrorText = await upstreamResponse.text()
                 firstErrorMessage = extractErrorMessage(retryErrorText)
               } else {
-                logger.info('upstream.retry.clampedMaxTokens.succeeded', {
-                  clampedTo: clampResult.clampedTo
-                })
+                logger.info(
+                  'upstream.retry.clampedMaxTokens.succeeded',
+                  'Upstream retry with clamped max tokens succeeded',
+                  {
+                    clampedTo: clampResult.clampedTo
+                  }
+                )
               }
             } catch (error) {
               const message = error instanceof Error ? error.message : 'Network error'
@@ -2769,17 +2810,19 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   lastProxyError = null
 
   if (stream) {
-    logger.debug('response.stream.handling', { apiType: upstreamAPIType })
+    logger.debug('response.stream.handling', 'Streaming response handling started', {
+      apiType: upstreamAPIType
+    })
     if (upstreamAPIType === 'responses') {
       await handleResponsesStreamResponse(upstreamResponse, res)
     } else {
       await handleChatCompletionsStreamResponse(upstreamResponse, res)
     }
-    logger.debug('response.stream.completed')
+    logger.debug('response.stream.completed', 'Streaming response handling completed')
     return
   }
 
-  logger.debug('response.nonStream.handling')
+  logger.debug('response.nonStream.handling', 'Non-streaming response handling started')
   let upstreamJSON: unknown
   try {
     upstreamJSON = await upstreamResponse.json()
@@ -2845,7 +2888,9 @@ export async function startCoworkOpenAICompatProxy(): Promise<void> {
         reject(new Error('Failed to bind OpenAI compatibility proxy port'))
         return
       }
-      logger.info('server.started', { port: addr.port })
+      logger.info('server.started', 'OpenAI compatibility proxy server started', {
+        port: addr.port
+      })
       proxyServer = server
       proxyPort = addr.port
       lastProxyError = null

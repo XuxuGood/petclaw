@@ -84,7 +84,8 @@ describe('diagnostics actions', () => {
       level: 'error',
       module: 'EngineSettings',
       event: 'renderer.logging.exportDiagnostics.failed',
-      message: 'disk full'
+      message: 'Failed to export diagnostics from engine settings',
+      fields: { errorMessage: 'disk full' }
     })
     expect(container.textContent).toContain('诊断包导出失败：disk full')
   })

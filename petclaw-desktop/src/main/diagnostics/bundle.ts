@@ -2,16 +2,16 @@ import fs from 'fs'
 import path from 'path'
 import { strToU8, zipSync } from 'fflate'
 
-import { getLoggingPlatform } from './facade'
-import { resolveLoggingPaths } from './paths'
-import { sanitizeUnknownForLog } from './sanitizer'
-import type { LogStorage } from './storage'
+import { getLoggingPlatform } from '../logging/facade'
+import { resolveLoggingPaths } from '../logging/paths'
+import { sanitizeUnknownForLog } from '../logging/sanitizer'
+import type { LogStorage } from '../logging/storage'
 import {
   DEFAULT_DIAGNOSTICS_RETAIN_COUNT,
   type DiagnosticsExportOptions,
   type DiagnosticsExportResult,
   type LogSource
-} from './types'
+} from '../logging/types'
 
 const DEFAULT_SOURCES: LogSource[] = [
   'main',

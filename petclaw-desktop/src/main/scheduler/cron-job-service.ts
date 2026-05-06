@@ -444,7 +444,7 @@ export class CronJobService {
         this.emitFullRefresh()
       }
     } catch (error) {
-      logger.warn('gateway.poll.failed', undefined, error)
+      logger.warn('gateway.poll.failed', 'Failed to poll gateway jobs', error)
     }
   }
 

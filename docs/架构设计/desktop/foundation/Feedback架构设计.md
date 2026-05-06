@@ -4,11 +4,11 @@
 
 Feedback 是 Desktop 用户问题反馈链路，负责把用户描述、截图、联系邮箱和脱敏诊断信息提交到 PetClaw 后端，形成可跟进的反馈编号。
 
-Feedback 不属于 Logging、Cowork、RuntimeGateway 或 Settings 任一业务域。它是横跨 Renderer、Preload、Main、Logging 和 `petclaw-api` 的产品闭环能力：
+Feedback 不属于 Logging、Diagnostics、Cowork、RuntimeGateway 或 Settings 任一业务域。它是横跨 Renderer、Preload、Main、Diagnostics、Logging 和 `petclaw-api` 的产品闭环能力：
 
 - Renderer 负责用户输入、截图预览、提交状态和本地化文案。
 - Preload 只暴露受控 feedback API。
-- Main 负责截图捕获、diagnostics bundle 生成、payload 校验和上传。
+- Main 负责截图捕获、Diagnostics bundle 生成、payload 校验和上传。
 - `petclaw-api` 负责接收、存储、通知和返回反馈编号。
 
 ## 2. 目标与非目标
@@ -39,7 +39,7 @@ FeedbackDialog
   -> feedback:* IPC
   -> FeedbackService
        -> BrowserWindow.capturePage()
-       -> DiagnosticsBundle.export({ timeRangeHours: 24 })
+       -> Diagnostics.exportBundle({ timeRangeHours: 24 })
        -> FeedbackClient.submit()
   -> POST /v1/feedback
   -> petclaw-api
@@ -137,7 +137,7 @@ feedback:submit
 
 - 校验问题描述长度、邮箱格式、截图数量和总大小。
 - 调用当前窗口截图能力并生成 PNG。
-- 调用 diagnostics bundle 生成最近 24 小时脱敏诊断包。
+- 调用 Diagnostics bundle 生成最近 24 小时脱敏诊断包。
 - 组装 multipart 请求。
 - 调用 `FeedbackClient` 上传。
 - 记录结构化日志。
@@ -148,7 +148,7 @@ feedback:submit
 - 联系邮箱：最多 254 字符，可为空。
 - 截图数量：最多 5 张。
 - 单张图片：最多 5 MB。
-- diagnostics bundle：最多 50 MB。
+- Diagnostics bundle：最多 50 MB。
 - 总请求：最多 75 MB。
 
 日志规则：
@@ -159,7 +159,7 @@ feedback:submit
 
 ## 7. Diagnostics 集成
 
-Feedback 使用 Logging 模块已有 diagnostics bundle 能力，但需要支持“反馈用最近 24 小时”这一固定策略。
+Feedback 使用 Diagnostics domain 的 bundle 能力。Diagnostics 读取 Logging storage 的受控日志源，并支持“反馈用最近 24 小时”这一固定策略。
 
 反馈诊断包包含：
 
@@ -179,8 +179,10 @@ Feedback 使用 Logging 模块已有 diagnostics bundle 能力，但需要支持
 日志可读性规则：
 
 - Feedback 不要求用户阅读日志，但提交给团队的诊断日志必须便于人工排障。
-- error/warn 级日志必须包含固定英文 `message`；例如 `Failed to generate session title`。
+- debug/info/warn/error 所有日志等级都必须包含固定英文 `message`；例如 `Failed to generate session title`。
+- main logger 和 renderer `logging.report` 都必须显式提供 `message`，底层日志输入不允许从 `event` 回退生成可读文本。
 - 变量必须留在 `fields`，例如 `sessionId`、`modelId`、`elapsedMs`，不得拼进 `message`。
+- Cowork、runtime、renderer 和 main 日志都必须直接产出 `event`、`message` 和结构化 `fields`，不保留独立 wrapper 或 detail 字符串入口。
 - 反馈摘要 UI 可以展示 `source`、`level`、`module`、`message`、`event` 和文件大小，不展示日志原文。
 
 ## 8. API 契约

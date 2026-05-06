@@ -5,8 +5,8 @@ import path from 'path'
 
 import { app } from 'electron'
 
-import { diagAppReady, diagBootResult } from '../../src/main/diagnostics'
-import { resetLoggingPlatformForTest } from '../../src/main/logging'
+import { diagAppReady, diagBootResult } from '../../../src/main/diagnostics'
+import { resetLoggingPlatformForTest } from '../../../src/main/logging'
 
 let tmpDir: string
 
@@ -30,12 +30,12 @@ function diagnosticsLogPath(): string {
   return path.join(tmpDir, 'logs', 'startup', 'startup-diagnostics.jsonl')
 }
 
-describe('diagnostics log path', () => {
+describe('startup diagnostics log path', () => {
   it('writes startup diagnostics under userData logs', () => {
     diagAppReady()
 
     const content = fs.readFileSync(diagnosticsLogPath(), 'utf8')
-    expect(content).toContain('"event":"app-when-ready"')
+    expect(content).toContain('"event":"app.ready"')
     expect(content).toContain('"source":"startup"')
     expect(content).toContain('"module":"StartupDiagnostics"')
   })
@@ -51,7 +51,7 @@ describe('diagnostics log path', () => {
     diagBootResult(false, 'missing runtime')
 
     const content = fs.readFileSync(diagnosticsLogPath(), 'utf8')
-    expect(content).toContain('"event":"boot-check-result"')
+    expect(content).toContain('"event":"bootCheck.completed"')
     expect(content).toContain('"success":false')
     expect(fs.existsSync(path.join(homeDir, '.petclaw'))).toBe(false)
   })

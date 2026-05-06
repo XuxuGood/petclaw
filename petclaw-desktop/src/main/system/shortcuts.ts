@@ -18,14 +18,18 @@ export function registerShortcuts(
     }
   })
   if (!registered1) {
-    logger.warn('shortcut.register.failed', { accelerator: 'CommandOrControl+Shift+P' })
+    logger.warn('shortcut.register.failed', 'Failed to register global shortcut', {
+      accelerator: 'CommandOrControl+Shift+P'
+    })
   }
 
   const registered2 = globalShortcut.register('CommandOrControl+Shift+C', () => {
     toggleMainWindow()
   })
   if (!registered2) {
-    logger.warn('shortcut.register.failed', { accelerator: 'CommandOrControl+Shift+C' })
+    logger.warn('shortcut.register.failed', 'Failed to register global shortcut', {
+      accelerator: 'CommandOrControl+Shift+C'
+    })
   }
 }
 

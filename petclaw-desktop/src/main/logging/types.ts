@@ -16,7 +16,7 @@ export interface LogEventInput {
   source: LogSource
   module: string
   event: string
-  message?: string
+  message: string
   fields?: Record<string, unknown>
   error?: unknown
 }

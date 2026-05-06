@@ -120,6 +120,40 @@ export function initDatabase(db: Database.Database): void {
     )
   `)
 
+  // ── Cowork 草稿 ──
+  // 用户尚未发送的新任务编辑态。草稿不是 Cowork session；首次发送成功后才创建
+  // cowork_sessions 记录。只有 visibility='listed' 且 prompt 非空的草稿进入侧栏。
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS cowork_drafts (
+      id TEXT PRIMARY KEY,                 -- UUID，PetClaw 侧草稿标识
+      title TEXT NOT NULL,                 -- 从 prompt 第一行派生的展示标题
+      prompt TEXT NOT NULL DEFAULT '',     -- 未发送消息正文；非空才允许进入侧栏草稿列表
+      directory_path TEXT,                 -- 草稿选择的工作目录；null=尚未选择
+      selected_model_json TEXT,            -- JSON { providerId, modelId } | null
+      skill_ids_json TEXT NOT NULL DEFAULT '[]', -- JSON string[]，本草稿选择的 Skill IDs
+      visibility TEXT NOT NULL DEFAULT 'editing', -- 'editing'=当前编辑态 | 'listed'=侧栏可见草稿
+      created_at INTEGER NOT NULL,         -- 创建时间，Unix 毫秒时间戳
+      updated_at INTEGER NOT NULL          -- 更新时间，Unix 毫秒时间戳
+    )
+  `)
+
+  // ── Cowork 草稿附件 ──
+  // 文件/目录保存绝对路径；无可靠路径的图片由主进程 staged 到 userData，仅保存 staged_path。
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS cowork_draft_attachments (
+      id TEXT PRIMARY KEY,                 -- UUID
+      draft_id TEXT NOT NULL,              -- 所属草稿 ID
+      kind TEXT NOT NULL,                  -- 'file' | 'directory' | 'image'
+      name TEXT NOT NULL,                  -- 展示名称
+      path TEXT,                           -- 原始绝对路径；无路径的粘贴图片为 null
+      mime_type TEXT,                      -- MIME 类型；未知为 null
+      size INTEGER,                        -- 字节大小；未知为 null
+      staged_path TEXT,                    -- userData 下 staged 文件路径；仅无路径附件需要
+      created_at INTEGER NOT NULL,         -- 创建时间，Unix 毫秒时间戳
+      FOREIGN KEY (draft_id) REFERENCES cowork_drafts(id) ON DELETE CASCADE
+    )
+  `)
+
   // ── IM 实例 ──
   // 每个 IM 平台连接对应一行。飞书/钉钉/企微可多实例（各最多 3 个），微信仅 1 个。
   db.exec(`
@@ -216,6 +250,10 @@ export function initDatabase(db: Database.Database): void {
   db.exec('CREATE INDEX IF NOT EXISTS idx_cowork_sessions_agent ON cowork_sessions(agent_id)')
   db.exec(
     'CREATE INDEX IF NOT EXISTS idx_cowork_sessions_directory ON cowork_sessions(directory_path)'
+  )
+  db.exec('CREATE INDEX IF NOT EXISTS idx_cowork_drafts_updated ON cowork_drafts(updated_at)')
+  db.exec(
+    'CREATE INDEX IF NOT EXISTS idx_cowork_draft_attachments_draft ON cowork_draft_attachments(draft_id)'
   )
 }
 

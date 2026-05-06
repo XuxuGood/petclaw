@@ -53,6 +53,50 @@ describe('initDatabase', () => {
     )
   })
 
+  it('creates cowork draft tables', () => {
+    const draftTable = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'cowork_drafts'")
+      .get()
+    const attachmentTable = db
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'cowork_draft_attachments'"
+      )
+      .get()
+
+    expect(draftTable).toEqual({ name: 'cowork_drafts' })
+    expect(attachmentTable).toEqual({ name: 'cowork_draft_attachments' })
+  })
+
+  it('documents expected cowork draft columns', () => {
+    const draftColumns = db.pragma('table_info(cowork_drafts)') as Array<{ name: string }>
+    const attachmentColumns = db.pragma('table_info(cowork_draft_attachments)') as Array<{
+      name: string
+    }>
+
+    expect(draftColumns.map((column) => column.name)).toEqual([
+      'id',
+      'title',
+      'prompt',
+      'directory_path',
+      'selected_model_json',
+      'skill_ids_json',
+      'visibility',
+      'created_at',
+      'updated_at'
+    ])
+    expect(attachmentColumns.map((column) => column.name)).toEqual([
+      'id',
+      'draft_id',
+      'kind',
+      'name',
+      'path',
+      'mime_type',
+      'size',
+      'staged_path',
+      'created_at'
+    ])
+  })
+
   it('should create indexes', () => {
     const indexes = db
       .prepare("SELECT name FROM sqlite_master WHERE type='index' AND name NOT LIKE 'sqlite_%'")

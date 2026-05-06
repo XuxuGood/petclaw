@@ -33,19 +33,26 @@ export class GatewayRestartScheduler {
   requestRestart(reason: string): void {
     // 幂等：已有待处理的延迟重启，不重复调度
     if (this.pendingReason !== null) {
-      logger.warn('restart.request.skipped', { pendingReason: this.pendingReason, reason })
+      logger.warn('restart.request.skipped', 'Gateway restart request was skipped', {
+        pendingReason: this.pendingReason,
+        reason
+      })
       return
     }
 
     // 无活跃工作负载 → 立即执行
     if (!this.deps.hasActiveWorkloads()) {
-      logger.warn('restart.executing.immediate', { reason })
+      logger.warn('restart.executing.immediate', 'Gateway restart is executing immediately', {
+        reason
+      })
       void this.deps.executeRestart(reason)
       return
     }
 
     // 有活跃工作负载 → 延迟重启
-    logger.warn('restart.deferred', { reason })
+    logger.warn('restart.deferred', 'Gateway restart was deferred until workloads are idle', {
+      reason
+    })
     this.pendingReason = reason
     this.startPolling()
   }
@@ -53,7 +60,9 @@ export class GatewayRestartScheduler {
   /** 取消待处理的延迟重启（app quit 时调用） */
   cancelPending(): void {
     if (this.pendingReason !== null) {
-      logger.warn('restart.pending.cancelled', { pendingReason: this.pendingReason })
+      logger.warn('restart.pending.cancelled', 'Pending gateway restart was cancelled', {
+        pendingReason: this.pendingReason
+      })
     }
     this.clearTimers()
     this.pendingReason = null
@@ -75,10 +84,14 @@ export class GatewayRestartScheduler {
 
     // 硬超时：5 分钟后不管工作负载状态，强制重启
     this.hardTimeout = setTimeout(() => {
-      logger.warn('restart.maxWait.exceeded', {
-        maxWaitMs: GatewayRestartScheduler.MAX_WAIT_MS,
-        pendingReason: this.pendingReason
-      })
+      logger.warn(
+        'restart.maxWait.exceeded',
+        'Gateway restart wait time exceeded the maximum delay',
+        {
+          maxWaitMs: GatewayRestartScheduler.MAX_WAIT_MS,
+          pendingReason: this.pendingReason
+        }
+      )
       this.execute()
     }, GatewayRestartScheduler.MAX_WAIT_MS)
   }
@@ -90,9 +103,9 @@ export class GatewayRestartScheduler {
     this.pendingReason = null
 
     if (reason) {
-      logger.warn('restart.executing.deferred', { reason })
+      logger.warn('restart.executing.deferred', 'Deferred gateway restart is executing', { reason })
       void this.deps.executeRestart(reason).catch((err) => {
-        logger.error('restart.failed', { reason }, err)
+        logger.error('restart.failed', 'Gateway restart failed', { reason }, err)
       })
     }
   }

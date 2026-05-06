@@ -4,7 +4,7 @@ import path from 'path'
 import { strFromU8, unzipSync } from 'fflate'
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 
-import { createDiagnosticsBundle } from '../../../src/main/logging/diagnostics-bundle'
+import { createDiagnosticsBundle } from '../../../src/main/diagnostics'
 import { createLogStorage } from '../../../src/main/logging/storage'
 import type { LogStorage } from '../../../src/main/logging/storage'
 
@@ -18,7 +18,7 @@ afterEach(() => {
   fs.rmSync(root, { recursive: true, force: true })
 })
 
-describe('createDiagnosticsBundle', () => {
+describe('diagnostics bundle', () => {
   test('exports sanitized logs and manifest', async () => {
     const storage = createLogStorage({
       userDataPath: root,

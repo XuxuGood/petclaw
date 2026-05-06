@@ -182,7 +182,7 @@ export function initializeMacosIntegration(options: MacosIntegrationOptions): vo
 
   void app.dock?.show().catch((error) => {
     // Dock show 失败不应阻塞启动；常见于测试环境或系统策略拒绝。
-    logger.warn('dock.show.failed', undefined, error)
+    logger.warn('dock.show.failed', 'Failed to show Dock icon', error)
   })
   refreshMacosMenus({ actions: options.actions, platform })
   app.on('activate', options.actions.openPetClaw)

@@ -137,7 +137,9 @@ export type ProviderRawConfig = {
   models: Array<{ id: string; name?: string; supportsImage?: boolean }>
 }
 
-import { coworkLog } from './cowork-logger'
+import { getLogger } from '../logging/facade'
+
+const logger = getLogger('ClaudeSettings', 'cowork')
 
 // ── 模块级注入点 ──────────────────────────────────────────────────────────────────
 
@@ -233,7 +235,7 @@ function tryPetclawServerFallback(modelId?: string): MatchedProvider | null {
   if (!effectiveModelId) return null
   const baseURL = `${serverBaseUrl}/api/proxy/v1`
   const cachedMeta = serverModelMetadataCache.get(effectiveModelId)
-  coworkLog('INFO', 'ClaudeSettings', 'petclaw-server fallback activated', {
+  logger.info('petclawServerFallback.used', 'PetClaw server fallback was used', {
     baseURL,
     modelId: effectiveModelId,
     supportsImage: cachedMeta?.supportsImage
@@ -481,17 +483,13 @@ export async function getCurrentApiConfig(
 export function resolveRawApiConfig(): ApiConfigResolution {
   const sqliteStore = getStore()
   if (!sqliteStore) {
-    coworkLog(
-      'INFO',
-      'ClaudeSettings',
-      'resolveRawApiConfig: store is null, storeGetter not set yet'
-    )
+    logger.info('rawApiConfig.store.missing', 'Raw API config store was missing')
     return { config: null, error: 'Store is not initialized.' }
   }
 
   const appConfig = sqliteStore.get<AppConfig>('app_config')
   if (!appConfig) {
-    coworkLog('INFO', 'ClaudeSettings', 'resolveRawApiConfig: app_config not found in store')
+    logger.info('rawApiConfig.appConfig.missing', 'Raw API config app configuration was missing')
     return { config: null, error: 'Application config not found.' }
   }
 
@@ -500,7 +498,7 @@ export function resolveRawApiConfig(): ApiConfigResolution {
     const providerKeys = Object.keys(appConfig.providers ?? {})
     const defaultModel = appConfig.model?.defaultModel
     const defaultProvider = appConfig.model?.defaultModelProvider
-    coworkLog('INFO', 'ClaudeSettings', 'resolveRawApiConfig: no matched provider', {
+    logger.info('rawApiConfig.provider.missing', 'Raw API config provider was missing', {
       error,
       providers: providerKeys.join(','),
       defaultModel,
@@ -518,11 +516,13 @@ export function resolveRawApiConfig(): ApiConfigResolution {
     apiKey || (!providerRequiresApiKey(matched.providerName) ? 'sk-petclaw-local' : '')
   apiKey = effectiveApiKey
 
-  coworkLog('INFO', 'ClaudeSettings', 'resolved raw API config', {
-    matched: JSON.stringify({
-      ...matched,
-      providerConfig: { ...matched.providerConfig, apiKey: apiKey ? '***' : '' }
-    })
+  logger.info('rawApiConfig.resolved', 'Raw API config was resolved', {
+    providerName: matched.providerName,
+    modelId: matched.modelId,
+    apiFormat: matched.apiFormat,
+    hasApiKey: Boolean(apiKey),
+    supportsImage: matched.supportsImage,
+    codingPlanEnabled: Boolean(matched.providerConfig.codingPlanEnabled)
   })
 
   return {
@@ -570,7 +570,7 @@ export function resolveAllProviderApiKeys(): Record<string, string> {
     result[envName] = apiKey || 'sk-petclaw-local'
   }
 
-  coworkLog('INFO', 'ClaudeSettings', 'resolveAllProviderApiKeys', {
+  logger.info('providerApiKeys.resolved', 'Provider API keys were resolved', {
     hasServer: !!result.SERVER,
     providers: Object.keys(result)
       .filter((k) => k !== 'SERVER')

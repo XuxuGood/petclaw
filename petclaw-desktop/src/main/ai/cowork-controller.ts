@@ -292,7 +292,12 @@ export class CoworkController extends EventEmitter {
       turn.stopRequested = true
       // 精确中断：传 sessionKey + runId
       this.gateway.chatAbort(turn.sessionKey, turn.runId).catch((err) => {
-        logger.warn('chatAbort.failed', { sessionId, sessionKey: turn.sessionKey }, err)
+        logger.warn(
+          'chatAbort.failed',
+          'Failed to abort cowork chat turn',
+          { sessionId, sessionKey: turn.sessionKey },
+          err
+        )
       })
     }
 
@@ -324,7 +329,12 @@ export class CoworkController extends EventEmitter {
 
     this.pendingApprovals.delete(requestId)
     this.gateway.approvalResolve(requestId, decision).catch((err) => {
-      logger.error('approvalResolve.failed', { requestId, decision }, err)
+      logger.error(
+        'approvalResolve.failed',
+        'Failed to resolve cowork approval',
+        { requestId, decision },
+        err
+      )
     })
   }
 
@@ -461,7 +471,12 @@ export class CoworkController extends EventEmitter {
           this.lastPatchedModelBySession.set(sessionId, currentModel)
         }
       } catch (err) {
-        logger.warn('session.patchModel.failed', { sessionId, sessionKey, currentModel }, err)
+        logger.warn(
+          'session.patchModel.failed',
+          'Failed to patch cowork session model',
+          { sessionId, sessionKey, currentModel },
+          err
+        )
       }
     }
 
@@ -605,7 +620,10 @@ export class CoworkController extends EventEmitter {
       const turn = this.activeTurns.get(sessionId)
       if (!turn) return
 
-      logger.warn('turn.timeout', { sessionId, timeoutMs: TURN_TIMEOUT_MS })
+      logger.warn('turn.timeout', 'Cowork turn timed out', {
+        sessionId,
+        timeoutMs: TURN_TIMEOUT_MS
+      })
       this.cleanupSessionTurn(sessionId)
       this.store.updateSession(sessionId, { status: 'error' })
       this.emit('error', sessionId, 'Turn timed out')

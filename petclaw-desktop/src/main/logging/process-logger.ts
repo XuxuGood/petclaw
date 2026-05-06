@@ -22,16 +22,18 @@ export function attachProcessLogger(options: AttachProcessLoggerOptions): void {
 
   options.stdout?.on('data', (chunk: Buffer | string) => {
     const text = chunkToText(chunk)
-    logger.info('process.stdout', { text })
+    logger.info('process.stdout', 'Process wrote to stdout', { text })
     if (/\[gateway\]/.test(text)) {
-      options.platform.getLogger(options.module).warn('process.milestone', {
-        source: options.source,
-        summary: text.replace(/\n+$/g, '').split('\n')[0]
-      })
+      options.platform
+        .getLogger(options.module)
+        .warn('process.milestone', 'Process milestone detected', {
+          source: options.source,
+          summary: text.replace(/\n+$/g, '').split('\n')[0]
+        })
     }
   })
 
   options.stderr?.on('data', (chunk: Buffer | string) => {
-    logger.warn('process.stderr', { text: chunkToText(chunk) })
+    logger.warn('process.stderr', 'Process wrote to stderr', { text: chunkToText(chunk) })
   })
 }

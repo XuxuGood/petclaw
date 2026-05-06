@@ -2,14 +2,14 @@
 
 ## 1. 模块定位
 
-Logging 是 Desktop foundation 层能力，负责 PetClaw 桌面端所有本地诊断日志、日志脱敏、日志落盘、跨进程日志上报和诊断包导出。
+Logging 是 Desktop foundation 层能力，负责 PetClaw 桌面端所有本地诊断日志、日志脱敏、日志落盘和跨进程日志上报。
 
 Logging 不属于 Cowork、RuntimeGateway、MCP、SystemIntegration 或 Renderer 任一业务域。业务域只声明事件和上下文字段，日志平台统一负责序列化、脱敏、路径、轮转、保留和导出。
 
 目标：
 
 - 给开发者提供可定位问题的结构化本地日志。
-- 给用户提供可操作的查看日志和导出诊断包入口。
+- 给用户提供可操作的查看日志入口，并为 Diagnostics 提供受控日志读取能力。
 - 给 AI/Cowork、MCP、OpenClaw runtime 等高敏感链路提供默认安全的诊断边界。
 - 在 macOS、Windows、Linux 三端使用同一套路径、保留、脱敏和导出规则。
 
@@ -37,17 +37,13 @@ Logging Platform
   │   ├── per-source log files
   │   ├── rotation / retention
   │   └── cross-platform path resolver
-  ├── DiagnosticsBundle
-  │   ├── collect recent logs
-  │   ├── collect app/runtime metadata
-  │   └── export sanitized archive
   └── Logging IPC
       ├── renderer -> main report
-      ├── diagnostics snapshot
-      └── diagnostics bundle export
+      ├── logging snapshot
+      └── open log folder
 ```
 
-`Logging IPC` 是 logging 能力的 Electron IPC 适配层，文件归属 `petclaw-desktop/src/main/ipc/logging-ipc.ts`；`petclaw-desktop/src/main/logging/` 只保留日志领域能力、存储、脱敏、诊断包和子进程日志接入。
+`Logging IPC` 是 logging 能力的 Electron IPC 适配层，文件归属 `petclaw-desktop/src/main/ipc/logging-ipc.ts`；`petclaw-desktop/src/main/logging/` 只保留日志领域能力、存储、脱敏和子进程日志接入。诊断事件和诊断包归属 `petclaw-desktop/src/main/diagnostics/`。
 
 核心原则：
 
@@ -55,7 +51,7 @@ Logging Platform
 - main process 是唯一落盘方。renderer 只能通过 preload 暴露的最小 logging API 上报结构化事件。
 - 所有落盘内容必须经过 `LogSanitizer`。诊断包导出时必须二次脱敏。
 - 生产源码禁止使用 `console.*`；main 使用 `getLogger(module, source)`，renderer 使用 preload logging API。
-- 日志写入失败不能影响业务主流程；应记录日志系统降级状态，并在 diagnostics snapshot 中暴露。
+- 日志写入失败不能影响业务主流程；应记录日志系统降级状态，并在 logging snapshot 中暴露。
 
 ## 3. 日志流与文件布局
 
@@ -108,7 +104,7 @@ Logging Platform
 默认策略：
 
 - 普通日志按天命名。
-- 单个日志文件默认上限为 20 MB；超过上限后使用同日序号轮转，例如 `main-YYYY-MM-DD.1.log`。迁移期可读取旧 `.old` 文件，但新平台不再生成新的 `.old` 文件。
+- 单个日志文件默认上限为 20 MB；超过上限后使用同日序号轮转，例如 `main-YYYY-MM-DD.1.log`。
 - 普通日志默认保留最近 14 天。
 - 启动诊断 JSONL 默认保留最近 14 天，并受单文件大小上限保护。
 - 诊断包默认保留最近 5 个。
@@ -118,7 +114,7 @@ Logging Platform
 - 写入前确保目录存在。
 - 单条事件序列化后超过事件大小上限时截断字段，并记录 `truncated: true`。
 - 单个日志流写入失败时只影响该日志流，不影响业务流程。
-- 日志系统降级状态通过 diagnostics snapshot 暴露给 UI。
+- 日志系统降级状态通过 logging snapshot 暴露给 UI。
 
 ## 5. LogFacade API 边界
 
@@ -154,7 +150,7 @@ logger.error(
 )
 ```
 
-事件命名使用 `domain.action.result`：
+事件命名使用点分 lowerCamelCase。对于全局日志使用 `domain.action.outcome`；对于 scoped logger，`module` 已经提供领域上下文时，event 可以使用 `action.outcome`，例如 `getLogger('ConfigSync')` 下的 `sync.failed`。
 
 ```text
 app.started
@@ -167,6 +163,14 @@ mcp.tool.failed
 renderer.render.failed
 updater.download.failed
 ```
+
+工程约束：
+
+- event 必须是字符串字面量，禁止模板字符串、变量和运行时拼接。
+- event 至少包含两段：`action.outcome`；推荐三段：`domain.action.outcome`。
+- 每段使用 lowerCamelCase，禁止中文、空格、横线和下划线。
+- 最后一段 outcome 必须登记在日志规范测试的白名单中；新增 outcome 需要同步说明语义，避免 `failed1`、`error2`、`someCase` 这类不可聚合命名。
+- 变量上下文只能进入 `fields`，不能进入 event。
 
 落盘事件标准字段：
 
@@ -227,11 +231,16 @@ logger.error(
 
 规则：
 
-- error/warn 必须提供非空英文 `message`。
-- info/debug 可以省略 `message`，但跨进程启动、配置同步、反馈、更新、gateway 生命周期等关键路径应提供 `message`。
+- debug/info/warn/error 所有日志等级都必须提供非空英文 `message`。
+- Logging facade 的 TypeScript 签名强制 `logger.<level>(event, message, fields?, error?)`，禁止 event-only 或 fields-only 调用。
+- `warn` / `error` 允许在无 fields 时写成 `logger.error(event, message, error)`；禁止使用 `undefined` 作为 fields 占位。
+- 底层 `LogEventInput.message` 必填，sanitizer 不从 `event` 回退生成可读文本。
+- `event` 和 `message` 都必须是字符串字面量，禁止模板字符串、变量和运行时拼接。
 - `message` 不包含用户正文、prompt、memory、token、URL query、文件全文或截图内容。
 - `message` 不使用中文；中文只用于 UI/i18n。
-- 实现阶段应升级 Logging facade 签名，使 `logger.error(event, message, fields, error)` 成为规范入口，并保留兼容测试防止退回 `console.*`。
+- 变量、错误摘要、动态上下文必须进入 `fields`；开发者自定义字段名应直接表达含义，例如 `sessionId`、`provider`、`elapsedMs`、`errorMessage`。
+- Cowork 日志必须直接使用 Logging facade，不保留独立 wrapper 或 detail 字符串入口。
+- 保留规范测试防止退回 `console.*`、动态 event、动态 message 或无 `message` 的日志调用。
 
 规则：
 
@@ -248,13 +257,13 @@ renderer 不直接写文件，不访问 Node/Electron 日志能力。
 preload 暴露最小 API：
 
 ```text
-window.api.logging.report(event)
+window.api.logging.report({ level, event, message, fields? })
 window.api.logging.snapshot()
 window.api.logging.exportDiagnostics(options)
 window.api.logging.openLogFolder()
 ```
 
-Feedback 不直接读取日志文件。问题反馈链路需要诊断信息时，必须由 main 侧 FeedbackService 调用 diagnostics bundle 生成脱敏包，再提交给 Feedback API。Renderer 只展示诊断摘要和勾选状态。
+Feedback 不直接读取日志文件。问题反馈链路需要诊断信息时，必须由 main 侧 FeedbackService 调用 Diagnostics bundle 生成脱敏包，再提交给 Feedback API。Renderer 只展示诊断摘要和勾选状态。
 
 IPC channel：
 
@@ -268,11 +277,12 @@ logging:open-log-folder
 规则：
 
 - IPC 必须通过 `safeHandle` / `safeOn` 注册。
-- IPC 适配层放在 `petclaw-desktop/src/main/ipc/logging-ipc.ts`，只调用 logging facade 和 diagnostics bundle，不反向让 logging domain 暴露 IPC 模块。
+- IPC 适配层放在 `petclaw-desktop/src/main/ipc/logging-ipc.ts`，只调用 logging facade 和 Diagnostics bundle，不反向让 logging domain 暴露 IPC 模块。
 - preload 只暴露受控方法，不透传 `ipcRenderer`。
 - main 负责 renderer payload shape 校验、字段裁剪、权限判断、脱敏、落盘和导出。
 - renderer 不能传任意路径给 main 打开，只能请求预定义日志目录。
 - renderer 默认只上报 error/warn、React 错误边界、不可恢复失败和关键用户操作失败。
+- renderer 上报遵守和 main 相同的 event/message 规范：`event`、`message` 使用字符串字面量，动态错误信息和 UI 上下文进入 `fields`。
 - 用户可见失败必须在 UI 展示本地化文案，不能只上报日志。
 
 ## 7. Child Process 与 Runtime 日志
@@ -373,7 +383,7 @@ Cowork、MCP、Memory 和模型调用属于高敏感链路。
 
 ## 10. 诊断包
 
-诊断包是 Logging Platform 的一等能力，用于用户主动导出本地排障资料。
+诊断包是 Diagnostics domain 的一等能力，用于用户主动提交或导出本地排障资料。Diagnostics 读取 Logging storage 的受控日志源，Logging 不反向依赖 Diagnostics。
 
 用户入口：
 
@@ -432,7 +442,7 @@ metadata 边界：
 
 - `app.json`：应用版本。
 - `platform.json`：platform、arch、Electron/Node/Chrome 版本。
-- Logging foundation 不直接读取 SQLite、runtime token、provider credential 或业务配置。需要业务域元数据时，由对应 domain 提供已脱敏摘要，再纳入诊断包。
+- Diagnostics 不直接读取 SQLite、runtime token、provider credential 或业务配置。需要业务域元数据时，由对应 domain 提供已脱敏摘要，再纳入诊断包。
 
 部分日志缺失、读失败或二次脱敏失败时，导出仍应尽力完成，并在 manifest 的 `exportErrors` 中记录失败来源和脱敏后的错误摘要。
 
@@ -451,17 +461,18 @@ metadata 边界：
 - renderer 上报失败不能影响当前 UI 操作。
 - 日志目录打开失败必须提示用户，并记录 main error。
 
-## 12. 迁移规则
+## 12. 最终态约束
 
-当前实现中已有多处日志入口，包括 main 显式 logger、Cowork 独立日志、启动诊断、OpenClaw gateway stdout/stderr、MCP 安全序列化和 updater 日志。迁移时遵循以下规则：
+Logging Platform 是 Desktop 唯一日志事实源。所有业务域，包括 main、startup、gateway、cowork、mcp、updater、installer 和 renderer 上报，都必须收敛到统一 storage、sanitizer、facade 和 IPC。启动诊断事件与反馈诊断包统一归属 Diagnostics domain，并消费 Logging storage。
 
-1. 先建立 Logging Platform 基础层：路径解析、日志流定义、facade、sanitizer、storage、rotation、retention。
-2. 删除生产源码中的 `console.*`，并用 guardrail 测试阻止回归。
-3. 将 main、startup、gateway、cowork、mcp、updater、installer 的写入入口收敛到统一 storage 和 sanitizer。
-4. 接入 renderer 上报时同步 main IPC、preload、类型声明、renderer 调用点和 i18n 错误态。
-5. 诊断 snapshot 和诊断包导出完成后，BootCheck、EngineSettings、Support/About 才能展示对应入口。
-6. 每个迁移阶段都必须可独立通过 typecheck 和针对性测试；UI 不允许出现空按钮、空实现或临时说明文案。
-7. 旧设计文档和 legacy 文档不再作为 Logging 事实源；有效规则以本文为准。
+规则：
+
+1. 生产源码禁止 `console.*`。
+2. 不保留业务域独立日志 wrapper。
+3. 不保留 event-only、fields-only、动态 message 或 detail 字符串入口。
+4. 不保留 `src/main/logger.ts` 兼容入口，业务代码不得直接导入 `electron-log/main`。
+5. 新增日志入口必须同时通过类型签名、运行时 schema 和日志规范测试。
+6. 旧设计文档和 legacy 文档不再作为 Logging 事实源；有效规则以本文为准。
 
 ## 13. 测试策略
 

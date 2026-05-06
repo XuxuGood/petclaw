@@ -40,7 +40,7 @@ vi.mock('../../../src/main/logging/facade', () => ({
   })
 }))
 
-vi.mock('../../../src/main/logging/diagnostics-bundle', () => ({
+vi.mock('../../../src/main/diagnostics', () => ({
   exportDiagnosticsBundle: ipcMock.exportDiagnosticsBundle
 }))
 
@@ -99,6 +99,18 @@ describe('validateRendererLogReport', () => {
       })
     ).toThrow('Invalid renderer log event')
   })
+
+  test('rejects renderer reports without a human readable message', async () => {
+    const { validateRendererLogReport } = await import('../../../src/main/ipc/logging-ipc')
+
+    expect(() =>
+      validateRendererLogReport({
+        level: 'error',
+        module: 'BootCheckPanel',
+        event: 'renderer.render.failed'
+      })
+    ).toThrow('Invalid renderer log message')
+  })
 })
 
 describe('registerLoggingIpcHandlers', () => {
@@ -127,13 +139,15 @@ describe('registerLoggingIpcHandlers', () => {
     ipcMock.handlers.get('logging:report')?.({} as never, {
       level: 'warn',
       module: 'Settings',
-      event: 'renderer.logging.failed'
+      event: 'renderer.logging.failed',
+      message: 'Renderer logging failed'
     })
 
     expect(ipcMock.reportRendererLog).toHaveBeenCalledWith({
       level: 'warn',
       module: 'Settings',
-      event: 'renderer.logging.failed'
+      event: 'renderer.logging.failed',
+      message: 'Renderer logging failed'
     })
   })
 
@@ -157,6 +171,7 @@ describe('registerLoggingIpcHandlers', () => {
 
     expect(ipcMock.loggerError).toHaveBeenCalledWith(
       'logging.openLogFolder.failed',
+      'Failed to open log folder',
       { dir: '/tmp/petclaw/logs/main' },
       expect.any(Error)
     )
