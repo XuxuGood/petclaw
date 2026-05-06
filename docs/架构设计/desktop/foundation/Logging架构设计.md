@@ -127,7 +127,7 @@ Logging Platform
 ```typescript
 const logger = getLogger('ConfigSync')
 
-logger.info('sync.completed', {
+logger.info('sync.completed', 'Config sync completed', {
   reason,
   changed,
   durationMs
@@ -135,6 +135,7 @@ logger.info('sync.completed', {
 
 logger.warn(
   'sync.degraded',
+  'Config sync completed with degraded optional inputs',
   {
     reason,
     missingOptionalConfig: true
@@ -144,6 +145,7 @@ logger.warn(
 
 logger.error(
   'sync.failed',
+  'Config sync failed',
   {
     reason,
     sessionId
@@ -186,12 +188,57 @@ fields?
 error?
 ```
 
+### 5.1 人类可读日志
+
+日志必须同时服务机器检索和人工排障。`event` 是稳定机器 key，`message` 是固定英文人类可读句子，变量必须进入 `fields`，不得拼接进 `message`。
+
+推荐：
+
+```typescript
+logger.error(
+  'titleGeneration.failed',
+  'Failed to generate session title',
+  {
+    sessionId,
+    modelId,
+    elapsedMs
+  },
+  error
+)
+```
+
+禁止：
+
+```typescript
+logger.error(
+  'titleGeneration.failed',
+  `Failed to generate title for session ${sessionId} using ${modelId}`,
+  undefined,
+  error
+)
+```
+
+原因：
+
+- 固定 `message` 让人可以快速理解日志含义。
+- 固定 `event` 让日志可以稳定聚合、过滤和告警。
+- 变量放入 `fields`，便于脱敏、裁剪、查询和诊断包摘要展示。
+- 变量拼接进 `message` 会让同类错误产生大量不同文本，并可能绕过字段级脱敏。
+
+规则：
+
+- error/warn 必须提供非空英文 `message`。
+- info/debug 可以省略 `message`，但跨进程启动、配置同步、反馈、更新、gateway 生命周期等关键路径应提供 `message`。
+- `message` 不包含用户正文、prompt、memory、token、URL query、文件全文或截图内容。
+- `message` 不使用中文；中文只用于 UI/i18n。
+- 实现阶段应升级 Logging facade 签名，使 `logger.error(event, message, fields, error)` 成为规范入口，并保留兼容测试防止退回 `console.*`。
+
 规则：
 
 - `electron-log` 或底层 writer 不暴露给业务模块。
 - 生产源码禁止使用 `console.*`；所有运行时日志必须显式使用 Logging facade 或 renderer logging IPC。
 - 错误对象作为最后一个参数传入，保留 `name`、`message`、`stack`。
-- 日志消息使用英文，模块标签和 event name 保持稳定。
+- 日志 `message` 使用英文固定句子，模块标签和 event name 保持稳定。
 - 高频轮询、心跳和 stream chunk 不使用 info 级别刷屏；必要时使用 debug 并限流。
 
 ## 6. Renderer 与 Preload 边界

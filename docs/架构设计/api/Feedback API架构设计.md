@@ -21,6 +21,7 @@ API 不直接依赖 `petclaw-desktop` 实现。Desktop 与 API 之间只通过 H
 - 不在第一版实现完整工单后台。
 - 不在 API 日志中输出反馈正文、邮箱、截图内容或诊断包内容。
 - 不解析 diagnostics zip 内部日志内容做在线搜索。
+- 不在 API 侧补写或推断 Desktop 日志的人类可读 message。
 - 不要求 Desktop 直接知道存储或通知实现细节。
 
 ## 3. 总体架构
@@ -194,6 +195,8 @@ Diagnostics: included
 Contact: present
 Storage: feedback/2026/05/06/PC-...
 ```
+
+诊断日志的人类可读性由 Desktop Logging 负责。API 可以在通知中标记 diagnostics 是否存在、大小和日志源摘要，但不解压 diagnostics zip、不重写日志 message、不把日志原文推送到通知渠道。
 
 通知不得直接包含：
 
