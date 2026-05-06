@@ -31,6 +31,19 @@ describe('sanitizeUnknownForLog', () => {
     expect(result.redactionCount).toBeGreaterThanOrEqual(2)
   })
 
+  test('redacts sensitive URL query params while preserving safe params', () => {
+    const result = sanitizeUnknownForLog(
+      'GET https://gateway.petclaw.test/rpc?token=secret-token&workspace=main&api_key=sk-live-1234567890'
+    )
+
+    expect(result.value).toContain('https://gateway.petclaw.test/rpc?workspace=main')
+    expect(result.value).toContain('token=%5Bredacted%5D')
+    expect(result.value).toContain('api_key=%5Bredacted%5D')
+    expect(String(result.value)).not.toContain('secret-token')
+    expect(String(result.value)).not.toContain('sk-live')
+    expect(result.redactionCount).toBe(2)
+  })
+
   test('normalizes known local paths', () => {
     const result = sanitizeUnknownForLog(
       {

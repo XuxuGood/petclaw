@@ -72,10 +72,20 @@ export function registerLoggingIpcHandlers(): void {
   )
 
   safeHandle('logging:open-log-folder', async () => {
-    const snapshot = getLoggingPlatform().snapshot()
+    const platform = getLoggingPlatform()
+    const logger = platform.getLogger('LoggingIPC')
+    const snapshot = platform.snapshot()
     const mainSource = snapshot.sources.find((source) => source.source === 'main')
-    if (!mainSource) throw new Error('Main log source is unavailable')
+    if (!mainSource) {
+      const error = new Error('Main log source is unavailable')
+      logger.error('logging.openLogFolder.failed', undefined, error)
+      throw error
+    }
     const error = await shell.openPath(mainSource.dir)
-    if (error) throw new Error(error)
+    if (error) {
+      const openError = new Error(error)
+      logger.error('logging.openLogFolder.failed', { dir: mainSource.dir }, openError)
+      throw openError
+    }
   })
 }

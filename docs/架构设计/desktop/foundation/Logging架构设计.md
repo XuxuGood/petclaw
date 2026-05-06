@@ -273,9 +273,9 @@ attachProcessLogger({
 
 ```text
 redactByKeyName(apiKey/token/secret/password/cookie/authorization...)
-→ redactByValuePattern(sk-..., Bearer ..., JWT-like...)
 → normalizePaths(userData/workspace/temp/home)
 → redactUrlQuery()
+→ redactByValuePattern(sk-..., Bearer ..., JWT-like..., non-URL key=value)
 → truncateLargeValues(max chars / max object keys / max array items)
 → circular-safe serialization
 → classify event contentPolicy

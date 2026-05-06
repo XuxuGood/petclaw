@@ -15,11 +15,13 @@ const SENSITIVE_KEY_PATTERN =
   /(api[-_]?key|token|secret|password|authorization|cookie|session|refresh[-_]?token|access[-_]?token|gateway[-_]?token)/i
 
 const SENSITIVE_VALUE_PATTERNS = [
-  /\b(?:api[-_]?key|token|secret|password|authorization|cookie|session|refresh[-_]?token|access[-_]?token)=\S+/gi,
+  /(?<![?&])\b(?:api[-_]?key|token|secret|password|authorization|cookie|session|refresh[-_]?token|access[-_]?token|gateway[-_]?token)=\S+/gi,
   /\bBearer\s+[A-Za-z0-9._~+/=-]+/g,
   /\bsk-[A-Za-z0-9_-]{8,}\b/g,
   /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g
 ]
+
+const URL_PATTERN = /\bhttps?:\/\/[^\s"'<>]+/gi
 
 export interface SanitizeOptions {
   maxChars?: number
@@ -58,13 +60,40 @@ function normalizePathText(value: string, options: SanitizeOptions): string {
 
 function redactString(value: string): { value: string; redactionCount: number } {
   let redactionCount = 0
-  let next = value
+  const urlRedacted = redactUrlQuery(value)
+  redactionCount += urlRedacted.redactionCount
+  let next = urlRedacted.value
   for (const pattern of SENSITIVE_VALUE_PATTERNS) {
     next = next.replace(pattern, () => {
       redactionCount += 1
       return REDACTED
     })
   }
+  return { value: next, redactionCount }
+}
+
+function redactUrlQuery(value: string): { value: string; redactionCount: number } {
+  let redactionCount = 0
+  const next = value.replace(URL_PATTERN, (rawUrl) => {
+    try {
+      const parsed = new URL(rawUrl)
+      const sensitiveKeys = Array.from(new Set(parsed.searchParams.keys())).filter((key) =>
+        SENSITIVE_KEY_PATTERN.test(key)
+      )
+      for (const key of sensitiveKeys) {
+        const existingValues = parsed.searchParams.getAll(key)
+        if (existingValues.length === 0) continue
+        redactionCount += existingValues.filter((item) => item !== REDACTED).length
+        parsed.searchParams.delete(key)
+        for (let index = 0; index < existingValues.length; index += 1) {
+          parsed.searchParams.append(key, REDACTED)
+        }
+      }
+      return parsed.toString()
+    } catch {
+      return rawUrl
+    }
+  })
   return { value: next, redactionCount }
 }
 

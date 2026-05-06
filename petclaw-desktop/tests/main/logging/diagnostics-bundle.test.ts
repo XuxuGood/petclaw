@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 
 import { createDiagnosticsBundle } from '../../../src/main/logging/diagnostics-bundle'
 import { createLogStorage } from '../../../src/main/logging/storage'
+import type { LogStorage } from '../../../src/main/logging/storage'
 
 let root: string
 
@@ -103,5 +104,38 @@ describe('createDiagnosticsBundle', () => {
 
     expect(bundles).toHaveLength(5)
     expect(bundles).not.toContain('petclaw-diagnostics-20260505T100000.zip')
+  })
+
+  test('sanitizes read failure warnings before writing manifest', async () => {
+    const storage = {
+      getRecentEntries: () => [
+        {
+          archiveName: 'main/missing.log',
+          filePath: path.join(root, 'logs', 'main', 'missing-token=secret-token.log')
+        }
+      ],
+      getCurrentFile: () => path.join(root, 'logs', 'main', 'main-2026-05-05.log'),
+      snapshot: () => ({ writable: true, sources: [], errors: [] }),
+      write: () => undefined
+    } satisfies LogStorage
+
+    const result = await createDiagnosticsBundle({
+      userDataPath: root,
+      appVersion: '0.1.0',
+      storage,
+      options: { timeRangeDays: 1, includeSources: ['main'] },
+      now: () => new Date('2026-05-05T10:05:00.000Z')
+    })
+
+    const archive = unzipSync(fs.readFileSync(result.filePath))
+    const manifest = JSON.parse(strFromU8(archive['manifest.json'])) as {
+      exportErrors: string[]
+    }
+
+    expect(manifest.exportErrors).toHaveLength(1)
+    expect(manifest.exportErrors[0]).toContain('{userData}')
+    expect(manifest.exportErrors[0]).toContain('[redacted]')
+    expect(manifest.exportErrors[0]).not.toContain(root)
+    expect(manifest.exportErrors[0]).not.toContain('secret-token')
   })
 })

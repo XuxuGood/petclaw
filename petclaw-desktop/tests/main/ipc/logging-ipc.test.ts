@@ -19,7 +19,8 @@ const ipcMock = vi.hoisted(() => ({
     errors: []
   })),
   exportDiagnosticsBundle: vi.fn(),
-  openPath: vi.fn(() => Promise.resolve(''))
+  openPath: vi.fn(() => Promise.resolve('')),
+  loggerError: vi.fn()
 }))
 
 vi.mock('../../../src/main/ipc/ipc-registry', () => ({
@@ -29,7 +30,13 @@ vi.mock('../../../src/main/ipc/ipc-registry', () => ({
 vi.mock('../../../src/main/logging/facade', () => ({
   getLoggingPlatform: () => ({
     reportRendererLog: ipcMock.reportRendererLog,
-    snapshot: ipcMock.snapshot
+    snapshot: ipcMock.snapshot,
+    getLogger: () => ({
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: ipcMock.loggerError
+    })
   })
 }))
 
@@ -137,5 +144,21 @@ describe('registerLoggingIpcHandlers', () => {
     await ipcMock.handlers.get('logging:open-log-folder')?.({} as never)
 
     expect(ipcMock.openPath).toHaveBeenCalledWith('/tmp/petclaw/logs/main')
+  })
+
+  test('logs main process failures when opening the log folder fails', async () => {
+    ipcMock.openPath.mockResolvedValueOnce('open denied')
+    const { registerLoggingIpcHandlers } = await import('../../../src/main/logging/logging-ipc')
+    registerLoggingIpcHandlers()
+
+    await expect(ipcMock.handlers.get('logging:open-log-folder')?.({} as never)).rejects.toThrow(
+      'open denied'
+    )
+
+    expect(ipcMock.loggerError).toHaveBeenCalledWith(
+      'logging.openLogFolder.failed',
+      { dir: '/tmp/petclaw/logs/main' },
+      expect.any(Error)
+    )
   })
 })

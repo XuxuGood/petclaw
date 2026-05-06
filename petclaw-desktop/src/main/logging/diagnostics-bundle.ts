@@ -69,6 +69,11 @@ function countEmbeddedRedactions(content: string): number {
   return count
 }
 
+function sanitizeExportWarning(source: LogSource, error: unknown, userDataPath: string): string {
+  const message = error instanceof Error ? error.message : String(error)
+  return `${source}: ${String(sanitizeUnknownForLog(message, { userDataPath }).value)}`
+}
+
 function pruneOldDiagnosticsBundles(dir: string, retainCount: number): void {
   if (!fs.existsSync(dir)) return
   const entries = fs
@@ -126,8 +131,7 @@ export async function createDiagnosticsBundle(
         redactionCount += sanitized.redactionCount + countEmbeddedRedactions(raw)
         files[`logs/${entry.archiveName}`] = strToU8(String(sanitized.value))
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        exportWarnings.push(`${source}: ${message}`)
+        exportWarnings.push(sanitizeExportWarning(source, error, input.userDataPath))
       }
     }
   }
