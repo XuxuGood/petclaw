@@ -7,6 +7,7 @@ import type Database from 'better-sqlite3'
 import type { Skill } from '../ai/types'
 import { kvGet, kvSet } from '../data/db'
 import { cpRecursiveSync } from '../fs-compat'
+import { getLogger } from '../logging/facade'
 
 const SKILL_FILE_NAME = 'SKILL.md'
 const SKILLS_CONFIG_FILE_NAME = 'skills.config.json'
@@ -18,6 +19,7 @@ const WEB_SEARCH_REPAIR_MARKERS: Record<string, string[]> = {
   'scripts/search.sh': ['ACTIVE_SERVER_URL'],
   'dist/server/index.js': ['createBridgeServer']
 }
+const logger = getLogger('SkillManager')
 
 type JsonRecord = Record<string, unknown>
 
@@ -96,7 +98,7 @@ export class SkillManager extends EventEmitter {
       fs.mkdirSync(userRoot, { recursive: true })
       configuredSkillIds = this.loadConfiguredSkillIds(bundledRoot)
     } catch (error) {
-      console.warn('[SkillManager] Failed to prepare bundled skills sync.', error)
+      logger.warn('bundledSkills.prepareSync.failed', undefined, error)
       return
     }
 
@@ -114,14 +116,14 @@ export class SkillManager extends EventEmitter {
       try {
         this.syncBundledSkill(sourceDir, path.join(userRoot, dirName), skillId)
       } catch (error) {
-        console.warn(`[SkillManager] Failed to sync bundled skill "${skillId}".`, error)
+        logger.warn('bundledSkills.syncSkill.failed', { skillId }, error)
       }
     }
 
     try {
       this.syncSkillsConfig(bundledRoot, userRoot)
     } catch (error) {
-      console.warn('[SkillManager] Failed to sync bundled skills config.', error)
+      logger.warn('bundledSkills.syncConfig.failed', undefined, error)
     }
   }
 
@@ -464,7 +466,7 @@ function restoreBackupIfNeeded(
       fs.renameSync(backupPath, targetDir)
       return
     } catch (error) {
-      console.warn('[SkillManager] Failed to restore skill backup after sync failure.', error)
+      logger.warn('bundledSkills.restoreBackup.failed', { targetDir }, error)
     }
   }
 

@@ -1,5 +1,9 @@
 import { globalShortcut, BrowserWindow } from 'electron'
 
+import { getLogger } from '../logging/facade'
+
+const logger = getLogger('Shortcuts')
+
 export function registerShortcuts(
   petWindow: BrowserWindow,
   _mainWindow: BrowserWindow,
@@ -13,12 +17,16 @@ export function registerShortcuts(
       petWindow.focus()
     }
   })
-  if (!registered1) console.warn('Failed to register shortcut: CommandOrControl+Shift+P')
+  if (!registered1) {
+    logger.warn('shortcut.register.failed', { accelerator: 'CommandOrControl+Shift+P' })
+  }
 
   const registered2 = globalShortcut.register('CommandOrControl+Shift+C', () => {
     toggleMainWindow()
   })
-  if (!registered2) console.warn('Failed to register shortcut: CommandOrControl+Shift+C')
+  if (!registered2) {
+    logger.warn('shortcut.register.failed', { accelerator: 'CommandOrControl+Shift+C' })
+  }
 }
 
 export function unregisterShortcuts(): void {

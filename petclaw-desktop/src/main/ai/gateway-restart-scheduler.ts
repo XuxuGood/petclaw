@@ -2,6 +2,10 @@
 // 活跃 Cowork 对话或 Cron 任务执行期间不立即重启 gateway，
 // 轮询等待工作负载空闲后再执行，5 分钟硬超时兜底。
 
+import { getLogger } from '../logging/facade'
+
+const logger = getLogger('GatewayRestartScheduler', 'runtime')
+
 export interface GatewayRestartSchedulerDeps {
   /** 检查是否存在活跃的 Cowork 会话或 Cron 任务 */
   hasActiveWorkloads: () => boolean
@@ -29,25 +33,19 @@ export class GatewayRestartScheduler {
   requestRestart(reason: string): void {
     // 幂等：已有待处理的延迟重启，不重复调度
     if (this.pendingReason !== null) {
-      console.warn(
-        `[GatewayRestartScheduler] already pending (${this.pendingReason}), skipping new request: ${reason}`
-      )
+      logger.warn('restart.request.skipped', { pendingReason: this.pendingReason, reason })
       return
     }
 
     // 无活跃工作负载 → 立即执行
     if (!this.deps.hasActiveWorkloads()) {
-      console.warn(
-        `[GatewayRestartScheduler] no active workloads, restarting immediately: ${reason}`
-      )
+      logger.warn('restart.executing.immediate', { reason })
       void this.deps.executeRestart(reason)
       return
     }
 
     // 有活跃工作负载 → 延迟重启
-    console.warn(
-      `[GatewayRestartScheduler] active workloads detected, deferring restart: ${reason}`
-    )
+    logger.warn('restart.deferred', { reason })
     this.pendingReason = reason
     this.startPolling()
   }
@@ -55,7 +53,7 @@ export class GatewayRestartScheduler {
   /** 取消待处理的延迟重启（app quit 时调用） */
   cancelPending(): void {
     if (this.pendingReason !== null) {
-      console.warn(`[GatewayRestartScheduler] cancelling pending restart: ${this.pendingReason}`)
+      logger.warn('restart.pending.cancelled', { pendingReason: this.pendingReason })
     }
     this.clearTimers()
     this.pendingReason = null
@@ -77,9 +75,10 @@ export class GatewayRestartScheduler {
 
     // 硬超时：5 分钟后不管工作负载状态，强制重启
     this.hardTimeout = setTimeout(() => {
-      console.warn(
-        `[GatewayRestartScheduler] max wait exceeded (${GatewayRestartScheduler.MAX_WAIT_MS}ms), forcing restart: ${this.pendingReason}`
-      )
+      logger.warn('restart.maxWait.exceeded', {
+        maxWaitMs: GatewayRestartScheduler.MAX_WAIT_MS,
+        pendingReason: this.pendingReason
+      })
       this.execute()
     }, GatewayRestartScheduler.MAX_WAIT_MS)
   }
@@ -91,9 +90,9 @@ export class GatewayRestartScheduler {
     this.pendingReason = null
 
     if (reason) {
-      console.warn(`[GatewayRestartScheduler] executing deferred restart: ${reason}`)
+      logger.warn('restart.executing.deferred', { reason })
       void this.deps.executeRestart(reason).catch((err) => {
-        console.error('[GatewayRestartScheduler] restart failed:', err)
+        logger.error('restart.failed', { reason }, err)
       })
     }
   }

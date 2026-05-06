@@ -57,7 +57,7 @@ describe('validateRendererLogReport', () => {
   })
 
   test('accepts warn and error reports', async () => {
-    const { validateRendererLogReport } = await import('../../../src/main/logging/logging-ipc')
+    const { validateRendererLogReport } = await import('../../../src/main/ipc/logging-ipc')
 
     expect(
       validateRendererLogReport({
@@ -77,7 +77,7 @@ describe('validateRendererLogReport', () => {
   })
 
   test('rejects info reports from renderer', async () => {
-    const { validateRendererLogReport } = await import('../../../src/main/logging/logging-ipc')
+    const { validateRendererLogReport } = await import('../../../src/main/ipc/logging-ipc')
 
     expect(() =>
       validateRendererLogReport({
@@ -89,7 +89,7 @@ describe('validateRendererLogReport', () => {
   })
 
   test('rejects oversized event names', async () => {
-    const { validateRendererLogReport } = await import('../../../src/main/logging/logging-ipc')
+    const { validateRendererLogReport } = await import('../../../src/main/ipc/logging-ipc')
 
     expect(() =>
       validateRendererLogReport({
@@ -108,7 +108,7 @@ describe('registerLoggingIpcHandlers', () => {
   })
 
   test('registers logging IPC handlers through the registry', async () => {
-    const { registerLoggingIpcHandlers } = await import('../../../src/main/logging/logging-ipc')
+    const { registerLoggingIpcHandlers } = await import('../../../src/main/ipc/logging-ipc')
 
     registerLoggingIpcHandlers()
 
@@ -121,7 +121,7 @@ describe('registerLoggingIpcHandlers', () => {
   })
 
   test('writes renderer reports through the logging platform', async () => {
-    const { registerLoggingIpcHandlers } = await import('../../../src/main/logging/logging-ipc')
+    const { registerLoggingIpcHandlers } = await import('../../../src/main/ipc/logging-ipc')
     registerLoggingIpcHandlers()
 
     ipcMock.handlers.get('logging:report')?.({} as never, {
@@ -138,7 +138,7 @@ describe('registerLoggingIpcHandlers', () => {
   })
 
   test('opens only the main log folder resolved by the logging platform', async () => {
-    const { registerLoggingIpcHandlers } = await import('../../../src/main/logging/logging-ipc')
+    const { registerLoggingIpcHandlers } = await import('../../../src/main/ipc/logging-ipc')
     registerLoggingIpcHandlers()
 
     await ipcMock.handlers.get('logging:open-log-folder')?.({} as never)
@@ -148,7 +148,7 @@ describe('registerLoggingIpcHandlers', () => {
 
   test('logs main process failures when opening the log folder fails', async () => {
     ipcMock.openPath.mockResolvedValueOnce('open denied')
-    const { registerLoggingIpcHandlers } = await import('../../../src/main/logging/logging-ipc')
+    const { registerLoggingIpcHandlers } = await import('../../../src/main/ipc/logging-ipc')
     registerLoggingIpcHandlers()
 
     await expect(ipcMock.handlers.get('logging:open-log-folder')?.({} as never)).rejects.toThrow(

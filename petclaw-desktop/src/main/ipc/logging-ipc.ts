@@ -1,9 +1,9 @@
 import { shell } from 'electron'
 
-import { safeHandle } from '../ipc/ipc-registry'
-import { exportDiagnosticsBundle } from './diagnostics-bundle'
-import { getLoggingPlatform, type RendererLogReport } from './facade'
-import type { DiagnosticsExportOptions, LogSource } from './types'
+import { safeHandle } from './ipc-registry'
+import { exportDiagnosticsBundle } from '../logging/diagnostics-bundle'
+import { getLoggingPlatform, type RendererLogReport } from '../logging/facade'
+import type { DiagnosticsExportOptions, LogSource } from '../logging/types'
 
 const ALLOWED_LOG_SOURCES: LogSource[] = [
   'main',

@@ -106,7 +106,16 @@ export function CwdSelector({ value, onChange }: CwdSelectorProps) {
       })
       if (dir) onChange(dir)
     } catch (err) {
-      console.error('[CwdSelector] selectDirectory failed', err)
+      await window.api.logging.report({
+        level: 'error',
+        module: 'CwdSelector',
+        event: 'directory.select.failed',
+        message: err instanceof Error ? err.message : 'Failed to select directory',
+        fields: {
+          errorName: err instanceof Error ? err.name : typeof err,
+          errorMessage: err instanceof Error ? err.message : String(err)
+        }
+      })
     }
   }
 

@@ -1,5 +1,9 @@
 import * as fs from 'fs'
 
+import { getLogger } from '../logging/facade'
+
+const logger = getLogger('ConfigInstaller')
+
 export class ConfigInstaller {
   private bridgePath: string
 
@@ -14,8 +18,8 @@ export class ConfigInstaller {
     if (fs.existsSync(settingsPath)) {
       try {
         settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'))
-      } catch {
-        console.warn('Invalid JSON in settings file, creating new config:', settingsPath)
+      } catch (error) {
+        logger.warn('claudeHooks.settings.invalidJson', { settingsPath }, error)
         settings = {}
       }
     }
@@ -53,8 +57,8 @@ export class ConfigInstaller {
     let settings: Record<string, unknown>
     try {
       settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'))
-    } catch {
-      console.warn('Invalid JSON in settings file, skipping uninstall:', settingsPath)
+    } catch (error) {
+      logger.warn('claudeHooks.uninstall.invalidJson', { settingsPath }, error)
       return
     }
     if (!settings.hooks) return

@@ -11,6 +11,9 @@ import type { ImGatewayManager } from '../im/im-gateway-manager'
 import type { MemorySearchConfigStore } from '../memory/memory-search-config-store'
 import type { McpToolManifestEntry } from './types'
 import { readAgentsTemplate, buildManagedSections } from './managed-prompts'
+import { getLogger } from '../logging/facade'
+
+const logger = getLogger('ConfigSync')
 
 export interface ConfigSyncResult {
   ok: boolean
@@ -182,16 +185,17 @@ export class ConfigSync {
 
       // 诊断日志：记录每次同步结果和变更明细
       if (configChanged || agentsMdChanged || needsGatewayRestart) {
-        const parts = [
-          `[ConfigSync] sync(${reason}):`,
-          configChanged ? 'config=changed' : null,
-          agentsMdChanged ? 'agents.md=changed' : null,
-          execApprovalsChanged ? 'exec-approvals=changed' : null,
-          bindingsChanged ? 'bindings=CHANGED(restart)' : null,
-          secretEnvVarsChanged ? `envVars=CHANGED(restart) keys=[${changedEnvKeys}]` : null,
-          mcpBridgeConfigChanged ? 'mcpBridge=CHANGED(restart)' : null
-        ].filter(Boolean)
-        console.warn(parts.join(' '))
+        logger.warn('sync.changed', {
+          reason,
+          configChanged,
+          agentsMdChanged,
+          execApprovalsChanged,
+          bindingsChanged,
+          secretEnvVarsChanged,
+          changedEnvKeys,
+          mcpBridgeConfigChanged,
+          needsGatewayRestart
+        })
       }
 
       return {
@@ -201,7 +205,7 @@ export class ConfigSync {
         needsGatewayRestart
       }
     } catch (err) {
-      console.error(`[ConfigSync] sync(${reason}) failed:`, err)
+      logger.error('sync.failed', { reason }, err)
       return {
         ok: false,
         changed: false,

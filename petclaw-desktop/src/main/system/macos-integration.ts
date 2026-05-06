@@ -4,9 +4,11 @@ import { app, Menu, nativeImage } from 'electron'
 import type { MenuItemConstructorOptions } from 'electron'
 
 import { t } from '../i18n'
+import { getLogger } from '../logging/facade'
 import type { SystemActions } from './system-actions'
 
 const APP_NAME = 'PetClaw'
+const logger = getLogger('MacosIntegration')
 
 export interface MacosIntegrationOptions {
   actions: SystemActions
@@ -180,7 +182,7 @@ export function initializeMacosIntegration(options: MacosIntegrationOptions): vo
 
   void app.dock?.show().catch((error) => {
     // Dock show 失败不应阻塞启动；常见于测试环境或系统策略拒绝。
-    console.warn('[MacosIntegration] failed to show Dock icon:', error)
+    logger.warn('dock.show.failed', undefined, error)
   })
   refreshMacosMenus({ actions: options.actions, platform })
   app.on('activate', options.actions.openPetClaw)

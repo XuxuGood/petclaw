@@ -47,12 +47,14 @@ Logging Platform
       └── diagnostics bundle export
 ```
 
+`Logging IPC` 是 logging 能力的 Electron IPC 适配层，文件归属 `petclaw-desktop/src/main/ipc/logging-ipc.ts`；`petclaw-desktop/src/main/logging/` 只保留日志领域能力、存储、脱敏、诊断包和子进程日志接入。
+
 核心原则：
 
 - 统一规则，不统一成单个日志文件。不同来源保留独立日志流，诊断包负责统一收集。
 - main process 是唯一落盘方。renderer 只能通过 preload 暴露的最小 logging API 上报结构化事件。
 - 所有落盘内容必须经过 `LogSanitizer`。诊断包导出时必须二次脱敏。
-- 新代码使用 `getLogger(module)` 或等价 facade；`console.*` 拦截只作为兼容层，捕获旧代码、Electron 内部输出和第三方库输出。
+- 生产源码禁止使用 `console.*`；main 使用 `getLogger(module, source)`，renderer 使用 preload logging API。
 - 日志写入失败不能影响业务主流程；应记录日志系统降级状态，并在 diagnostics snapshot 中暴露。
 
 ## 3. 日志流与文件布局
@@ -187,8 +189,7 @@ error?
 规则：
 
 - `electron-log` 或底层 writer 不暴露给业务模块。
-- `console.*` 拦截保留为兼容层，新代码不依赖它作为规范入口。
-- 兼容层识别存量 `[Module] message` 前缀，并按真实 module 写入结构化日志；无前缀日志归入 `ConsoleCompat`。
+- 生产源码禁止使用 `console.*`；所有运行时日志必须显式使用 Logging facade 或 renderer logging IPC。
 - 错误对象作为最后一个参数传入，保留 `name`、`message`、`stack`。
 - 日志消息使用英文，模块标签和 event name 保持稳定。
 - 高频轮询、心跳和 stream chunk 不使用 info 级别刷屏；必要时使用 debug 并限流。
@@ -218,6 +219,7 @@ logging:open-log-folder
 规则：
 
 - IPC 必须通过 `safeHandle` / `safeOn` 注册。
+- IPC 适配层放在 `petclaw-desktop/src/main/ipc/logging-ipc.ts`，只调用 logging facade 和 diagnostics bundle，不反向让 logging domain 暴露 IPC 模块。
 - preload 只暴露受控方法，不透传 `ipcRenderer`。
 - main 负责 renderer payload shape 校验、字段裁剪、权限判断、脱敏、落盘和导出。
 - renderer 不能传任意路径给 main 打开，只能请求预定义日志目录。
@@ -402,10 +404,10 @@ metadata 边界：
 
 ## 12. 迁移规则
 
-当前实现中已有多处日志入口，包括主进程 `console.*` 拦截、Cowork 独立日志、启动诊断、OpenClaw gateway stdout/stderr、MCP 安全序列化和 updater 日志。迁移时遵循以下规则：
+当前实现中已有多处日志入口，包括 main 显式 logger、Cowork 独立日志、启动诊断、OpenClaw gateway stdout/stderr、MCP 安全序列化和 updater 日志。迁移时遵循以下规则：
 
 1. 先建立 Logging Platform 基础层：路径解析、日志流定义、facade、sanitizer、storage、rotation、retention。
-2. 保留 `console.*` 拦截作为兼容层，但新代码必须走 `getLogger()`。
+2. 删除生产源码中的 `console.*`，并用 guardrail 测试阻止回归。
 3. 将 main、startup、gateway、cowork、mcp、updater、installer 的写入入口收敛到统一 storage 和 sanitizer。
 4. 接入 renderer 上报时同步 main IPC、preload、类型声明、renderer 调用点和 i18n 错误态。
 5. 诊断 snapshot 和诊断包导出完成后，BootCheck、EngineSettings、Support/About 才能展示对应入口。
@@ -418,7 +420,7 @@ metadata 边界：
 
 - `LogSanitizer`：key/value 脱敏、路径规范化、URL query 脱敏、循环引用、大对象截断。
 - `LogStorage`：跨平台路径、目录创建、日切、大小轮转、retention、写入失败降级。
-- `LogFacade`：事件字段标准化、error stack 保留、console 兼容层不重复输出。
+- `LogFacade`：事件字段标准化、error stack 保留、日志初始化幂等。
 - `Renderer logging IPC`：schema 校验、字段裁剪、非法 payload 拒绝、renderer 无文件写权限。
 - `DiagnosticsBundle`：zip 内容、manifest、二次脱敏、缺失文件 warning、诊断包保留数量。
 - `Gateway/Cowork/MCP`：不泄漏 token、prompt、memory、tool 参数原文。

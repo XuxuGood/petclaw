@@ -1,4 +1,6 @@
-import { app } from 'electron'
+import * as electron from 'electron'
+import os from 'os'
+import path from 'path'
 
 import { createLogStorage, type LogStorage } from './storage'
 import type { LogLevel, LogSource } from './types'
@@ -34,6 +36,27 @@ export interface LoggingPlatformOptions {
 }
 
 let activePlatform: LoggingPlatform | null = null
+
+interface ElectronAppLike {
+  getPath?: (name: string) => string
+  getVersion?: () => string
+}
+
+function getElectronApp(): ElectronAppLike | undefined {
+  return 'app' in electron ? (electron.app as ElectronAppLike | undefined) : undefined
+}
+
+function resolveElectronUserDataPath(): string {
+  const app = getElectronApp()
+  return typeof app?.getPath === 'function'
+    ? app.getPath('userData')
+    : path.join(os.tmpdir(), 'petclaw-logging-fallback')
+}
+
+function resolveElectronAppVersion(): string {
+  const app = getElectronApp()
+  return typeof app?.getVersion === 'function' ? app.getVersion() : '0.0.0'
+}
 
 export function createLoggingPlatform(options: LoggingPlatformOptions): LoggingPlatform {
   const storage = createLogStorage(options)
@@ -80,8 +103,8 @@ export function createLoggingPlatform(options: LoggingPlatformOptions): LoggingP
 
 export function initLoggingPlatform(): LoggingPlatform {
   activePlatform = createLoggingPlatform({
-    userDataPath: app.getPath('userData'),
-    appVersion: app.getVersion()
+    userDataPath: resolveElectronUserDataPath(),
+    appVersion: resolveElectronAppVersion()
   })
   return activePlatform
 }

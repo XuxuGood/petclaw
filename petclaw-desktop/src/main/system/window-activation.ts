@@ -1,5 +1,9 @@
 import type { App, BrowserWindow } from 'electron'
 
+import { getLogger } from '../logging/facade'
+
+const logger = getLogger('WindowActivation')
+
 export interface MainWindowActivationOptions {
   app: Pick<App, 'show' | 'focus'> & Partial<Pick<App, 'setActivationPolicy' | 'dock'>>
   window: Pick<BrowserWindow, 'show' | 'focus'> &
@@ -13,7 +17,7 @@ export function activateMainWindow(options: MainWindowActivationOptions): void {
   if (platform === 'darwin') {
     options.app.setActivationPolicy?.('regular')
     void options.app.dock?.show().catch((error) => {
-      console.warn('[WindowActivation] failed to show Dock icon:', error)
+      logger.warn('dock.show.failed', undefined, error)
     })
     options.app.show()
   }

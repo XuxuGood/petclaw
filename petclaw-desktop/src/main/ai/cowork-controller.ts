@@ -23,6 +23,7 @@ import type {
 import { buildSessionKey } from './types'
 import { buildLocalTimeContext } from './managed-prompts'
 import { isDeleteCommand, getCommandDangerLevel } from './command-safety'
+import { getLogger } from '../logging/facade'
 
 // ── 常量 ──
 
@@ -35,6 +36,7 @@ const MESSAGE_UPDATE_THROTTLE_MS = 200
 const STORE_UPDATE_THROTTLE_MS = 250
 const LIFECYCLE_END_FALLBACK_MS = 3000
 const LIFECYCLE_ERROR_FALLBACK_MS = 2000
+const logger = getLogger('CoworkController', 'cowork')
 
 // ── 辅助函数 ──
 
@@ -290,7 +292,7 @@ export class CoworkController extends EventEmitter {
       turn.stopRequested = true
       // 精确中断：传 sessionKey + runId
       this.gateway.chatAbort(turn.sessionKey, turn.runId).catch((err) => {
-        console.warn('[CoworkController] chatAbort failed:', err)
+        logger.warn('chatAbort.failed', { sessionId, sessionKey: turn.sessionKey }, err)
       })
     }
 
@@ -322,7 +324,7 @@ export class CoworkController extends EventEmitter {
 
     this.pendingApprovals.delete(requestId)
     this.gateway.approvalResolve(requestId, decision).catch((err) => {
-      console.error(`[CoworkController] approvalResolve failed for ${requestId}:`, err)
+      logger.error('approvalResolve.failed', { requestId, decision }, err)
     })
   }
 
@@ -459,7 +461,7 @@ export class CoworkController extends EventEmitter {
           this.lastPatchedModelBySession.set(sessionId, currentModel)
         }
       } catch (err) {
-        console.warn('[CoworkController] Failed to patch session model:', err)
+        logger.warn('session.patchModel.failed', { sessionId, sessionKey, currentModel }, err)
       }
     }
 
@@ -603,9 +605,7 @@ export class CoworkController extends EventEmitter {
       const turn = this.activeTurns.get(sessionId)
       if (!turn) return
 
-      console.warn(
-        `[CoworkController] Turn timeout for session ${sessionId} after ${TURN_TIMEOUT_MS}ms`
-      )
+      logger.warn('turn.timeout', { sessionId, timeoutMs: TURN_TIMEOUT_MS })
       this.cleanupSessionTurn(sessionId)
       this.store.updateSession(sessionId, { status: 'error' })
       this.emit('error', sessionId, 'Turn timed out')

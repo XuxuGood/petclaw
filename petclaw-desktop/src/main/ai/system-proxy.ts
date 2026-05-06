@@ -1,5 +1,9 @@
 import { app, session } from 'electron'
 
+import { getLogger } from '../logging/facade'
+
+const logger = getLogger('SystemProxy', 'runtime')
+
 const PROXY_ENV_KEYS = [
   'http_proxy',
   'https_proxy',
@@ -119,7 +123,7 @@ export async function resolveSystemProxyUrl(targetUrl: string): Promise<string |
       }
     }
   } catch (error) {
-    console.error('Failed to resolve system proxy:', error)
+    logger.error('proxy.resolve.failed', undefined, error)
   }
 
   return null

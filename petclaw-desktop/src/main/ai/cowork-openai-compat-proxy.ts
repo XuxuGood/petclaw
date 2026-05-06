@@ -9,6 +9,9 @@ import {
   openAIToAnthropic,
   type OpenAIStreamChunk
 } from './cowork-format-transform'
+import { getLogger } from '../logging/facade'
+
+const logger = getLogger('CoworkProxy', 'cowork')
 
 export type OpenAICompatUpstreamConfig = {
   baseURL: string
@@ -1114,7 +1117,7 @@ function readRequestBody(req: http.IncomingMessage): Promise<string> {
         }
 
         if (gbDecoded && !utf8Decoded) {
-          console.warn('[CoworkProxy] Decoded request body using gb18030 fallback')
+          logger.warn('requestBody.decoded.gb18030Fallback')
           return gbDecoded
         }
       }
@@ -2174,7 +2177,7 @@ async function handleChatCompletionsStreamResponse(
   })
 
   if (!upstreamResponse.body) {
-    console.warn('[CoworkProxy] Stream: upstream returned empty body')
+    logger.warn('stream.upstream.emptyBody')
     emitSSE(
       res,
       'error',
@@ -2194,7 +2197,7 @@ async function handleChatCompletionsStreamResponse(
 
   const flushDone = () => {
     if (!state.hasMessageStart) {
-      console.warn('[CoworkProxy] Stream: flushDone called but no message_start was emitted')
+      logger.warn('stream.flushDone.missingMessageStart')
       return
     }
     if (!state.hasMessageStop) {
@@ -2206,14 +2209,12 @@ async function handleChatCompletionsStreamResponse(
     }
   }
 
-  console.log('[CoworkProxy] Stream: starting to read upstream SSE chunks')
+  logger.debug('stream.read.started')
 
   while (true) {
     const { value, done } = await reader.read()
     if (done) {
-      console.log(
-        `[CoworkProxy] Stream: upstream done after ${chunkCount} chunks, sawDoneMarker=${sawDoneMarker}`
-      )
+      logger.debug('stream.read.completed', { chunkCount, sawDoneMarker })
       break
     }
 
@@ -2276,7 +2277,7 @@ async function handleChatCompletionsStreamResponse(
 async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
   // DNS Rebinding protection: reject requests with non-loopback Host header
   if (!isAllowedProxyHost(req)) {
-    console.warn(`[CoworkProxy] Rejected request with disallowed Host header: ${req.headers.host}`)
+    logger.warn('request.rejected.disallowedHost', { host: req.headers.host })
     res.writeHead(403, { 'Content-Type': 'text/plain' })
     res.end('Forbidden')
     return
@@ -2307,7 +2308,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     }
   }
 
-  console.log(`[CoworkProxy] ${method} ${url.pathname}`)
+  logger.debug('request.received', { method, pathname: url.pathname })
 
   if (method === 'POST' && url.pathname === '/api/event_logging/batch') {
     writeJSON(res, 200, { ok: true })
@@ -2385,9 +2386,10 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     const upstreamUrl = upstreamBase.endsWith('/chat/completions')
       ? upstreamBase
       : `${upstreamBase}/chat/completions`
-    console.log(
-      `[CoworkProxy] OpenAI passthrough → ${upstreamUrl} (provider: ${upstreamConfig.provider})`
-    )
+    logger.info('passthrough.request.started', {
+      upstreamUrl,
+      provider: upstreamConfig.provider ?? null
+    })
     try {
       let upstreamResponse = await session.defaultSession.fetch(upstreamUrl, {
         method: 'POST',
@@ -2401,9 +2403,9 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       ) {
         const refresher = tokenRefreshers.get(upstreamConfig.provider)
         if (refresher) {
-          console.log(
-            `[CoworkProxy] OpenAI passthrough: ${upstreamConfig.provider} auth error, refreshing token and retrying...`
-          )
+          logger.warn('passthrough.tokenRefresh.started', {
+            provider: upstreamConfig.provider
+          })
           try {
             const newToken = await refresher()
             if (newToken) {
@@ -2414,13 +2416,14 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
                 headers: upstreamHeaders,
                 body
               })
-              console.log(
-                `[CoworkProxy] OpenAI passthrough: retry status=${upstreamResponse.status}`
-              )
+              logger.warn('passthrough.tokenRefresh.retry.completed', {
+                status: upstreamResponse.status
+              })
             }
           } catch (refreshErr) {
-            console.warn(
-              `[CoworkProxy] OpenAI passthrough: ${upstreamConfig.provider} token refresh failed:`,
+            logger.warn(
+              'passthrough.tokenRefresh.failed',
+              { provider: upstreamConfig.provider },
               refreshErr
             )
           }
@@ -2449,7 +2452,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         res.end(text)
       }
     } catch (proxyError) {
-      console.error('[CoworkProxy] OpenAI passthrough error:', proxyError)
+      logger.error('passthrough.failed', undefined, proxyError)
       writeJSON(
         res,
         502,
@@ -2529,9 +2532,11 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   ) {
     const requestModel = typeof openAIRequest.model === 'string' ? openAIRequest.model : ''
     if (requestModel !== upstreamConfig.model) {
-      console.info(
-        `[CoworkProxy] Remapping model: ${requestModel} -> ${upstreamConfig.model} (provider: ${upstreamConfig.provider})`
-      )
+      logger.info('request.model.remapped', {
+        requestModel,
+        upstreamModel: upstreamConfig.model,
+        provider: upstreamConfig.provider
+      })
       openAIRequest.model = upstreamConfig.model
     }
   }
@@ -2554,9 +2559,12 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       : openAIRequest
   const stream = Boolean(upstreamRequest.stream)
 
-  console.log(
-    `[CoworkProxy] Upstream: apiType=${upstreamAPIType}, model=${upstreamRequest.model}, stream=${stream}, provider=${upstreamConfig.provider}`
-  )
+  logger.info('upstream.request.prepared', {
+    apiType: upstreamAPIType,
+    model: upstreamRequest.model,
+    stream,
+    provider: upstreamConfig.provider
+  })
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json'
@@ -2577,7 +2585,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     targetURL: string
   ): Promise<Response> => {
     currentTargetURL = targetURL
-    console.log(`[CoworkProxy] Sending upstream request to: ${targetURL}`)
+    logger.info('upstream.request.sending', { targetURL })
     return session.defaultSession.fetch(targetURL, {
       method: 'POST',
       headers,
@@ -2588,19 +2596,22 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   let upstreamResponse: Response
   const fetchStartTime = Date.now()
   try {
-    console.log(
-      `[CoworkProxy] Awaiting upstream fetch (stream=${stream}, model=${upstreamRequest.model})...`
-    )
+    logger.debug('upstream.fetch.awaiting', { stream, model: upstreamRequest.model })
     upstreamResponse = await sendUpstreamRequest(upstreamRequest, targetURLs[0])
     const fetchDuration = Date.now() - fetchStartTime
-    console.log(
-      `[CoworkProxy] Upstream response: status=${upstreamResponse.status}, ok=${upstreamResponse.ok}, fetchTime=${fetchDuration}ms, stream=${stream}`
-    )
+    logger.info('upstream.fetch.completed', {
+      status: upstreamResponse.status,
+      ok: upstreamResponse.ok,
+      fetchDurationMs: fetchDuration,
+      stream
+    })
   } catch (error) {
     const fetchDuration = Date.now() - fetchStartTime
     const message = error instanceof Error ? error.message : 'Network error'
-    console.error(
-      `[CoworkProxy] Upstream fetch error after ${fetchDuration}ms (stream=${stream}): ${message}`
+    logger.error(
+      'upstream.fetch.failed',
+      { fetchDurationMs: fetchDuration, stream, message },
+      error
     )
     lastProxyError = message
     writeJSON(res, 502, createAnthropicErrorBody(message))
@@ -2616,9 +2627,10 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     ) {
       const refresher = tokenRefreshers.get(upstreamConfig.provider)
       if (refresher) {
-        console.log(
-          `[CoworkProxy] Got ${upstreamResponse.status} from ${upstreamConfig.provider}, attempting token refresh and retry...`
-        )
+        logger.warn('upstream.tokenRefresh.started', {
+          status: upstreamResponse.status,
+          provider: upstreamConfig.provider
+        })
         try {
           const newToken = await refresher()
           if (newToken) {
@@ -2632,13 +2644,16 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
             }
             upstreamResponse = await sendUpstreamRequest(upstreamRequest, currentTargetURL)
             const retryDuration = Date.now() - fetchStartTime
-            console.log(
-              `[CoworkProxy] Token refresh retry: status=${upstreamResponse.status}, ok=${upstreamResponse.ok}, fetchTime=${retryDuration}ms`
-            )
+            logger.warn('upstream.tokenRefresh.retry.completed', {
+              status: upstreamResponse.status,
+              ok: upstreamResponse.ok,
+              retryDurationMs: retryDuration
+            })
           }
         } catch (refreshError) {
-          console.warn(
-            `[CoworkProxy] Token refresh for ${upstreamConfig.provider} failed:`,
+          logger.warn(
+            'upstream.tokenRefresh.failed',
+            { provider: upstreamConfig.provider },
             refreshError
           )
         }
@@ -2664,9 +2679,10 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 
     if (!upstreamResponse.ok) {
       const firstErrorText = await upstreamResponse.text()
-      console.error(
-        `[CoworkProxy] Upstream error: status=${upstreamResponse.status}, body=${firstErrorText.slice(0, 500)}`
-      )
+      logger.error('upstream.response.failed', {
+        status: upstreamResponse.status,
+        bodySnippet: firstErrorText.slice(0, 500)
+      })
       let firstErrorMessage = extractErrorMessage(firstErrorText)
       if (firstErrorMessage === 'Upstream API request failed') {
         firstErrorMessage = `Upstream API request failed (${upstreamResponse.status}) ${currentTargetURL}`
@@ -2684,7 +2700,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
                 const retryErrorText = await upstreamResponse.text()
                 firstErrorMessage = extractErrorMessage(retryErrorText)
               } else {
-                console.info('[CoworkProxy] Retried request after stripping unsupported tools')
+                logger.info('upstream.retry.stripUnsupportedTools.succeeded')
               }
             } catch (error) {
               const message = error instanceof Error ? error.message : 'Network error'
@@ -2704,10 +2720,9 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
                 const retryErrorText = await upstreamResponse.text()
                 firstErrorMessage = extractErrorMessage(retryErrorText)
               } else {
-                console.info(
-                  '[cowork-openai-compat-proxy] Retried request with max_completion_tokens ' +
-                    `converted from max_tokens=${convertResult.convertedTo}`
-                )
+                logger.info('upstream.retry.maxCompletionTokens.succeeded', {
+                  convertedTo: convertResult.convertedTo
+                })
               }
             } catch (error) {
               const message = error instanceof Error ? error.message : 'Network error'
@@ -2729,9 +2744,9 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
                 const retryErrorText = await upstreamResponse.text()
                 firstErrorMessage = extractErrorMessage(retryErrorText)
               } else {
-                console.info(
-                  `[cowork-openai-compat-proxy] Retried request with clamped max_tokens=${clampResult.clampedTo}`
-                )
+                logger.info('upstream.retry.clampedMaxTokens.succeeded', {
+                  clampedTo: clampResult.clampedTo
+                })
               }
             } catch (error) {
               const message = error instanceof Error ? error.message : 'Network error'
@@ -2754,17 +2769,17 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
   lastProxyError = null
 
   if (stream) {
-    console.log(`[CoworkProxy] Handling streaming response (type=${upstreamAPIType})`)
+    logger.debug('response.stream.handling', { apiType: upstreamAPIType })
     if (upstreamAPIType === 'responses') {
       await handleResponsesStreamResponse(upstreamResponse, res)
     } else {
       await handleChatCompletionsStreamResponse(upstreamResponse, res)
     }
-    console.log('[CoworkProxy] Streaming response completed')
+    logger.debug('response.stream.completed')
     return
   }
 
-  console.log('[CoworkProxy] Handling non-streaming response')
+  logger.debug('response.nonStream.handling')
   let upstreamJSON: unknown
   try {
     upstreamJSON = await upstreamResponse.json()
@@ -2830,7 +2845,7 @@ export async function startCoworkOpenAICompatProxy(): Promise<void> {
         reject(new Error('Failed to bind OpenAI compatibility proxy port'))
         return
       }
-      console.log(`[CoworkProxy] Proxy server started on port ${addr.port}`)
+      logger.info('server.started', { port: addr.port })
       proxyServer = server
       proxyPort = addr.port
       lastProxyError = null

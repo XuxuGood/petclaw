@@ -10,8 +10,11 @@ import type { ConfigSync, ConfigSyncResult } from '../ai/config-sync'
 import type { McpBridgeServer, AskUserResponse } from '../mcp/mcp-bridge-server'
 import { mergeCoworkSystemPrompt } from '../ai/system-prompt'
 import { t } from '../i18n'
+import { getLogger } from '../logging/facade'
 
 type ConfigSynchronizer = Pick<ConfigSync, 'sync'>
+
+const logger = getLogger('ChatIPC')
 
 export interface ChatIpcDeps {
   coworkSessionManager: CoworkSessionManager
@@ -56,7 +59,7 @@ export function registerChatIpcHandlers(deps: ChatIpcDeps): void {
     const config = coworkConfigStore.setConfig(patch)
     const syncResult: ConfigSyncResult = configSync.sync('cowork-config-change')
     if (!syncResult.ok) {
-      console.warn('[ChatIPC] ConfigSync failed after cowork config update:', syncResult.error)
+      logger.warn('configSync.afterCoworkConfigUpdate.failed', {}, syncResult.error)
     }
     return config
   })

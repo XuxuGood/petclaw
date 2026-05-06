@@ -18,7 +18,12 @@ import {
 } from './openclaw-local-extensions'
 import { appendPythonRuntimeToEnv } from './python-runtime'
 import { isSystemProxyEnabled, resolveSystemProxyUrlForTargets } from './system-proxy'
-import { attachProcessLogger, getLoggingPlatform, type ProcessLogStream } from '../logging'
+import {
+  attachProcessLogger,
+  getLogger,
+  getLoggingPlatform,
+  type ProcessLogStream
+} from '../logging'
 
 // ── 类型 ──
 
@@ -36,6 +41,7 @@ const GATEWAY_PORT_SCAN_LIMIT = 80
 const GATEWAY_BOOT_TIMEOUT_MS = 300_000
 const GATEWAY_MAX_RESTART_ATTEMPTS = 5
 const GATEWAY_RESTART_DELAYS = [3_000, 5_000, 10_000, 20_000, 30_000]
+const logger = getLogger('OpenClaw', 'runtime')
 
 // ── 可测试纯函数 ──
 
@@ -324,7 +330,7 @@ export class OpenclawEngineManager extends EventEmitter {
     // 同步本地扩展到运行时目录
     const localExtensionSync = syncLocalOpenClawExtensionsIntoRuntime(runtime.root)
     if (localExtensionSync.copied.length > 0) {
-      console.warn(`[OpenClaw] 已同步本地扩展: ${localExtensionSync.copied.join(', ')}`)
+      logger.info('localExtensions.synced', { copied: localExtensionSync.copied })
     }
 
     // 清理可能残留在 dist/extensions/ 中的过期第三方插件
@@ -338,7 +344,7 @@ export class OpenclawEngineManager extends EventEmitter {
       const allNonBundledIds = [...new Set([...thirdPartyIds, ...localIds, ...renamedIds])]
       const cleaned = cleanupStaleThirdPartyPluginsFromBundledDir(runtime.root, allNonBundledIds)
       if (cleaned.length > 0) {
-        console.warn(`[OpenClaw] 已清理过期插件: ${cleaned.join(', ')}`)
+        logger.info('thirdPartyPlugins.cleaned', { cleaned })
       }
     } catch {
       // 尽力清理，不阻塞启动
@@ -361,7 +367,7 @@ export class OpenclawEngineManager extends EventEmitter {
   /** 启动 Gateway 进程（去重：重复调用复用同一个 Promise） */
   async startGateway(): Promise<EngineStatus> {
     if (this.startGatewayPromise) {
-      console.warn('[OpenClaw] startGateway: 已在启动中，复用现有 Promise')
+      logger.warn('gateway.start.reused')
       return this.startGatewayPromise
     }
     this.startGatewayPromise = this.doStartGateway().finally(() => {
@@ -380,9 +386,9 @@ export class OpenclawEngineManager extends EventEmitter {
     }
 
     if (this.gatewayProcess) {
-      console.warn('[OpenClaw] 正在停止 gateway 进程...')
+      logger.warn('gateway.stop.started')
       await this.stopGatewayProcess(this.gatewayProcess)
-      console.warn('[OpenClaw] gateway 进程已停止')
+      logger.warn('gateway.stop.completed')
       this.gatewayProcess = null
     }
 
@@ -399,10 +405,10 @@ export class OpenclawEngineManager extends EventEmitter {
 
   /** 重启 Gateway（先停后启，重置重启计数） */
   async restartGateway(): Promise<EngineStatus> {
-    console.warn('[OpenClaw] restartGateway: 正在停止现有 gateway...')
+    logger.warn('gateway.restart.stopExisting.started')
     await this.stopGateway()
     this.gatewayRestartAttempt = 0
-    console.warn('[OpenClaw] restartGateway: 启动新 gateway...')
+    logger.warn('gateway.restart.startNew.started')
     return this.startGateway()
   }
 
@@ -411,10 +417,12 @@ export class OpenclawEngineManager extends EventEmitter {
   private async doStartGateway(): Promise<EngineStatus> {
     this.shutdownRequested = false
     const t0 = Date.now()
-    const elapsed = () => `${Date.now() - t0}ms`
 
     const ensured = await this.ensureReady()
-    console.warn(`[OpenClaw] startGateway: ensureReady 完成 (${elapsed()}), phase=${ensured.phase}`)
+    logger.info('gateway.start.ensureReady.completed', {
+      elapsedMs: Date.now() - t0,
+      phase: ensured.phase
+    })
     // 接受 ready 和 running（gateway 已在运行）两种状态
     if (ensured.phase !== 'ready' && ensured.phase !== 'running') {
       return ensured
@@ -425,7 +433,11 @@ export class OpenclawEngineManager extends EventEmitter {
       const port = this.gatewayPort ?? this.readGatewayPort()
       if (port) {
         const healthy = await this.isGatewayHealthy(port)
-        console.warn(`[OpenClaw] 现有进程健康检查 (${elapsed()}), healthy=${healthy}`)
+        logger.info('gateway.existingProcess.healthChecked', {
+          elapsedMs: Date.now() - t0,
+          healthy,
+          port
+        })
         if (healthy) {
           if (this.status.phase !== 'running') {
             this.setStatus({
@@ -444,9 +456,10 @@ export class OpenclawEngineManager extends EventEmitter {
     }
 
     const runtime = this.resolveRuntimeMetadata()
-    console.warn(
-      `[OpenClaw] resolveRuntimeMetadata 完成 (${elapsed()}), root=${runtime.root ? 'found' : 'missing'}`
-    )
+    logger.info('runtime.metadata.resolved', {
+      elapsedMs: Date.now() - t0,
+      hasRoot: Boolean(runtime.root)
+    })
     if (!runtime.root) {
       this.setStatus({
         phase: 'not_installed',
@@ -459,10 +472,10 @@ export class OpenclawEngineManager extends EventEmitter {
 
     // asar 解压：确保入口文件和 control-ui 在磁盘上可用
     this.ensureBareEntryFiles(runtime.root)
-    console.warn(`[OpenClaw] ensureBareEntryFiles 完成 (${elapsed()})`)
+    logger.info('runtime.bareEntryFiles.ensure.completed', { elapsedMs: Date.now() - t0 })
 
     const openclawEntry = this.resolveOpenClawEntry(runtime.root)
-    console.warn(`[OpenClaw] resolveOpenClawEntry 完成 (${elapsed()}), entry=${openclawEntry}`)
+    logger.info('runtime.entry.resolved', { elapsedMs: Date.now() - t0, openclawEntry })
     if (!openclawEntry) {
       this.setStatus({
         phase: 'error',
@@ -474,9 +487,9 @@ export class OpenclawEngineManager extends EventEmitter {
     }
 
     const token = this.ensureGatewayToken()
-    console.warn(`[OpenClaw] ensureGatewayToken 完成 (${elapsed()})`)
+    logger.info('gateway.token.ensure.completed', { elapsedMs: Date.now() - t0 })
     const port = await this.resolveGatewayPort()
-    console.warn(`[OpenClaw] resolveGatewayPort 完成 (${elapsed()}), port=${port}`)
+    logger.info('gateway.port.resolved', { elapsedMs: Date.now() - t0, port })
     this.gatewayPort = port
     this.writeGatewayPort(port)
     this.ensureConfigFile()
@@ -531,7 +544,7 @@ export class OpenclawEngineManager extends EventEmitter {
       const hostTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
       if (hostTimezone) {
         env.TZ = hostTimezone
-        console.warn(`[OpenClaw] 注入 TZ=${hostTimezone} 到 gateway 环境变量`)
+        logger.info('gateway.env.timezone.injected', { timezone: hostTimezone })
       }
     }
 
@@ -563,7 +576,7 @@ export class OpenclawEngineManager extends EventEmitter {
         env.https_proxy = proxyUrl
         env.HTTP_PROXY = proxyUrl
         env.HTTPS_PROXY = proxyUrl
-        console.warn(`[OpenClaw] 已注入系统代理 via ${targetUrl}: ${proxyUrl}`)
+        logger.warn('gateway.env.systemProxy.injected', { targetUrl })
       }
     }
 
@@ -577,9 +590,7 @@ export class OpenclawEngineManager extends EventEmitter {
       token,
       '--verbose'
     ]
-    console.warn(
-      `[OpenClaw] spawning gateway: entry=${openclawEntry}, cwd=${runtime.root}, port=${port}`
-    )
+    logger.warn('gateway.spawn.started', { openclawEntry, cwd: runtime.root, port })
 
     // Windows 使用 child_process.spawn + ELECTRON_RUN_AS_NODE，其他平台使用 utilityProcess.fork
     let child: GatewayProcess
@@ -604,11 +615,11 @@ export class OpenclawEngineManager extends EventEmitter {
     this.attachGatewayExitHandlers(child)
 
     child.once('spawn', () => {
-      console.warn(`[OpenClaw] gateway 进程已 spawned (${elapsed()}), pid=${child.pid}`)
+      logger.warn('gateway.spawn.completed', { elapsedMs: Date.now() - t0, pid: child.pid })
     })
 
     const ready = await this.waitForGatewayReady(port, GATEWAY_BOOT_TIMEOUT_MS)
-    console.warn(`[OpenClaw] waitForGatewayReady 返回 (${elapsed()}), ready=${ready}`)
+    logger.warn('gateway.waitForReady.completed', { elapsedMs: Date.now() - t0, ready })
     if (!ready) {
       this.setStatus({
         phase: 'error',
@@ -704,13 +715,13 @@ export class OpenclawEngineManager extends EventEmitter {
     // 快速路径：bundle 存在时只需确保 control-ui 可用
     const bundlePath = path.join(runtimeRoot, 'gateway-bundle.mjs')
     if (fs.existsSync(bundlePath)) {
-      console.warn('[OpenClaw] ensureBareEntryFiles: bundle 存在，跳过 dist 解压')
+      logger.info('runtime.bareEntryFiles.bundleFound')
       this.ensureControlUiFiles(runtimeRoot)
-      console.warn(`[OpenClaw] ensureBareEntryFiles: 完成耗时 ${Date.now() - t0}ms`)
+      logger.info('runtime.bareEntryFiles.ensure.completed', { elapsedMs: Date.now() - t0 })
       return
     }
 
-    console.warn('[OpenClaw] ensureBareEntryFiles: 无 bundle，检查裸文件')
+    logger.info('runtime.bareEntryFiles.bundleMissing')
     const bareEntry = path.join(runtimeRoot, 'openclaw.mjs')
     const bareDistEntry = path.join(runtimeRoot, 'dist', 'entry.js')
 
@@ -724,24 +735,24 @@ export class OpenclawEngineManager extends EventEmitter {
       return
     }
 
-    console.warn('[OpenClaw] ensureBareEntryFiles: 从 gateway.asar 解压（无 bundle）')
+    logger.warn('runtime.bareEntryFiles.extract.started')
 
     try {
       if (!fs.existsSync(bareEntry)) {
         fs.writeFileSync(bareEntry, fs.readFileSync(asarEntry))
-        console.warn('[OpenClaw] 已解压 openclaw.mjs')
+        logger.info('runtime.bareEntryFiles.openclawEntry.extracted')
       }
 
       const asarDist = path.join(asarRoot, 'dist')
       const bareDist = path.join(runtimeRoot, 'dist')
       if (fs.existsSync(asarDist) && !fs.existsSync(bareDistEntry)) {
         this.copyDirFromAsar(asarDist, bareDist)
-        console.warn('[OpenClaw] 已解压 dist/')
+        logger.info('runtime.bareEntryFiles.dist.extracted')
       }
 
-      console.warn('[OpenClaw] 入口文件解压成功。')
+      logger.warn('runtime.bareEntryFiles.extract.completed')
     } catch (err) {
-      console.error('[OpenClaw] 从 gateway.asar 解压入口文件失败:', err)
+      logger.error('runtime.bareEntryFiles.extract.failed', { runtimeRoot }, err)
     }
   }
 
@@ -760,12 +771,12 @@ export class OpenclawEngineManager extends EventEmitter {
       return
     }
 
-    console.warn('[OpenClaw] 正在从 gateway.asar 解压 dist/control-ui/...')
+    logger.warn('runtime.controlUi.extract.started')
     try {
       this.copyDirFromAsar(asarControlUi, path.join(runtimeRoot, 'dist', 'control-ui'))
-      console.warn('[OpenClaw] 已解压 dist/control-ui/')
+      logger.warn('runtime.controlUi.extract.completed')
     } catch (err) {
-      console.error('[OpenClaw] 解压 dist/control-ui/ 失败:', err)
+      logger.error('runtime.controlUi.extract.failed', { runtimeRoot }, err)
     }
   }
 
@@ -844,7 +855,7 @@ export class OpenclawEngineManager extends EventEmitter {
 
       return shimDir
     } catch (error) {
-      console.error('[OpenClaw] 准备 CLI shim 失败:', error)
+      logger.error('cliShim.prepare.failed', undefined, error)
       return null
     }
   }
@@ -857,7 +868,7 @@ export class OpenclawEngineManager extends EventEmitter {
     if (process.platform === 'win32') {
       const bundlePath = path.join(runtimeRoot, 'gateway-bundle.mjs')
       if (fs.existsSync(bundlePath)) {
-        console.warn('[OpenClaw] resolveOpenClawEntry: 使用 bundle 快速路径')
+        logger.info('runtime.entry.bundleFastPath.used', { runtimeRoot })
         return this.ensureGatewayLauncherCjsForBundle(runtimeRoot)
       }
     }
@@ -962,10 +973,10 @@ export class OpenclawEngineManager extends EventEmitter {
       const existing = fs.existsSync(launcherPath) ? fs.readFileSync(launcherPath, 'utf8') : ''
       if (existing !== expectedContent) {
         fs.writeFileSync(launcherPath, expectedContent, 'utf8')
-        console.warn('[OpenClaw] 已生成 gateway-launcher.cjs (Windows ESM 兼容)')
+        logger.info('gatewayLauncher.generated', { launcherPath, mode: 'esm-wrapper' })
       }
     } catch (err) {
-      console.error('[OpenClaw] 写入 gateway-launcher.cjs 失败:', err)
+      logger.error('gatewayLauncher.write.failed', { launcherPath }, err)
       return esmEntry
     }
     return launcherPath
@@ -1018,13 +1029,13 @@ export class OpenclawEngineManager extends EventEmitter {
       const existing = fs.existsSync(launcherPath) ? fs.readFileSync(launcherPath, 'utf8') : ''
       if (existing !== expectedContent) {
         if (existing) {
-          console.warn('[OpenClaw] 覆盖现有 gateway-launcher.cjs（切换为仅 bundle 模式）')
+          logger.warn('gatewayLauncher.overwritten', { launcherPath, mode: 'bundle-only' })
         }
         fs.writeFileSync(launcherPath, expectedContent, 'utf8')
-        console.warn('[OpenClaw] 已生成 gateway-launcher.cjs (仅 bundle 模式)')
+        logger.info('gatewayLauncher.generated', { launcherPath, mode: 'bundle-only' })
       }
     } catch (err) {
-      console.error('[OpenClaw] 写入 gateway-launcher.cjs 失败:', err)
+      logger.error('gatewayLauncher.write.failed', { launcherPath }, err)
       // 回退到旧版 launcher 生成
       const fallbackEsm = findPath([
         path.join(runtimeRoot, 'openclaw.mjs'),
@@ -1218,7 +1229,7 @@ export class OpenclawEngineManager extends EventEmitter {
 
     if (verbose && !healthy) {
       const tcpResult = results[results.length - 1] ? 'reachable' : 'unreachable'
-      console.warn(`[OpenClaw] 健康探针详情: tcp=${tcpResult}, ${httpResults.join(', ')}`)
+      logger.warn('gateway.healthProbe.failed', { tcpResult, httpResults })
     }
     return healthy
   }
@@ -1231,13 +1242,13 @@ export class OpenclawEngineManager extends EventEmitter {
     return new Promise((resolve) => {
       const tick = async () => {
         if (this.shutdownRequested) {
-          console.warn('[OpenClaw] waitForGatewayReady: 收到关闭请求，中止')
+          logger.warn('gateway.waitForReady.aborted.shutdownRequested')
           resolve(false)
           return
         }
 
         if (!this.gatewayProcess) {
-          console.warn('[OpenClaw] waitForGatewayReady: gateway 进程已退出，中止')
+          logger.warn('gateway.waitForReady.aborted.processExited')
           resolve(false)
           return
         }
@@ -1248,15 +1259,13 @@ export class OpenclawEngineManager extends EventEmitter {
         const healthy = await this.isGatewayHealthy(port, verboseProbe)
 
         if (healthy) {
-          console.warn(
-            `[OpenClaw] waitForGatewayReady: gateway 就绪，耗时 ${elapsedMs}ms (${pollCount} 次轮询)`
-          )
+          logger.warn('gateway.waitForReady.ready', { elapsedMs, pollCount })
           resolve(true)
           return
         }
 
         if (elapsedMs >= timeoutMs) {
-          console.warn(`[OpenClaw] waitForGatewayReady: 超时 ${timeoutMs}ms (${pollCount} 次轮询)`)
+          logger.warn('gateway.waitForReady.timeout', { timeoutMs, pollCount })
           resolve(false)
           return
         }
@@ -1274,9 +1283,7 @@ export class OpenclawEngineManager extends EventEmitter {
         })
 
         if (pollCount % 5 === 0) {
-          console.warn(
-            `[OpenClaw] waitForGatewayReady: 轮询 #${pollCount}, elapsed=${elapsedMs}ms, progress=${progress}%`
-          )
+          logger.info('gateway.waitForReady.poll', { pollCount, elapsedMs, progress })
         }
 
         setTimeout(() => {
@@ -1371,7 +1378,7 @@ export class OpenclawEngineManager extends EventEmitter {
     onceGatewayError(child, (...args: unknown[]) => {
       const errorMsg =
         args[0] instanceof Error ? args[0].message : `${args[0]}${args[1] ? ` (${args[1]})` : ''}`
-      console.error(`[OpenClaw] gateway 进程错误: ${errorMsg}`)
+      logger.error('gateway.process.error', { errorMsg })
       if (this.expectedGatewayExits.has(child)) return
       if (this.shutdownRequested) return
       this.setStatus({
@@ -1383,7 +1390,7 @@ export class OpenclawEngineManager extends EventEmitter {
     })
 
     onceGatewayExit(child, (code) => {
-      console.warn(`[OpenClaw] gateway 进程退出, code=${code}`)
+      logger.warn('gateway.process.exited', { code })
       if (this.gatewayProcess === child) {
         this.gatewayProcess = null
       }
@@ -1409,7 +1416,9 @@ export class OpenclawEngineManager extends EventEmitter {
     if (this.gatewayRestartTimer) return
 
     if (this.gatewayRestartAttempt >= GATEWAY_MAX_RESTART_ATTEMPTS) {
-      console.error(`[OpenClaw] 已达最大重启次数 (${GATEWAY_MAX_RESTART_ATTEMPTS})，放弃重启`)
+      logger.error('gateway.restart.maxAttempts.reached', {
+        maxAttempts: GATEWAY_MAX_RESTART_ATTEMPTS
+      })
       this.setStatus({
         phase: 'error',
         version: this.status.version,
@@ -1424,9 +1433,11 @@ export class OpenclawEngineManager extends EventEmitter {
         Math.min(this.gatewayRestartAttempt, GATEWAY_RESTART_DELAYS.length - 1)
       ]
     this.gatewayRestartAttempt++
-    console.warn(
-      `[OpenClaw] 调度重启 #${this.gatewayRestartAttempt}/${GATEWAY_MAX_RESTART_ATTEMPTS}, 延迟 ${delay}ms`
-    )
+    logger.warn('gateway.restart.scheduled', {
+      attempt: this.gatewayRestartAttempt,
+      maxAttempts: GATEWAY_MAX_RESTART_ATTEMPTS,
+      delayMs: delay
+    })
 
     this.gatewayRestartTimer = setTimeout(() => {
       this.gatewayRestartTimer = null

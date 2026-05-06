@@ -28,7 +28,10 @@ import {
 import type { OpenAICompatProxyTarget } from './cowork-openai-compat-proxy'
 import { appendPythonRuntimeToEnv } from './python-runtime'
 import { isSystemProxyEnabled, resolveSystemProxyUrlForTargets } from './system-proxy'
+import { getLogger } from '../logging/facade'
 import { resolveUserDataPaths } from '../user-data-paths'
+
+const logger = getLogger('CoworkUtil', 'cowork')
 
 function appendEnvPath(current: string | undefined, additions: string[]): string | undefined {
   const items = new Set<string>()
@@ -171,7 +174,7 @@ function resolveUserShellPath(): string | null {
     }
     cachedUserShellPath = resolved
   } catch (error) {
-    console.warn('[coworkUtil] Failed to resolve user shell PATH:', error)
+    logger.warn('shellPath.resolve.failed', undefined, error)
     cachedUserShellPath = null
   }
 
@@ -1528,7 +1531,7 @@ export async function getEnhancedEnv(
     env.https_proxy = proxyUrl
     env.HTTP_PROXY = proxyUrl
     env.HTTPS_PROXY = proxyUrl
-    console.warn(`[CoworkUtil] Injected system proxy for subprocess via ${targetUrl}:`, proxyUrl)
+    logger.warn('systemProxy.injected', { targetUrl })
   }
 
   return env
@@ -1548,9 +1551,9 @@ export function ensureCoworkTempDir(cwd: string): string {
   if (!existsSync(tempDir)) {
     try {
       mkdirSync(tempDir, { recursive: true })
-      console.warn('Created cowork temp directory:', tempDir)
+      logger.info('tempDir.created', { tempDir })
     } catch (error) {
-      console.error('Failed to create cowork temp directory:', error)
+      logger.error('tempDir.create.failed', { tempDir }, error)
       // 临时目录创建失败时不阻断会话启动，回退到 cwd 让 SDK 仍有可写位置。
       return cwd
     }
@@ -1803,7 +1806,7 @@ export async function generateSessionTitle(userIntent: string | null): Promise<s
   const { config, error } = resolveSessionTitleApiConfig()
   if (!config) {
     if (error) {
-      console.warn('[cowork-title] Skip title generation due to missing API config:', error)
+      logger.warn('titleGeneration.skipped.missingApiConfig', undefined, error)
     }
     return fallbackTitle
   }
@@ -1817,9 +1820,12 @@ export async function generateSessionTitle(userIntent: string | null): Promise<s
         ? buildGeminiGenerateContentUrl(config.baseURL, config.model)
         : buildAnthropicMessagesUrl(config.baseURL)
     const prompt = `Generate a short title from this input, keep the same language, return plain text only (no markdown), and keep it within ${SESSION_TITLE_MAX_CHARS} characters: ${normalizedInput}`
-    console.warn(
-      `[cowork-title] Generating title: protocol=${config.protocol}, baseURL=${config.baseURL}, requestUrl=${url}, model=${config.model}`
-    )
+    logger.debug('titleGeneration.request.started', {
+      protocol: config.protocol,
+      baseURL: config.baseURL,
+      requestUrl: url,
+      model: config.model
+    })
 
     const response = await fetch(url, {
       method: 'POST',
@@ -1855,33 +1861,32 @@ export async function generateSessionTitle(userIntent: string | null): Promise<s
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => '')
-      console.warn(
-        '[cowork-title] Failed to generate title:',
-        response.status,
-        errorText.slice(0, 240)
-      )
+      logger.warn('titleGeneration.response.failed', {
+        status: response.status,
+        errorSnippet: errorText.slice(0, 240)
+      })
       return fallbackTitle
     }
 
     const payload = await response.json()
-    console.warn('[cowork-title] Title response payload:', JSON.stringify(payload).slice(0, 500))
+    logger.debug('titleGeneration.response.received', {
+      payloadSize: JSON.stringify(payload).length
+    })
     // 不同协议的响应结构不同，解析后仍统一经过 normalizeTitleToPlainText 清洗。
     // 这样即使模型返回 Markdown 或超长文本，最终落到 UI 的标题也保持稳定。
     const llmTitle =
       config.protocol === CoworkModelProtocol.GeminiNative
         ? extractTextFromGeminiResponse(payload)
         : extractTextFromAnthropicResponse(payload)
-    console.warn(`[cowork-title] Extracted title text: "${llmTitle}"`)
+    logger.debug('titleGeneration.title.extracted', { titleLength: llmTitle.length })
     return normalizeTitleToPlainText(llmTitle, fallbackTitle)
   } catch (titleError) {
     if (isAbortError(titleError)) {
       const timeoutSeconds = Math.ceil(SESSION_TITLE_TIMEOUT_MS / 1000)
-      console.warn(
-        `[cowork-title] Title generation timed out after ${timeoutSeconds}s. Using fallback title.`
-      )
+      logger.warn('titleGeneration.timeout', { timeoutSeconds })
       return fallbackTitle
     }
-    console.error('[cowork-title] Failed to generate session title:', titleError)
+    logger.error('titleGeneration.failed', undefined, titleError)
     return fallbackTitle
   } finally {
     clearTimeout(timeoutId)

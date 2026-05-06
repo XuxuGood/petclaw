@@ -5,6 +5,7 @@
 import { BrowserWindow } from 'electron'
 
 import type { ScheduledTaskMetaStore } from '../data/scheduled-task-meta-store'
+import { getLogger } from '../logging/facade'
 
 import type {
   Schedule,
@@ -19,6 +20,8 @@ import type {
   WakeMode
 } from './types'
 import { SchedulerIpcChannel } from './types'
+
+const logger = getLogger('CronJobService')
 
 type GatewayClientLike = {
   request: <T = Record<string, unknown>>(method: string, params?: unknown) => Promise<T>
@@ -441,7 +444,7 @@ export class CronJobService {
         this.emitFullRefresh()
       }
     } catch (error) {
-      console.warn('[CronJobService] Polling error:', error)
+      logger.warn('gateway.poll.failed', undefined, error)
     }
   }
 

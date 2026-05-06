@@ -31,7 +31,7 @@ import { registerMcpIpcHandlers, type McpIpcDeps } from './mcp-ipc'
 import { registerMemoryIpcHandlers, type MemoryIpcDeps } from './memory-ipc'
 import { registerSchedulerIpcHandlers, type SchedulerIpcDeps } from './scheduler-ipc'
 import { registerImIpcHandlers, type ImIpcDeps } from './im-ipc'
-import { registerLoggingIpcHandlers } from '../logging/logging-ipc'
+import { registerLoggingIpcHandlers } from './logging-ipc'
 
 // AllIpcDeps 合并全部模块的依赖接口，主进程统一注入
 export type AllIpcDeps = ChatIpcDeps &

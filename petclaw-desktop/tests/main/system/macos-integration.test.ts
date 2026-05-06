@@ -51,6 +51,13 @@ const electronMock = vi.hoisted(() => {
   }
 })
 
+const loggingMock = vi.hoisted(() => ({
+  debug: vi.fn(),
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn()
+}))
+
 vi.mock('electron', () => ({
   Menu: {
     buildFromTemplate: electronMock.buildFromTemplate,
@@ -60,6 +67,10 @@ vi.mock('electron', () => ({
   nativeImage: {
     createFromPath: electronMock.createFromPath
   }
+}))
+
+vi.mock('../../../src/main/logging/facade', () => ({
+  getLogger: () => loggingMock
 }))
 
 vi.mock('../../../src/main/i18n', () => ({
@@ -326,7 +337,6 @@ describe('macOS system integration', () => {
 
   it('logs a warning when Dock show fails', async () => {
     const actions = makeActions()
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     electronMock.showDock.mockRejectedValueOnce(new Error('dock unavailable'))
 
     initializeMacosIntegration({
@@ -335,11 +345,7 @@ describe('macOS system integration', () => {
     })
     await Promise.resolve()
 
-    expect(warn).toHaveBeenCalledWith(
-      '[MacosIntegration] failed to show Dock icon:',
-      expect.any(Error)
-    )
-    warn.mockRestore()
+    expect(loggingMock.warn).toHaveBeenCalledWith('dock.show.failed', undefined, expect.any(Error))
   })
 
   it('refreshes native menus without re-registering activate handlers or changing the Dock icon', () => {

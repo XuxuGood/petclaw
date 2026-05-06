@@ -5,6 +5,9 @@ import { app } from 'electron'
 
 import type { OpenclawEngineManager } from './engine-manager'
 import type { GatewayConnectionInfo } from './types'
+import { getLogger } from '../logging/facade'
+
+const logger = getLogger('Gateway', 'gateway')
 
 // ── GatewayClient duck-type 接口（从 runtime 动态加载）──
 
@@ -236,7 +239,12 @@ export class OpenclawGateway extends EventEmitter {
       this.gatewayClientEntryPath !== null &&
       this.gatewayClientEntryPath !== connectionInfo.clientEntryPath
     if (versionChanged || pathChanged) {
-      console.warn('[Gateway] version/path changed, disconnecting old client')
+      logger.warn('client.versionOrPath.changed', {
+        previousVersion: this.gatewayClientVersion,
+        nextVersion: connectionInfo.version ?? null,
+        previousEntryPath: this.gatewayClientEntryPath,
+        nextEntryPath: connectionInfo.clientEntryPath
+      })
       this.disconnect()
     }
 
@@ -334,9 +342,9 @@ export class OpenclawGateway extends EventEmitter {
 
   private scheduleGatewayReconnect(): void {
     if (this.gatewayReconnectAttempt >= OpenclawGateway.GATEWAY_RECONNECT_MAX_ATTEMPTS) {
-      console.error(
-        `[GatewayReconnect] max attempts reached (${OpenclawGateway.GATEWAY_RECONNECT_MAX_ATTEMPTS}), giving up`
-      )
+      logger.error('reconnect.maxAttempts.reached', {
+        maxAttempts: OpenclawGateway.GATEWAY_RECONNECT_MAX_ATTEMPTS
+      })
       return
     }
 
@@ -344,9 +352,11 @@ export class OpenclawGateway extends EventEmitter {
     const delay = delays[Math.min(this.gatewayReconnectAttempt, delays.length - 1)]
     this.gatewayReconnectAttempt++
 
-    console.warn(
-      `[GatewayReconnect] scheduling attempt ${this.gatewayReconnectAttempt}/${OpenclawGateway.GATEWAY_RECONNECT_MAX_ATTEMPTS} in ${delay}ms`
-    )
+    logger.warn('reconnect.scheduled', {
+      attempt: this.gatewayReconnectAttempt,
+      maxAttempts: OpenclawGateway.GATEWAY_RECONNECT_MAX_ATTEMPTS,
+      delayMs: delay
+    })
 
     this.gatewayReconnectTimer = setTimeout(() => {
       this.gatewayReconnectTimer = null
@@ -360,7 +370,7 @@ export class OpenclawGateway extends EventEmitter {
       await this.connectIfNeeded(this.lastConnectionInfo)
       this.gatewayReconnectAttempt = 0
     } catch (error) {
-      console.warn('[GatewayReconnect] reconnect failed:', error)
+      logger.warn('reconnect.failed', undefined, error)
       this.scheduleGatewayReconnect()
     }
   }
@@ -393,9 +403,10 @@ export class OpenclawGateway extends EventEmitter {
     const elapsed = Date.now() - this.lastTickTimestamp
     if (elapsed <= OpenclawGateway.TICK_TIMEOUT_MS) return
 
-    console.warn(
-      `[TickWatchdog] no tick for ${Math.round(elapsed / 1000)}s (threshold: ${OpenclawGateway.TICK_TIMEOUT_MS / 1000}s) — triggering reconnect`
-    )
+    logger.warn('tickWatchdog.timeout', {
+      elapsedMs: elapsed,
+      thresholdMs: OpenclawGateway.TICK_TIMEOUT_MS
+    })
     this.cancelGatewayReconnect()
     this.disconnect()
     this.gatewayReconnectAttempt = 0

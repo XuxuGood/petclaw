@@ -411,7 +411,18 @@ export function ChatInputBox({
       })
     } catch (err) {
       // 静默失败：对话框类错误不阻断用户，仅入库，避免涂屏
-      console.warn('[ChatInputBox] selectAttachments failed:', err)
+      void window.api.logging
+        .report({
+          level: 'warn',
+          module: 'ChatInputBox',
+          event: 'attachments.select.failed',
+          message: err instanceof Error ? err.message : 'Failed to select attachments',
+          fields: {
+            errorName: err instanceof Error ? err.name : typeof err,
+            errorMessage: err instanceof Error ? err.message : String(err)
+          }
+        })
+        .catch(() => undefined)
     }
   }
 

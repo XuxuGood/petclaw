@@ -3,7 +3,10 @@
 import { ipcMain } from 'electron'
 import type { IpcMainInvokeEvent, IpcMainEvent } from 'electron'
 
+import { getLogger } from '../logging/facade'
+
 const registered = new Set<string>()
+const logger = getLogger('IPCRegistry')
 
 // handle 模式（invoke/handle 请求-响应），重复注册时跳过并告警
 // 使用与 ipcMain.handle 相同的宽松签名，允许各 handler 自行声明具体参数类型
@@ -13,7 +16,7 @@ export function safeHandle(
   handler: (event: IpcMainInvokeEvent, ...args: any[]) => any
 ): void {
   if (registered.has(channel)) {
-    console.warn(`[IPC] channel "${channel}" already registered, skipping duplicate`)
+    logger.warn('channel.duplicate.skipped', { channel, mode: 'handle' })
     return
   }
   registered.add(channel)
@@ -27,7 +30,7 @@ export function safeOn(
   listener: (event: IpcMainEvent, ...args: any[]) => void
 ): void {
   if (registered.has(channel)) {
-    console.warn(`[IPC] channel "${channel}" already registered, skipping duplicate`)
+    logger.warn('channel.duplicate.skipped', { channel, mode: 'on' })
     return
   }
   registered.add(channel)
