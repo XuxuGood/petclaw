@@ -42,6 +42,25 @@ describe('SkillManager', () => {
     fs.rmSync(bundledDir, { recursive: true, force: true })
   })
 
+  it('ships the LobsterAI skill-creator package as the canonical builtin skill', () => {
+    const packageRoot = path.resolve(process.cwd(), 'skills', 'skill-creator')
+    const skillMdPath = path.join(packageRoot, 'SKILL.md')
+
+    expect(fs.existsSync(skillMdPath)).toBe(true)
+    expect(fs.existsSync(path.join(packageRoot, 'LICENSE.txt'))).toBe(true)
+    expect(fs.existsSync(path.join(packageRoot, 'agents'))).toBe(true)
+    expect(fs.existsSync(path.join(packageRoot, 'references'))).toBe(true)
+    expect(fs.existsSync(path.join(packageRoot, 'scripts'))).toBe(true)
+    expect(fs.existsSync(path.resolve(process.cwd(), 'skills', 'create-skill'))).toBe(false)
+    expect(fs.existsSync(path.resolve(process.cwd(), 'skills', 'skill-creator123'))).toBe(false)
+
+    const skillMd = fs.readFileSync(skillMdPath, 'utf8')
+    expect(skillMd).toContain('name: skill-creator')
+    expect(skillMd).toContain('version: 1.0.1')
+    expect(skillMd).not.toContain('QoderWork')
+    expect(skillMd).not.toContain('.qoderwork')
+  })
+
   it('should scan skills from directory', async () => {
     const skills = await manager.scan()
     expect(skills.length).toBe(2)

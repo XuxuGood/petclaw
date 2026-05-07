@@ -1,0 +1,8 @@
+{
+  "defaults": {
+    "skill-creator": {
+      "enabled": true,
+      "origin": "builtin"
+    }
+  }
+}
