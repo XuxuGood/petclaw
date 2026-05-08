@@ -43,14 +43,35 @@ describe('SkillManager', () => {
   })
 
   it('ships the LobsterAI skill-creator package as the canonical builtin skill', () => {
+    const skillsRoot = path.resolve(process.cwd(), 'skills')
     const packageRoot = path.resolve(process.cwd(), 'skills', 'skill-creator')
     const skillMdPath = path.join(packageRoot, 'SKILL.md')
+    const licensePath = path.join(packageRoot, 'LICENSE.txt')
+
+    expect(JSON.parse(fs.readFileSync(path.join(skillsRoot, 'skills.config.json'), 'utf8'))).toEqual({
+      defaults: {
+        'skill-creator': {
+          enabled: true,
+          origin: 'builtin'
+        }
+      }
+    })
 
     expect(fs.existsSync(skillMdPath)).toBe(true)
-    expect(fs.existsSync(path.join(packageRoot, 'LICENSE.txt'))).toBe(true)
+    expect(fs.existsSync(licensePath)).toBe(true)
     expect(fs.existsSync(path.join(packageRoot, 'agents'))).toBe(true)
     expect(fs.existsSync(path.join(packageRoot, 'references'))).toBe(true)
     expect(fs.existsSync(path.join(packageRoot, 'scripts'))).toBe(true)
+    expect(fs.existsSync(path.join(packageRoot, 'eval-viewer', 'viewer.html'))).toBe(true)
+    expect(fs.existsSync(path.join(packageRoot, 'eval-viewer', 'generate_review.py'))).toBe(true)
+    expect(fs.existsSync(path.join(packageRoot, 'assets', 'eval_review.html'))).toBe(true)
+    expect(fs.existsSync(path.join(packageRoot, 'scripts', 'package_skill.py'))).toBe(true)
+    expect(fs.existsSync(path.join(packageRoot, 'scripts', 'run_eval.py'))).toBe(true)
+    expect(fs.existsSync(path.join(packageRoot, 'scripts', 'run_loop.py'))).toBe(true)
+    expect(fs.existsSync(path.join(packageRoot, 'references', 'schemas.md'))).toBe(true)
+    expect(fs.existsSync(path.join(packageRoot, 'agents', 'analyzer.md'))).toBe(true)
+    expect(fs.existsSync(path.join(packageRoot, 'agents', 'comparator.md'))).toBe(true)
+    expect(fs.existsSync(path.join(packageRoot, 'agents', 'grader.md'))).toBe(true)
     expect(fs.existsSync(path.resolve(process.cwd(), 'skills', 'create-skill'))).toBe(false)
     expect(fs.existsSync(path.resolve(process.cwd(), 'skills', 'skill-creator123'))).toBe(false)
 
@@ -59,6 +80,12 @@ describe('SkillManager', () => {
     expect(skillMd).toContain('version: 1.0.1')
     expect(skillMd).not.toContain('QoderWork')
     expect(skillMd).not.toContain('.qoderwork')
+
+    const license = fs.readFileSync(licensePath, 'utf8')
+    expect(license).toContain('Apache License')
+    expect(license).toContain('Version 2.0, January 2004')
+    expect(license).toContain('TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION')
+    expect(license).toContain('END OF TERMS AND CONDITIONS')
   })
 
   it('should scan skills from directory', async () => {
