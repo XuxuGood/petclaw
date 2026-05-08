@@ -1,0 +1,41 @@
+examples:
+  - id: code-review-skill
+    title:
+      zh: 代码审查技能
+      en: Code review skill
+    description:
+      zh: 创建一个能按项目规范做代码审查的技能。
+      en: Create a skill that reviews code against project conventions.
+    prompt:
+      zh: 请帮我创建一个 PetClaw/OpenClaw 技能，用于审查代码改动，重点检查回归风险、测试缺口和架构契约。
+      en: Create a PetClaw/OpenClaw skill for reviewing code changes, focused on regression risks, test gaps, and architecture contracts.
+  - id: commit-message-skill
+    title:
+      zh: 提交信息技能
+      en: Commit message skill
+    description:
+      zh: 创建一个生成 Conventional Commits 提交信息的技能。
+      en: Create a skill that drafts Conventional Commits messages.
+    prompt:
+      zh: 请帮我创建一个 PetClaw/OpenClaw 技能，根据 git diff 生成清晰的 Conventional Commits 提交信息。
+      en: Create a PetClaw/OpenClaw skill that drafts clear Conventional Commits messages from a git diff.
+  - id: document-processing-skill
+    title:
+      zh: 文档处理技能
+      en: Document processing skill
+    description:
+      zh: 创建一个处理 PDF、Word 或 Markdown 文档的技能。
+      en: Create a skill for processing PDF, Word, or Markdown documents.
+    prompt:
+      zh: 请帮我创建一个 PetClaw/OpenClaw 技能，用于读取、整理和输出 PDF、Word 或 Markdown 文档内容。
+      en: Create a PetClaw/OpenClaw skill for reading, organizing, and producing PDF, Word, or Markdown document content.
+  - id: extract-from-conversation
+    title:
+      zh: 从对话沉淀技能
+      en: Extract from conversation
+    description:
+      zh: 将当前对话中反复出现的工作流沉淀成可复用技能。
+      en: Turn a repeated workflow from the current conversation into a reusable skill.
+    prompt:
+      zh: 请根据我们最近的对话，提炼一个可复用的 PetClaw/OpenClaw 技能，先总结触发场景、输入输出和必要资源。
+      en: Based on our recent conversation, extract a reusable PetClaw/OpenClaw skill and first summarize triggers, inputs, outputs, and required resources.

@@ -170,6 +170,55 @@ describe('SkillManager', () => {
     expect(skills.find((skill) => skill.id === 'docx')?.isBuiltIn).toBe(true)
   })
 
+  it('syncs skill-creator as a builtin skill and preserves bundled resources', async () => {
+    const bundledSkill = path.join(bundledDir, 'skill-creator')
+    const userRoot = path.join(tmpDir, 'user-skills')
+    fs.mkdirSync(path.join(bundledSkill, 'scripts'), { recursive: true })
+    fs.writeFileSync(
+      path.join(bundledSkill, 'SKILL.md'),
+      [
+        '---',
+        'name: skill-creator',
+        'description: Create skills',
+        'version: 1.0.1',
+        '---',
+        'Create PetClaw/OpenClaw skills.'
+      ].join('\n')
+    )
+    fs.writeFileSync(path.join(bundledSkill, 'LICENSE.txt'), 'Apache License\n')
+    fs.writeFileSync(path.join(bundledSkill, 'scripts', 'package_skill.py'), 'print("package")\n')
+    fs.writeFileSync(
+      path.join(bundledDir, 'skills.config.json'),
+      JSON.stringify({ defaults: { 'skill-creator': { enabled: true } } }, null, 2)
+    )
+
+    manager = new SkillManager(db, userRoot)
+    manager.syncBundledSkillsToUserData({ bundledRoot: bundledDir })
+    const skills = await manager.scan()
+
+    expect(skills).toContainEqual(
+      expect.objectContaining({
+        id: 'skill-creator',
+        name: 'skill-creator',
+        enabled: true,
+        isBuiltIn: true,
+        version: '1.0.1'
+      })
+    )
+    expect(fs.existsSync(path.join(userRoot, 'skill-creator', 'LICENSE.txt'))).toBe(true)
+    expect(fs.existsSync(path.join(userRoot, 'skill-creator', 'scripts', 'package_skill.py'))).toBe(
+      true
+    )
+    expect(
+      fs.readFileSync(path.join(userRoot, 'skills.config.json'), 'utf8')
+    ).toContain('skill-creator')
+    expect(
+      db.prepare('SELECT origin, enabled, missing FROM skill_installs WHERE id = ?').get(
+        'skill-creator'
+      )
+    ).toMatchObject({ origin: 'builtin', enabled: 1, missing: 0 })
+  })
+
   it('should skip bundled directories that are not declared in skills config defaults', () => {
     const declaredSkill = path.join(bundledDir, 'docx')
     fs.mkdirSync(declaredSkill, { recursive: true })
